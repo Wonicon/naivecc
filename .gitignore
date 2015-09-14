@@ -1,5 +1,6 @@
 *.yy.*
 *.tab.*
 *.o
-parser
 *.output
+parser
+lexier
