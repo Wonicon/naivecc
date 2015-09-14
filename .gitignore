@@ -1,2 +1,4 @@
 *.yy.c
 *.tab.c
+*.o
+parser
