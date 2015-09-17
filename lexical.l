@@ -71,7 +71,15 @@ TAB \t
 {OCT} { LOG(OCT); return OCT; }
 {INT} { LOG(INT); return INT; }
 {ID} { LOG(ID); return ID; }
-{TAB} { printf(" "); }
-{WS} { printf(" "); }
+{TAB} {
+#ifdef DEBUG
+    printf("  ");
+#endif
+      }
+{WS} {
+#ifdef DEBUG
+    printf(" ");
+#endif
+     }
 . { ErrorMsg(yytext, yylineno); exit(-1); }
 %%
