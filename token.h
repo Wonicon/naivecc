@@ -29,7 +29,7 @@ enum TOKEN_TYPE
     TYPE,      // int | float
     LP,        // (
     RP,        // )
-    LB         // [
+    LB,        // [
     RB,        // ]
     LC,        // {
     RC,        // }
