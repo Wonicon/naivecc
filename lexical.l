@@ -71,21 +71,18 @@ WS [[:blank:]]
 {IF} { LOG(IF); return IF; }
 {ELSE} { LOG(ELSE); return ELSE; }
 {WHILE} { LOG(WHILE); return WHILE; }
+{HEX} { return check_hex(yytext, yyleng, yylineno); }
+{OCT} { return check_oct(yytext, yyleng, yylineno); }
+{INT} { LOG(INT); return INT; }
+{ID} { LOG(ID); return ID; }
+"\n" { yylineno++; yycolumn = 1; }
+{WS} {}
 
-{HEX} {
-    int i;
-    // Jump over '0x'
-    for (i = 2; i < yyleng; i++) {
-        char ch = yytext[i];
-        if ((ch > 'f' && ch <= 'z') || (ch > 'F' && ch <= 'Z')) {
-            ErrorMsg("Illegal hexadecimal number", yytext, yylineno);
-            return 0;
-        }
-    }
-    LOG(HEX); return HEX;
-}
+. { ErrorMsg("Mysterious character", yytext, yylineno); return 0; }
+%%
 
-{OCT} {
+int check_oct(char *yytext, int yyleng, int yylineno)
+{
     int i;
     // all zero here is considered oct
     for (i = 0; i < yyleng; i++) {
@@ -99,17 +96,18 @@ WS [[:blank:]]
     return OCT;
 }
 
-{INT} { LOG(INT); return INT; }
-{ID} { LOG(ID); return ID; }
-{WS} {}
-
-\n {
-#ifdef DEBUG
-    putchar('\n');
-#endif
-    yylineno++;
-    yycolumn = 1;
+int check_hex(char *yytext, int yyleng, int yylineno)
+{
+    int i;
+    // Jump over '0x'
+    for (i = 2; i < yyleng; i++) {
+        char ch = yytext[i];
+        if ((ch > 'f' && ch <= 'z') || (ch > 'F' && ch <= 'Z')) {
+            ErrorMsg("Illegal hexadecimal number", yytext, yylineno);
+            return 0;
+        }
+    }
+    LOG(HEX);
+    return HEX;
 }
 
-. { ErrorMsg("Mysterious character", yytext, yylineno); return 0; }
-%%

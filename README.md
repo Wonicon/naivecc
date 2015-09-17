@@ -25,3 +25,13 @@ when compiled to generate parser......
 
 `%locations` and `YY_USER_ACTION` should be written in `syntax.y`, namely, the bison source file, and then include `lex.yy.c`!
 
+## 2015-09-18
+
+### always syntax error
+
+I forgot to add `HEX` and `OCT` in the production, and the newline seems having some problems.
+
+### syntax error at newline
+
+Because the project folder was first opened under windows, we get '^M' at the end of line.
+

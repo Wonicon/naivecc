@@ -1,5 +1,6 @@
 %locations
 %{
+    //#define YYDEBUG 1
     #include <stdio.h>
 
     #define YY_USER_ACTION\
@@ -143,6 +144,8 @@ Exp : Exp ASSIGNOP Exp
     | ID
     | INT
     | FLOAT
+    | HEX
+    | OCT
     ;
 Args : Exp COMMA Args
      | Exp
