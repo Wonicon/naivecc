@@ -46,8 +46,14 @@ enum TOKEN_TYPE
 
 static inline void ErrorMsg(char *msg, int lineno)
 {
-    fprintf(stderr, "Error type A at Line %d: Mysterious character \"%s\"",
+#ifndef DEBUG
+#define FD stderr
+#else
+#define FD stdout
+#endif
+    fprintf(FD, "Error type A at Line %d: Mysterious character \"%s\"",
             lineno, msg);
+#undef FD
 }
 
 #endif
