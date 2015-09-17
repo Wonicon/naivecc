@@ -4,11 +4,10 @@
 // The sheer lexical analyzer does not need it.
 // The DEBUG macro should be defined in compile command
 #include "syntax.tab.h"
-#endif
-
+#else
 #include "token.h"
 #include "debug.h"
-//{AAA} { LOG(AAA); return AAA; }
+#endif
 %}
 
 %option yylineno
@@ -47,7 +46,6 @@ IF if
 ELSE else
 WHILE while
 WS [[:blank:]]
-TAB \t
 %%
 {SEMI} { LOG(SEMI); return SEMI; }
 {COMMA} { LOG(COMMA); return COMMA; }
@@ -77,15 +75,7 @@ TAB \t
 {OCT} { LOG(OCT); return OCT; }
 {INT} { LOG(INT); return INT; }
 {ID} { LOG(ID); return ID; }
-{TAB} {
-#ifdef DEBUG
-    printf("  ");
-#endif
-      }
-{WS} {
-#ifdef DEBUG
-    printf(" ");
-#endif
-     }
+{WS} {}
+\n { LOG(\n); yylineno++; }
 . { ErrorMsg(yytext, yylineno); exit(-1); }
 %%
