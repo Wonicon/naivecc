@@ -1,3 +1,9 @@
+%{
+#define DEBUG
+#include "token.h"
+#include "debug.h"
+%}
+
 digit [0-9]
 letter [a-zA-Z]
 number {digit}+
