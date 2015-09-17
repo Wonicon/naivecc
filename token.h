@@ -3,7 +3,7 @@
 
 enum TOKEN_TYPE
 {
-    INT,       // A sequence of digits without spaces
+    INT = 1,   // A sequence of digits without spaces
 
     FLOAT,     // A real number consisting of digits and one 
                // decimal point. The decimal point must be
@@ -41,5 +41,11 @@ enum TOKEN_TYPE
     OCT,       // oct number satrts with 0
     HEX,       // hex number starts with 0x | 0X
 };
+
+static inline void ErrorMsg(char *msg, int lineno)
+{
+    fprintf(stderr, "Error type A at Line %d: Mysterious character \"%s\"",
+            lineno, msg);
+}
 
 #endif
