@@ -21,3 +21,7 @@ But it is suggested not modifying the original commands in makefile, and I notic
 with no for loop initialier and other benefits. If I using the default compile options, the `lex.yy.c` will finally come up with errors
 when compiled to generate parser......
 
+### parser
+
+`%locations` and `YY_USER_ACTION` should be written in `syntax.y`, namely, the bison source file, and then include `lex.yy.c`!
+

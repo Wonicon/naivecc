@@ -1,5 +1,6 @@
 *.yy.*
 *.tab.*
+*.swp
 *.o
 *.output
 parser

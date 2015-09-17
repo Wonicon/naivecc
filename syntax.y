@@ -1,6 +1,16 @@
+%locations
 %{
-#include <stdio.h>
+    #include <stdio.h>
+
+    #define YY_USER_ACTION\
+    yylloc.first_line = yylloc.last_line = yylineno;\
+    yylloc.first_column = yycolumn;\
+    yylloc.last_column = yycolumn + yyleng - 1;\
+    yycolumn += yyleng;
+
+    #include "lex.yy.c"
 %}
+
 
 /* declared types */
 %union {
@@ -27,9 +37,6 @@
 %token IF ELSE
 %token WHILE
 
-/* delcared non-terminals */
-%type <type_double> Exp Factor Term
-
 %%
 
 /* High-level Definitions */
@@ -44,7 +51,7 @@ ExtDefList : ExtDef ExtDefList
 
 ExtDef : Specifier ExtDecList SEMI
        | Specifier SEMI /* int; ??? */
-       | Speicfier FunDec CompSt
+       | Specifier FunDec CompSt
        ;
 
 ExtDecList : VarDec
@@ -58,7 +65,7 @@ Specifier : TYPE
           ;
 
 StructSpecifier : STRUCT OptTag LC DefList RC
-                : STRUCT Tag
+                | STRUCT Tag
                 ;
 
 
@@ -73,71 +80,71 @@ Tag : ID
 /* Declarators */
 
 VarDec : ID
-       : VarDec LB INT RB /* a[8] */
+       | VarDec LB INT RB /* a[8] */
        ;
 
 FunDec : ID LP VarList RP /* func(...) */
-       : ID LP RP /* func() */
+       | ID LP RP /* func() */
        ;
 
+ParamDec : Specifier VarDec
+         ;
+
 VarList : ParamDec COMMA VarList /* int,int */
-        : ParamDec /* only one */
+        | ParamDec /* only one */
         ;
-
-PramamDec : Specifier VarDec
-          ;
-
 /* Statements */
 
 CompSt : LC DefList StmtList RC
        ;
 
 StmtList : Stmt StmtList
-         : /* empty */
+         | /* empty */
          ;
 
 Stmt : Exp SEMI
-     : CompSt
-     : RETURN Exp SEMI
-     : IF LP Exp RP Stmt
-     : IF LP Exp RP Stmt ELSE Stmt
-     : WHILE LP Exp RP Stmt
+     | CompSt
+     | RETURN Exp SEMI
+     | IF LP Exp RP Stmt
+     | IF LP Exp RP Stmt ELSE Stmt
+     | WHILE LP Exp RP Stmt
      ;
 
 /* Local Definitions */
 
 DefList : Def DefList
-        :
+        |
         ;
 Def : Specifier DecList SEMI
     ;
 DecList : Dec
-        : Dec COMMA DecList
+        | Dec COMMA DecList
         ;
 Dec : VarDec
-    : VarDec ASSIGNOP Exp
+    | VarDec ASSIGNOP Exp
     ;
 
 /* Expressions */
 Exp : Exp ASSIGNOP Exp
-    : Exp AND Exp
-    : Exp OR Exp
-    : Exp RELOP Exp
-    : Exp PLUS Exp
-    : Exp MINUS Exp
-    : Exp STAR Exp
-    : Exp DIV Exp
-    : LP Exp RP
-    : MINUS Exp
-    : NOT Exp
-    : ID LP Args RP
-    : ID LP RP
-    : Exp LB Exp RB
-    : Exp DOT ID
-    : ID
-    : INT
-    : FLOAT
+    | Exp AND Exp
+    | Exp OR Exp
+    | Exp RELOP Exp
+    | Exp PLUS Exp
+    | Exp MINUS Exp
+    | Exp STAR Exp
+    | Exp DIV Exp
+    | LP Exp RP
+    | MINUS Exp
+    | NOT Exp
+    | ID LP Args RP
+    | ID LP RP
+    | Exp LB Exp RB
+    | Exp DOT ID
+    | ID
+    | INT
+    | FLOAT
     ;
 Args : Exp COMMA Args
-     : Exp
+     | Exp
      ;
+%%
