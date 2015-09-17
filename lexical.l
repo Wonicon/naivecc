@@ -14,12 +14,11 @@
 
 digit [0-9]
 letter [a-zA-Z]
-number {digit}+
 
 ID ({letter}|_)({letter}|{digit}|_)*
-INT 0+|[1-9][0-9]*
-OCT 0[1-7][0-7]*
-HEX 0(x|X)[0-9a-fA-F]+
+INT 0|[1-9][0-9]*
+OCT 0[0-9]+
+HEX 0(x|X)({digit}|{letter})+
 
 SEMI ;
 COMMA ,
@@ -71,11 +70,42 @@ WS [[:blank:]]
 {IF} { LOG(IF); return IF; }
 {ELSE} { LOG(ELSE); return ELSE; }
 {WHILE} { LOG(WHILE); return WHILE; }
-{HEX} { LOG(HEX); return HEX; }
-{OCT} { LOG(OCT); return OCT; }
+
+{HEX} {
+    // Jump over '0x'
+    for (int i = 2; i < yyleng; i++) {
+        char ch = yytext[i];
+        if ((ch > 'f' && ch <= 'z') || (ch > 'F' && ch <= 'Z')) {
+            ErrorMsg("Illegal hexadecimal number", yytext, yylineno);
+            return 0;
+        }
+    }
+    LOG(HEX); return HEX;
+}
+
+{OCT} {
+    // all zero here is considered oct
+    for (int i = 0; i < yyleng; i++) {
+        char ch = yytext[i];
+        if (ch == '8' || ch == '9') {
+            ErrorMsg("Illegal octal number", yytext, yylineno);
+            return 0;
+        }
+    }
+    LOG(OCT);
+    return OCT;
+}
+
 {INT} { LOG(INT); return INT; }
 {ID} { LOG(ID); return ID; }
 {WS} {}
-\n { LOG(\n); yylineno++; }
-. { ErrorMsg(yytext, yylineno); exit(-1); }
+
+\n {
+#ifdef DEBUG
+    putchar('\n');
+#endif
+    yylineno++;
+}
+
+. { ErrorMsg("Mysterious character", yytext, yylineno); return 0; }
 %%
