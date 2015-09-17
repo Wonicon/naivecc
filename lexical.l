@@ -1,5 +1,11 @@
 %{
-#define DEBUG
+#ifndef DEBUG
+// This header file will generate with default `make'
+// The sheer lexical analyzer does not need it.
+// The DEBUG macro should be defined in compile command
+#include "syntax.tab.h"
+#endif
+
 #include "token.h"
 #include "debug.h"
 //{AAA} { LOG(AAA); return AAA; }

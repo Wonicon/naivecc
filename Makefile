@@ -21,7 +21,7 @@ parser: syntax $(filter-out $(LFO),$(OBJS))
 	$(CC) -o parser $(filter-out $(LFO),$(OBJS)) -lfl -ly
 
 play: lexical
-	$(CC) -o play $(LFC) -lfl
+	$(CC) -o play $(LFC) -lfl -DDEBUG
 
 syntax: lexical syntax-c
 	$(CC) -c $(YFC) -o $(YFO)

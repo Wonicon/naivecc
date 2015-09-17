@@ -1,6 +1,7 @@
 #ifndef __TOKEN_H__
 #define __TOKEN_H__
 
+#ifdef DEBUG
 enum TOKEN_TYPE
 {
     INT = 1,   // A sequence of digits without spaces
@@ -41,6 +42,7 @@ enum TOKEN_TYPE
     OCT,       // oct number satrts with 0
     HEX,       // hex number starts with 0x | 0X
 };
+#endif
 
 static inline void ErrorMsg(char *msg, int lineno)
 {
