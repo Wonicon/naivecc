@@ -21,7 +21,7 @@ parser: syntax $(filter-out $(LFO),$(OBJS))
 	$(CC) -o parser $(filter-out $(LFO),$(OBJS)) -lfl -ly
 
 play: lexical
-	$(CC) -o play $(LFC) -lfl -DDEBUG
+	$(CC) -std=gnu99 -o play $(LFC) -lfl -DDEBUG
 
 syntax: lexical syntax-c
 	$(CC) -c $(YFC) -o $(YFO)
@@ -39,7 +39,7 @@ syntax-c: $(YFILE)
 test:
 	./parser ../Test/test1.cmm
 clean:
-	rm -f parser lex.yy.c syntax.tab.c syntax.tab.h syntax.output
+	rm -f parser play lex.yy.c syntax.tab.c syntax.tab.h syntax.output
 	rm -f $(OBJS) $(OBJS:.o=.d)
 	rm -f $(LFC) $(YFC) $(YFC:.c=.h)
 	rm -f *~
