@@ -72,8 +72,9 @@ WS [[:blank:]]
 {WHILE} { LOG(WHILE); return WHILE; }
 
 {HEX} {
+    int i;
     // Jump over '0x'
-    for (int i = 2; i < yyleng; i++) {
+    for (i = 2; i < yyleng; i++) {
         char ch = yytext[i];
         if ((ch > 'f' && ch <= 'z') || (ch > 'F' && ch <= 'Z')) {
             ErrorMsg("Illegal hexadecimal number", yytext, yylineno);
@@ -84,8 +85,9 @@ WS [[:blank:]]
 }
 
 {OCT} {
+    int i;
     // all zero here is considered oct
-    for (int i = 0; i < yyleng; i++) {
+    for (i = 0; i < yyleng; i++) {
         char ch = yytext[i];
         if (ch == '8' || ch == '9') {
             ErrorMsg("Illegal octal number", yytext, yylineno);
