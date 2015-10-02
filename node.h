@@ -1,14 +1,9 @@
-#ifndef __NODE_H__
-#define __NODE_H__
-
-typedef enum {
-    NODE_VALUE_INT,
-    NODE_VALUE_DOUBLE,
-    NODE_VALUE_ID,
-} node_val_t;
+#ifndef NODE_H
+#define NODE_H
 
 typedef struct Node {
-    node_val_t type;
+    int type;
+    int code;
     union {
         int i;
         float f;
@@ -19,5 +14,5 @@ typedef struct Node {
 } node_t;
 
 int add_node(node_t *src, int n, ...);
-
-#endif /* __NODE_H__ */
+node_t *new_node(int type);
+#endif /* NODE_H */

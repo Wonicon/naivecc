@@ -1,14 +1,27 @@
 %{
-// This header file will generate with default `make'
-// The sheer lexical analyzer does not need it.
-// The DEBUG macro should be defined in compile command
+
 #include "node.h"
 #include "syntax.tab.h"
 #include "token.h"
 #include "debug.h"
 #include <stdio.h>
 #include <stdlib.h>
+
 int yycolumn = 1;
+
+#ifndef DEBUG
+#define Type enum yytokentype
+#else
+#define Type enum TOKEN_Type
+#endif
+
+Type lex_handle(Type type);
+
+/*
+ * Wrapper of lex_handle aimed to use LOG
+ */
+#define HANDLE(type) { LOG(type); return lex_handle(type); }
+
 %}
 
 
@@ -17,11 +30,7 @@ int yycolumn = 1;
 digit [0-9]
 letter [a-zA-Z]
 
-ID ({letter}|_)({letter}|{digit}|_)*
-INT 0|[1-9][0-9]*
-OCT 0[0-9]+
-HEX 0(x|X)({digit}|{letter})+
-
+/* READ START */
 SEMI ;
 COMMA ,
 ASSIGNOP =
@@ -46,51 +55,59 @@ RETURN return
 IF if
 ELSE else
 WHILE while
+ID ({letter}|_)({letter}|{digit}|_)*
+/* READ END */
+HEX 0(x|X)({digit}|{letter})+
+OCT 0[0-9]+
+INT 0|[1-9][0-9]*
 WS [[:blank:]]
+
 %%
-{SEMI} { LOG(SEMI); return SEMI; }
-{COMMA} { LOG(COMMA); return COMMA; }
-{ASSIGNOP} { LOG(ASSIGNOP); return ASSIGNOP; }
-{RELOP} { LOG(RELOP); return RELOP; }
-{PLUS} { LOG(PLUS); return PLUS; }
-{MINUS} { LOG(MINUS); return MINUS; }
-{STAR} { LOG(STAR); return STAR; }
-{DIV} { LOG(DIV); return DIV; }
-{AND} { LOG(AND); return AND; }
-{OR} { LOG(OR); return OR; }
-{DOT} { LOG(DOT); return DOT; }
-{NOT} { LOG(NOT); return NOT; }
-{TYPE} { LOG(TYPE); return TYPE; }
-{LP} { LOG(LP); return LP; }
-{RP} { LOG(RP); return RP; }
-{LB} { LOG(LB); return LB; }
-{RB} { LOG(RB); return RB; }
-{LC} { LOG(LC); return LC; }
-{RC} { LOG(RC); return RC; }
-{STRUCT} { LOG(STRUCT); return STRUCT; }
-{RETURN} { LOG(RETURN); return RETURN; }
-{IF} { LOG(IF); return IF; }
-{ELSE} { LOG(ELSE); return ELSE; }
-{WHILE} { LOG(WHILE); return WHILE; }
-{HEX} { return check_hex(yytext, yyleng, yylineno); }
-{OCT} { return check_oct(yytext, yyleng, yylineno); }
-{INT} {
-    LOG(INT);
-    yylval.nd = (node_t *)malloc(sizeof(node_t));
-    yylval.nd->val.i = atoi(yytext);
+
+{SEMI}      HANDLE(SEMI)
+{COMMA}     HANDLE(COMMA)
+{ASSIGNOP}  HANDLE(ASSIGNOP)
+{RELOP}     HANDLE(RELOP)
+{PLUS}      HANDLE(PLUS)
+{MINUS}     HANDLE(MINUS)
+{STAR}      HANDLE(STAR)
+{DIV}       HANDLE(DIV)
+{AND}       HANDLE(AND)
+{OR}        HANDLE(OR)
+{DOT}       HANDLE(DOT)
+{NOT}       HANDLE(NOT)
+{TYPE}      HANDLE(TYPE)
+{LP}        HANDLE(LP)
+{RP}        HANDLE(RP)
+{LB}        HANDLE(LB)
+{RB}        HANDLE(RB)
+{LC}        HANDLE(LC)
+{RC}        HANDLE(RC)
+{STRUCT}    HANDLE(STRUCT)
+{RETURN}    HANDLE(RETURN)
+{IF}        HANDLE(IF)
+{ELSE}      HANDLE(ELSE)
+{WHILE}     HANDLE(WHILE)
+{ID}        HANDLE(ID)
+{HEX}       {
+    yylval.nd = new_node(INT - FLOAT + 3);
+    yylval.nd->val.i = strtol(yytext, NULL, 16);
     return INT;
-      }
-{ID} { 
-    LOG(ID);
-    yylval.nd = (node_t *)malloc(sizeof(node_t));
-    yylval.nd->type = NODE_VALUE_ID;
-    yylval.nd->val.s = strdup(yytext);
-    return ID;
-     }
+            }
+{OCT}       {
+    yylval.nd = new_node(INT - FLOAT + 3);
+    yylval.nd->val.i = strtol(yytext, NULL, 8);
+    return INT;
+            }
+{INT}       {
+    yylval.nd = new_node(INT - FLOAT + 3);
+    yylval.nd->val.i = strtol(yytext, NULL, 10);
+    return INT;
+            }
 "\n" { yylineno++; yycolumn = 1; }
 {WS} {}
-
 . { ErrorMsg("Mysterious character", yytext, yylineno); return 0; }
+
 %%
 
 int check_oct(char *yytext, int yyleng, int yylineno)
@@ -127,3 +144,19 @@ int check_hex(char *yytext, int yyleng, int yylineno)
     return INT;
 }
 
+/*
+ * lex_handle : the common handle routine
+ * PARAM type : the type of the lexeme
+ * RETURN     : the type of the lexeme 
+ */
+Type lex_handle(Type type)
+{
+    // Currently FLOAT is the first token defined in syntax.y
+    // In lexical phase we don't pay attention to non-terminals
+    yylval.nd = new_node(type - FLOAT + 3);
+    switch (type) {
+        case TYPE: yylval.nd->val.s = strdup(yytext); break;
+        case ID: yylval.nd->val.s = strdup(yytext); break;
+    }
+    return type;
+}

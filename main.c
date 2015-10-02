@@ -3,6 +3,8 @@
 extern int yyrestart(FILE *);
 extern int yyparse();
 extern int yydebug;
+extern void ast();
+
 int main(int argc, char *argv[])
 {
     if (argc <= 1) return 1;
@@ -13,7 +15,8 @@ int main(int argc, char *argv[])
         return 1;
     }
     yyrestart(f);
-    yydebug = 1;
+    //yydebug = 1;
     yyparse();
+    ast();
     return 0;
 }
