@@ -1,48 +1,72 @@
 %locations
 %{
-    //#define YYDEBUG 1
-    #include <stdio.h>
+#include "node.h"
+static node_t prog;
 
-    #define YY_USER_ACTION\
-    yylloc.first_line = yylloc.last_line = yylineno;\
-    yylloc.first_column = yycolumn;\
-    yylloc.last_column = yycolumn + yyleng - 1;\
-    yycolumn += yyleng;
+#define YYDEBUG 1
+#include <stdio.h>
 
-    #include "lex.yy.c"
+#define YY_USER_ACTION\
+yylloc.first_line = yylloc.last_line = yylineno;\
+yylloc.first_column = yycolumn;\
+yylloc.last_column = yycolumn + yyleng - 1;\
+yycolumn += yyleng;
+
+#include "lex.yy.c"
 %}
 
 
 /* declared types */
 %union {
-    int type_int;
-    float type_float;
+    node_t *nd;
 }
 
 /* declared tokens */
-%token <type_int> INT OCT HEX
-%token <type_float> FLOAT
-%token ID
-%token SEMI COMMA
-%token ASSIGNOP
-%token RELOP
-%token PLUS MINUS STAR DIV
-%token AND OR NOT
-%token DOT
-%token TYPE
-%token LP RP
-%token LB RB
-%token LC RC
-%token STRUCT
-%token RETURN
-%token IF ELSE
-%token WHILE
+%token <nd>
+    INT
+    FLOAT
+    ID
+    ASSIGNOP
+    RELOP
+    PLUS MINUS STAR DIV
+    AND OR NOT
+    DOT
+    TYPE
+    LB RB
+    STRUCT
+    RETURN
+    IF ELSE
+    WHILE
+%token
+    LP RP
+    LC RC
+    SEMI COMMA
 
+%type <nd>
+    Program
+    ExtDefList
+    ExtDef
+    Specifier
+    StructSpecifier
+    OptTag
+    Tag
+    VarDec
+    FunDec
+    ParamDec
+    VarList
+    CompSt
+    StmtList
+    Stmt
+    DefList
+    DecList
+    Dec
+    Exp
+    Args
 %%
 
 /* High-level Definitions */
 
-Program : ExtDefList
+Program : ExtDefList { printf("You should print something!\n"); }
         ;
 
 ExtDefList : ExtDef ExtDefList
@@ -118,15 +142,16 @@ DefList : Def DefList
         ;
 Def : Specifier DecList SEMI
     ;
+
 DecList : Dec
         | Dec COMMA DecList
         ;
-Dec : VarDec
-    | VarDec ASSIGNOP Exp
+Dec : VarDec { printf("VarDec %s\n", $1->val.s); }
+    | VarDec ASSIGNOP Exp { printf("Assignment!\n"); }
     ;
 
 /* Expressions */
-Exp : Exp ASSIGNOP Exp
+Exp : Exp ASSIGNOP Exp { printf("Exp ASSIGN!\n"); }
     | Exp AND Exp
     | Exp OR Exp
     | Exp RELOP Exp
@@ -141,11 +166,9 @@ Exp : Exp ASSIGNOP Exp
     | ID LP RP
     | Exp LB Exp RB
     | Exp DOT ID
-    | ID
-    | INT
+    | ID  { printf("What is ID? %s\n", $1->val.s); }
+    | INT { printf("%s:Found INT %d\n", __FUNCTION__, $1->val.i); }
     | FLOAT
-    | HEX
-    | OCT
     ;
 Args : Exp COMMA Args
      | Exp

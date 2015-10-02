@@ -1,13 +1,14 @@
 %{
-    #ifndef DEBUG
-    // This header file will generate with default `make'
-    // The sheer lexical analyzer does not need it.
-    // The DEBUG macro should be defined in compile command
-    #include "syntax.tab.h"
-    #endif
-    #include "token.h"
-    #include "debug.h"
-    int yycolumn = 1;
+// This header file will generate with default `make'
+// The sheer lexical analyzer does not need it.
+// The DEBUG macro should be defined in compile command
+#include "node.h"
+#include "syntax.tab.h"
+#include "token.h"
+#include "debug.h"
+#include <stdio.h>
+#include <stdlib.h>
+int yycolumn = 1;
 %}
 
 
@@ -73,8 +74,19 @@ WS [[:blank:]]
 {WHILE} { LOG(WHILE); return WHILE; }
 {HEX} { return check_hex(yytext, yyleng, yylineno); }
 {OCT} { return check_oct(yytext, yyleng, yylineno); }
-{INT} { LOG(INT); return INT; }
-{ID} { LOG(ID); return ID; }
+{INT} {
+    LOG(INT);
+    yylval.nd = (node_t *)malloc(sizeof(node_t));
+    yylval.nd->val.i = atoi(yytext);
+    return INT;
+      }
+{ID} { 
+    LOG(ID);
+    yylval.nd = (node_t *)malloc(sizeof(node_t));
+    yylval.nd->type = NODE_VALUE_ID;
+    yylval.nd->val.s = strdup(yytext);
+    return ID;
+     }
 "\n" { yylineno++; yycolumn = 1; }
 {WS} {}
 
@@ -93,7 +105,9 @@ int check_oct(char *yytext, int yyleng, int yylineno)
         }
     }
     LOG(OCT);
-    return OCT;
+    yylval.nd = (node_t *)malloc(sizeof(node_t));
+    yylval.nd->val.i = strtol(yytext, NULL, 16);
+    return INT;
 }
 
 int check_hex(char *yytext, int yyleng, int yylineno)
@@ -108,6 +122,8 @@ int check_hex(char *yytext, int yyleng, int yylineno)
         }
     }
     LOG(HEX);
-    return HEX;
+    yylval.nd = (node_t *)malloc(sizeof(node_t));
+    yylval.nd->val.i = strtol(yytext, NULL, 8);
+    return INT;
 }
 

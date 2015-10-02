@@ -1,0 +1,4 @@
+int a = 1;
+int main() {
+    int abb = 20;
+}
