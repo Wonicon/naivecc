@@ -185,7 +185,7 @@ VarList : ParamDec COMMA VarList { BODY_111(VarList, $$, $1, $2, $3); }
         ;
 /* Statements */
 
-CompSt : LC DefList StmtList RC
+CompSt : LC DefList StmtList RC { BODY_1111(CompSt, $$, $1, $2, $3, $4); }
        ;
 
 StmtList : Stmt StmtList { BODY_11(StmtList, $$, $1, $2); }
@@ -248,6 +248,9 @@ void midorder(node_t *nd, int level)
     printf("%*s%s", level * 2, "", yytname[nd->type]);
     if (nd->type == YY_TYPE || nd->type == YY_ID) {
         printf(": %s", nd->val.s);
+    }
+    else if (nd->type == YY_INT) {
+        printf(": %d", nd->val.i);
     }
     putchar('\n');
     midorder(nd->child, level + 1);
