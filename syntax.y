@@ -67,7 +67,7 @@ static node_t *prog;
     LB RB
     STRUCT
     RETURN
-    IF ELSE
+    IF ELSE SUB_ELSE
     WHILE
     LP RP
     LC RC
@@ -96,6 +96,10 @@ static node_t *prog;
     Dec
     Exp
     Args
+
+/* Handle shift/reduce conflict of if-if-else */
+%nonassoc SUB_ELSE /* a fake token used to define the precedence of a production */
+%nonassoc ELSE     /* use nonassoc to define precedence only */
 
 /* Handle ambiguity according to Appendix A */
 %right ASSIGNOP
@@ -178,12 +182,12 @@ StmtList : Stmt StmtList { LINK_NULL(StmtList, 2); }
          |               { $$ = NULL; }
          ;
 
-Stmt : Exp SEMI                     { LINK(Stmt, 2); }
-     | CompSt                       { LINK(Stmt, 1); }
-     | RETURN Exp SEMI              { LINK(Stmt, 3); }
-     | IF LP Exp RP Stmt            { LINK(Stmt, 5); }
-     | IF LP Exp RP Stmt ELSE Stmt  { LINK(Stmt, 6); }
-     | WHILE LP Exp RP Stmt         { LINK(Stmt, 5); }
+Stmt : Exp SEMI                         { LINK(Stmt, 2); }
+     | CompSt                           { LINK(Stmt, 1); }
+     | RETURN Exp SEMI                  { LINK(Stmt, 3); }
+     | IF LP Exp RP Stmt %prec SUB_ELSE { LINK(Stmt, 5); }
+     | IF LP Exp RP Stmt ELSE Stmt      { LINK(Stmt, 6); }
+     | WHILE LP Exp RP Stmt             { LINK(Stmt, 5); }
      ;
 
 /* Local Definitions */
