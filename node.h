@@ -4,6 +4,8 @@
 typedef struct Node {
     int type;
     int code;
+    int lineno;
+    int colno;
     union {
         int i;
         float f;

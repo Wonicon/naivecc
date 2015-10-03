@@ -3,5 +3,6 @@
 *.swp
 *.o
 *.output
+*.cmm
 parser
 play

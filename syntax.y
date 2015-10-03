@@ -6,13 +6,6 @@ static node_t *prog;
 
 #define YYDEBUG 1
 #include <stdio.h>
-
-#define YY_USER_ACTION\
-yylloc .first_line = yylloc.last_line = yylineno;\
-yylloc .first_column = yycolumn;\
-yylloc .last_column = yycolumn + yyleng - 1;\
-yycolumn += yyleng;
-
 #include "lex.yy.c"
 
 #define S(x) # x
@@ -74,6 +67,37 @@ yycolumn += yyleng;
     if (BD4 != NULL) BD4->sibling = BD5;\
 }while(0)
 
+#define LINK(x, n) do {\
+    yyval.nd = new_node(name(x));\
+    yyval.nd->lineno = yyloc.first_line;\
+    yyval.nd->child = yyvsp[1 - n].nd;\
+    node_t *cur = yyvsp[1 - n].nd;\
+    cur->sibling = NULL;\
+    int i = 2;\
+    while (i <= n) {\
+        cur->sibling = yyvsp[i - n].nd;\
+        cur = cur->sibling;\
+        i++;\
+    }\
+}while(0)
+
+#define LINK_NULL(x, n) do {\
+    yyval.nd = new_node(name(x));\
+    yyval.nd->lineno = yyloc.first_line;\
+    yyval.nd->child = yyvsp[1 - n].nd;\
+    node_t *cur = yyvsp[1 - n].nd;\
+    cur->sibling = NULL;\
+    int i = 2;\
+    while (i <= n) {\
+        if (yyvsp[i - n].nd != NULL) {\
+            cur->sibling = yyvsp[i - n].nd;\
+            cur = cur->sibling;\
+        }\
+        i++;\
+    }\
+}while(0)
+
+
 %}
 
 
@@ -131,112 +155,112 @@ yycolumn += yyleng;
 /* nonterminal start */
 /* High-level Definitions */
 
-Program : ExtDefList { BODY_1(Program, $$, $1); prog = $$; }
+Program : ExtDefList { LINK_NULL(Program, 1); prog = $$; }
         ;
 
-ExtDefList : ExtDef ExtDefList { BODY_11(ExtDefList, $$, $1, $2); }
+ExtDefList : ExtDef ExtDefList { LINK_NULL(ExtDefList, 2); }
            |                   { $$ = NULL; }
            ;
 
 
-ExtDef : Specifier ExtDecList SEMI { BODY_111(ExtDef, $$, $1, $2, $3); }
-       | Specifier SEMI            { BODY_11(ExtDef, $$, $1, $2); }
-       | Specifier FunDec CompSt   { BODY_111(ExtDef, $$, $1, $2, $3); }
+ExtDef : Specifier ExtDecList SEMI { LINK(ExtDef, 3); }
+       | Specifier SEMI            { LINK(ExtDef, 2); }
+       | Specifier FunDec CompSt   { LINK(ExtDef, 3); }
        ;
 
-ExtDecList : VarDec                  { BODY_1(ExtDecList, $$, $1); }
-           | VarDec COMMA ExtDecList { BODY_111(ExtDecList, $$, $1, $2, $3); }
+ExtDecList : VarDec                  { LINK(ExtDecList, 1); }
+           | VarDec COMMA ExtDecList { LINK(ExtDecList, 3); }
            ;
 
 /* Specifiers */
 
-Specifier : TYPE            { BODY_1(Specifier, $$, $1); }
-          | StructSpecifier { BODY_1(Specifier, $$, $1); }
+Specifier : TYPE            { LINK(Specifier, 1); }
+          | StructSpecifier { LINK(Specifier, 1); }
           ;
 
-StructSpecifier : STRUCT OptTag LC DefList RC { BODY_10101(StructSpecifier, $$, $1, $2, $3, $4, $5); }
-                | STRUCT Tag                  { BODY_11(StructSpecifier, $$, $1, $2); }
+StructSpecifier : STRUCT OptTag LC DefList RC { LINK_NULL(StructSpecifier, 5); }
+                | STRUCT Tag                  { LINK(StructSpecifier, 2); }
                 ;
 
 
 /* Because struct {...} is allowed */
-OptTag : ID { BODY_1(OptTag, $$, $1); }
+OptTag : ID { LINK(OptTag, 1); }
        |    { $$ = NULL; }
        ;
 
-Tag : ID { BODY_1(Tag, $$, $1); }
+Tag : ID { LINK(Tag, 1); }
     ;
 
 /* Declarators */
 
-VarDec : ID               { BODY_1(VarDec, $$, $1); }
-       | VarDec LB INT RB { BODY_1111(VarDec, $$, $1, $2, $3, $4); }
+VarDec : ID               { LINK(VarDec, 1); }
+       | VarDec LB INT RB { LINK(VarDec, 4); } 
        ;
 
-FunDec : ID LP VarList RP { BODY_1111(FunDec, $$, $1, $2, $3, $4); }
-       | ID LP RP         { BODY_111(FunDec, $$, $1, $2, $3); }
+FunDec : ID LP VarList RP { LINK(FunDec, 4); }
+       | ID LP RP         { LINK(FunDec, 3); }
        ;
 
-ParamDec : Specifier VarDec { BODY_11(ParamDec, $$, $1, $2); }
+ParamDec : Specifier VarDec { LINK(ParamDec, 2); }
          ;
 
-VarList : ParamDec COMMA VarList { BODY_111(VarList, $$, $1, $2, $3); }
-        | ParamDec               { BODY_1(VarList, $$, $1); }
+VarList : ParamDec COMMA VarList { LINK(VarList, 3); }
+        | ParamDec               { LINK(VarList, 1); }
         ;
 /* Statements */
 
-CompSt : LC DefList StmtList RC { BODY_1111(CompSt, $$, $1, $2, $3, $4); }
+CompSt : LC DefList StmtList RC { LINK_NULL(CompSt, 4); }
        ;
 
-StmtList : Stmt StmtList { BODY_11(StmtList, $$, $1, $2); }
+StmtList : Stmt StmtList { LINK_NULL(StmtList, 2); }
          |               { $$ = NULL; }
          ;
 
-Stmt : Exp SEMI                     { BODY_11(Stmt, $$, $1, $2); }
-     | CompSt                       { BODY_1(Stmt, $$, $1); }
-     | RETURN Exp SEMI              { BODY_111(Stmt, $$, $1, $2, $3); }
-     | IF LP Exp RP Stmt            { BODY_1111(Stmt, $$, $1, $2, $3, $4); }
-     | IF LP Exp RP Stmt ELSE Stmt  { BODY_11111(Stmt, $$, $1, $2, $3, $4, $5); }
-     | WHILE LP Exp RP Stmt         { BODY_1111(Stmt, $$, $1, $2, $3, $4); }
+Stmt : Exp SEMI                     { LINK(Stmt, 2); }
+     | CompSt                       { LINK(Stmt, 1); }
+     | RETURN Exp SEMI              { LINK(Stmt, 3); }
+     | IF LP Exp RP Stmt            { LINK(Stmt, 5); }
+     | IF LP Exp RP Stmt ELSE Stmt  { LINK(Stmt, 6); }
+     | WHILE LP Exp RP Stmt         { LINK(Stmt, 5); }
      ;
 
 /* Local Definitions */
 
-DefList : Def DefList { BODY_11(DefList, $$, $1, $2); }
+DefList : Def DefList { LINK(DefList, 2); }
         |             { $$ = NULL; }
         ;
-Def : Specifier DecList SEMI { BODY_111(Def, $$, $1, $2, $3); }
+Def : Specifier DecList SEMI { LINK(Def, 3); }
     ;
 
-DecList : Dec               { BODY_1(DecList, $$, $1); }
-        | Dec COMMA DecList { BODY_111(DecList, $$, $1, $2, $3); }
+DecList : Dec               { LINK(DecList, 1); }
+        | Dec COMMA DecList { LINK(DecList, 3); }
         ;
-Dec : VarDec              { BODY_1(Dec, $$, $1); }
-    | VarDec ASSIGNOP Exp { BODY_111(Dec, $$, $1, $2, $3); }
+Dec : VarDec              { LINK(Dec, 1); }
+    | VarDec ASSIGNOP Exp { LINK(Dec, 3); }
     ;
 
 /* Expressions */
-Exp : Exp ASSIGNOP Exp { BODY_111(Exp, $$, $1, $2, $3); }
-    | Exp AND Exp      { BODY_111(Exp, $$, $1, $2, $3); }
-    | Exp OR Exp       { BODY_111(Exp, $$, $1, $2, $3); }
-    | Exp RELOP Exp    { BODY_111(Exp, $$, $1, $2, $3); }
-    | Exp PLUS Exp     { BODY_111(Exp, $$, $1, $2, $3); }
-    | Exp MINUS Exp    { BODY_111(Exp, $$, $1, $2, $3); }
-    | Exp STAR Exp     { BODY_111(Exp, $$, $1, $2, $3); }
-    | Exp DIV Exp      { BODY_111(Exp, $$, $1, $2, $3); }
-    | LP Exp RP        { BODY_111(Exp, $$, $1, $2, $3); }
-    | MINUS Exp        { BODY_11(Exp, $$, $1, $2); }
-    | NOT Exp          { BODY_11(Exp, $$, $1, $2); }
-    | ID LP Args RP    { BODY_1111(Exp, $$, $1, $2, $3, $4); }
-    | ID LP RP         { BODY_111(Exp, $$, $1, $2, $3); }
-    | Exp LB Exp RB    { BODY_1111(Exp, $$, $1, $2, $3, $4); }
-    | Exp DOT ID       { BODY_111(Exp, $$, $1, $2, $3); }
-    | ID               { BODY_1(Exp, $$, $1); }
-    | INT              { BODY_1(Exp, $$, $1); }
-    | FLOAT            { BODY_1(Exp, $$, $1); }
+Exp : Exp ASSIGNOP Exp { LINK(Exp, 3); }
+    | Exp AND Exp      { LINK(Exp, 3); }
+    | Exp OR Exp       { LINK(Exp, 3); }
+    | Exp RELOP Exp    { LINK(Exp, 3); }
+    | Exp PLUS Exp     { LINK(Exp, 3); }
+    | Exp MINUS Exp    { LINK(Exp, 3); }
+    | Exp STAR Exp     { LINK(Exp, 3); }
+    | Exp DIV Exp      { LINK(Exp, 3); }
+    | LP Exp RP        { LINK(Exp, 3); }
+    | MINUS Exp        { LINK(Exp, 2); }
+    | NOT Exp          { LINK(Exp, 2); }
+    | ID LP Args RP    { LINK(Exp, 4); }
+    | ID LP RP         { LINK(Exp, 3); }
+    | Exp LB Exp RB    { LINK(Exp, 4); }
+    | Exp DOT ID       { LINK(Exp, 3); }
+    | ID               { LINK(Exp, 1); }
+    | INT              { LINK(Exp, 1); }
+    | FLOAT            { LINK(Exp, 1); }
     ;
-Args : Exp COMMA Args  { BODY_111(Args, $$, $1, $2, $3); }
-     | Exp             { BODY_1(Args, $$, $1); }
+Args : Exp COMMA Args  { LINK(Args, 3); }
+     | Exp             { LINK(Args, 1); }
      ;
 /* nonterminal end */
 
@@ -251,6 +275,9 @@ void midorder(node_t *nd, int level)
     }
     else if (nd->type == YY_INT) {
         printf(": %d", nd->val.i);
+    }
+    if (nd->type > YYNTOKENS) {
+        printf(" (%d)", nd->lineno);
     }
     putchar('\n');
     midorder(nd->child, level + 1);

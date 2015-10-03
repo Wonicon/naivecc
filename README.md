@@ -4,6 +4,7 @@
 
 Just set `%option yylineno` does not provide me with an auto-inc `yylineno`.
 Because this option is just aimed to be compatible with the old lex, so it is better to add a rule and add up `yylineno` by hand.
+But if combined with bison, it will have an auto-increase yylineno.
 
 ### fileno
 
@@ -23,13 +24,15 @@ when compiled to generate parser......
 
 ### parser
 
-`%locations` and `YY_USER_ACTION` should be written in `syntax.y`, namely, the bison source file, and then include `lex.yy.c`!
+`%locations` and `YY_USER_ACTION` should be written in `lexical.l`, then the generated `lex.yy.c` can have this macro!
 
 ## 2015-09-18
 
 ### always syntax error
 
-I forgot to add `HEX` and `OCT` in the production, and the newline seems having some problems.
+~~I forgot to add `HEX` and `OCT` in the production, and the newline seems having some problems.~~
+
+The `HEX` and `OCT` is the pattern handled in lexicier which should return `INT` as its token type!
 
 ### syntax error at newline
 

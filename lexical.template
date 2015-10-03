@@ -71,31 +71,7 @@ WS [[:blank:]]
 
 %%
 
-{SEMI}      HANDLE(SEMI)
-{COMMA}     HANDLE(COMMA)
-{ASSIGNOP}  HANDLE(ASSIGNOP)
-{RELOP}     HANDLE(RELOP)
-{PLUS}      HANDLE(PLUS)
-{MINUS}     HANDLE(MINUS)
-{STAR}      HANDLE(STAR)
-{DIV}       HANDLE(DIV)
-{AND}       HANDLE(AND)
-{OR}        HANDLE(OR)
-{DOT}       HANDLE(DOT)
-{NOT}       HANDLE(NOT)
-{TYPE}      HANDLE(TYPE)
-{LP}        HANDLE(LP)
-{RP}        HANDLE(RP)
-{LB}        HANDLE(LB)
-{RB}        HANDLE(RB)
-{LC}        HANDLE(LC)
-{RC}        HANDLE(RC)
-{STRUCT}    HANDLE(STRUCT)
-{RETURN}    HANDLE(RETURN)
-{IF}        HANDLE(IF)
-{ELSE}      HANDLE(ELSE)
-{WHILE}     HANDLE(WHILE)
-{ID}        HANDLE(ID)
+// GEN HERE
 {HEX}       {
     yylval.nd = new_node(INT - FLOAT + 3);
     yylval.nd->val.i = strtol(yytext, NULL, 16);
