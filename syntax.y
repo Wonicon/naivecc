@@ -2,70 +2,16 @@
 %{
 #include "node.h"
 #include "yytname.h"
-static node_t *prog;
 
 #define YYDEBUG 1
-#include <stdio.h>
 #include "lex.yy.c"
+
+#include <stdio.h>
+
 
 #define S(x) # x
 #define concat(x, y) x ## y
 #define name(x) concat(YY_, x)
-
-#define BODY_1(x, NT, BD1) do {\
-    NT = new_node(name(x));\
-    NT->child = BD1;\
-}while(0)
-
-#define BODY_11(x, NT, BD1, BD2) do {\
-    NT = new_node(name(x));\
-    NT->child = BD1;\
-    BD1->sibling = BD2;\
-}while(0)
-
-#define BODY_111(x, NT, BD1, BD2, BD3) do {\
-    NT = new_node(name(x));\
-    NT->child = BD1;\
-    BD1->sibling = BD2;\
-    BD2->sibling = BD3;\
-}while(0)
-
-#define BODY_101(x, NT, BD1, BD2, BD3) do {\
-    NT = new_node(name(x));\
-    NT->child = BD1;\
-    if (BD2 != NULL) {\
-        BD1->sibling = BD2;\
-        BD2->sibling = BD3;\
-    } else {\
-        BD1->sibling = BD3;\
-    }\
-}while(0)
-
-#define BODY_1111(x, NT, BD1, BD2, BD3, BD4) do {\
-    NT = new_node(name(x));\
-    NT->child = BD1;\
-    BD1->sibling = BD2;\
-    BD2->sibling = BD3;\
-    BD3->sibling = BD4;\
-}while(0)
-
-#define BODY_11111(x, NT, BD1, BD2, BD3, BD4, BD5) do {\
-    NT = new_node(name(x));\
-    NT->child = BD1;\
-    BD1->sibling = BD2;\
-    BD2->sibling = BD3;\
-    BD3->sibling = BD4;\
-    BD4->sibling = BD5;\
-}while(0)
-
-#define BODY_10101(x, NT, BD1, BD2, BD3, BD4, BD5) do {\
-    NT = new_node(name(x));\
-    NT->child = BD1;\
-    BD1->sibling = BD2 != NULL ? BD2 : BD3;\
-    if (BD2 != NULL) BD2->sibling = BD3;\
-    BD3->sibling = BD4 != NULL ? BD4 : BD5;\
-    if (BD4 != NULL) BD4->sibling = BD5;\
-}while(0)
 
 #define LINK(x, n) do {\
     yyval.nd = new_node(name(x));\
@@ -97,6 +43,7 @@ static node_t *prog;
     }\
 }while(0)
 
+static node_t *prog;
 
 %}
 
@@ -149,6 +96,21 @@ static node_t *prog;
     Dec
     Exp
     Args
+
+/* Handle ambiguity according to Appendix A */
+%right ASSIGNOP
+%left OR
+%left AND
+%left RELOP
+%left PLUS MINUS
+%left STAR DIV
+%right NOT
+/* TODO
+ * NEG operation is denoted as MINUS token, but we cannot define MINUS's
+ * association again, so how to handle the association of NEG which shares
+ * the same token as MINUS?
+ */
+%left LP RP DOT LB RB
 
 %%
 
