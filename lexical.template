@@ -1,18 +1,17 @@
 %{
 
 #include "node.h"
-#include "syntax.tab.h"
 #include "token.h"
-#include "debug.h"
+#include "syntax.tab.h"
 #include <stdio.h>
 #include <stdlib.h>
 
 #ifndef DEBUG
 #define Type enum yytokentype
-#define LOG(x) printf("\033[0;35;40m" #x "\033[0m" " ")
+#define LOG(x) ;
 #else
 #define Type enum TOKEN_Type
-#define LOG(x) ;
+#define LOG(x) printf("\033[0;35;40m" #x "\033[0m" " ")
 #endif
 
 Type lex_handle(Type type);

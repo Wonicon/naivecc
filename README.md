@@ -38,3 +38,6 @@ The `HEX` and `OCT` is the pattern handled in lexicier which should return `INT`
 
 Because the project folder was first opened under windows, we get '^M' at the end of line.
 
+### YYDEBUG redifined
+
+syntax.tab.c will define YYDEBUG in ifndef block, we must provide a YYDEBUG definition before it.
