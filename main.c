@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 extern int yyrestart(FILE *);
 extern int yyparse();
@@ -19,4 +21,20 @@ int main(int argc, char *argv[])
     yyparse();
     ast();
     return 0;
+}
+
+char *split(char *msg)
+{
+    char *s = msg;
+    char *err = strtok(s, ",");
+    char *unexp = strtok(NULL, ",");
+    char *exp = strtok(NULL, "");
+
+    unexp = strtok(unexp, " ");
+    unexp = strtok(NULL, " ");
+
+    exp = strtok(exp, " ");
+    exp = strtok(NULL, " ");
+
+    return exp;
 }

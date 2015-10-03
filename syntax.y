@@ -1,4 +1,5 @@
 %locations
+%error-verbose
 %{
 #include "node.h"
 #include "yytname.h"
@@ -182,7 +183,7 @@ StmtList : Stmt StmtList { LINK_NULL(StmtList, 2); }
          |               { $$ = NULL; }
          ;
 
-Stmt : Exp SEMI                         { LINK(Stmt, 2); }
+Stmt : Exp {} SEMI                         { LINK(Stmt, 2); }
      | CompSt                           { LINK(Stmt, 1); }
      | RETURN Exp SEMI                  { LINK(Stmt, 3); }
      | IF LP Exp RP Stmt %prec SUB_ELSE { LINK(Stmt, 5); }
@@ -253,4 +254,20 @@ void midorder(node_t *nd, int level)
 void ast()
 {
    midorder(prog, 0); 
+}
+
+char *split(char *msg); /* main.c */
+int yyerror(char *msg)
+{
+    char *exp = split(msg);
+
+    if (exp != NULL) {
+        if (!strcmp(exp, yytname[YY_SEMI])) exp = "\";\"";
+        fprintf(stderr, "Error type B at line %d: Missing %s.\n", yylineno, exp);
+    }
+    else {
+        fprintf(stderr, "Error type B at line %d: %s\n", yylineno, msg);
+    }
+
+    return 0;
 }
