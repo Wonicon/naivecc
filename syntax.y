@@ -9,6 +9,9 @@
 
 #include <stdio.h>
 
+static node_t *prog;
+extern int is_lex_error;
+extern int is_syn_error;
 
 #define S(x) # x
 #define concat(x, y) x ## y
@@ -26,6 +29,7 @@
         cur = cur->sibling;\
         i++;\
     }\
+    prog = yyval.nd;\
 }while(0)
 
 #define LINK_NULL(x, n) do {\
@@ -42,9 +46,10 @@
         }\
         i++;\
     }\
+    prog = yyval.nd;\
 }while(0)
 
-static node_t *prog;
+//#define LINK LINK_NULL
 
 %}
 
@@ -73,6 +78,7 @@ static node_t *prog;
     LP RP
     LC RC
     SEMI COMMA
+    UND
 /* token end */
 
 %type <nd>
@@ -183,7 +189,7 @@ StmtList : Stmt StmtList { LINK_NULL(StmtList, 2); }
          |               { $$ = NULL; }
          ;
 
-Stmt : Exp {} SEMI                         { LINK(Stmt, 2); }
+Stmt : Exp SEMI                         { LINK(Stmt, 2); }
      | CompSt                           { LINK(Stmt, 1); }
      | RETURN Exp SEMI                  { LINK(Stmt, 3); }
      | IF LP Exp RP Stmt %prec SUB_ELSE { LINK(Stmt, 5); }
@@ -193,10 +199,11 @@ Stmt : Exp {} SEMI                         { LINK(Stmt, 2); }
 
 /* Local Definitions */
 
-DefList : Def DefList { LINK(DefList, 2); }
-        |             { $$ = NULL; }
+DefList : Def DefList   { LINK(DefList, 2); }
+        |               { $$ = NULL; }
         ;
 Def : Specifier DecList SEMI { LINK(Def, 3); }
+    | error {}
     ;
 
 DecList : Dec               { LINK(DecList, 1); }
@@ -259,15 +266,37 @@ void ast()
 char *split(char *msg); /* main.c */
 int yyerror(char *msg)
 {
+    is_syn_error = 1;
+    if (is_lex_error) {
+        is_lex_error = 0;
+        return 0;
+    }
+
+    /* The gloabl ast root -> prog is changed every time
+     * when successfully reduce a production.
+     * When an error occurs, it is highly possible that the
+     * nterm has an upper level wrapper nterm as well as a
+     * sub nterm which owns the ast root. So we can use this
+     * information to locate our errors better.
+     * For example, DecList is an upper level nterm which
+     * has some leaf nterms. But the detailed error will be
+     * first triggered in the leaf level, so the lineno of the
+     * place where error really occurs is highly possible to
+     * be consistent with the ast root's lineno information.
+     */
+    //printf("Temp ast:\n");
+    //ast();
+    printf("Error type B at line %d: %s.\n", prog->lineno, msg);
+    /*
     char *exp = split(msg);
 
     if (exp != NULL) {
         if (!strcmp(exp, yytname[YY_SEMI])) exp = "\";\"";
-        fprintf(stderr, "Error type B at line %d: Missing %s.\n", yylineno, exp);
+        printf("Error type B at line %d: Missing %s.\n", yylineno, exp);
     }
     else {
-        fprintf(stderr, "Error type B at line %d: %s\n", yylineno, msg);
+        printf("Error type B at line %d: %s.\n", yylineno, msg);
     }
-
+    */
     return 0;
 }

@@ -44,11 +44,4 @@ enum TOKEN_TYPE
 };
 #endif
 
-static inline void ErrorMsg(char *desc, char *lexeme, int lineno)
-{
-    FILE *f = fopen("log", "w");
-    fprintf(f, "Error type A at Line %d: %s '%s'", lineno, desc, lexeme);
-    fclose(f);
-}
-
 #endif

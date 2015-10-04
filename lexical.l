@@ -15,7 +15,10 @@
 #endif
 
 Type lex_handle(Type type);
+void ErrorMsg(char *desc, char *lexeme, int lineno);
 int yycolumn = 1;
+
+extern int is_lex_error;
 
 /*
  * Wrapper of lex_handle aimed to use LOG
@@ -96,11 +99,19 @@ WS [[:blank:]]
 {WHILE}     HANDLE(WHILE)
 {ID}        HANDLE(ID)
 {HEX}       {
+    if (!check_hex(yytext, yyleng, yylineno)) {
+        is_lex_error = 1;
+        return UND;
+    }
     yylval.nd = new_node(INT - FLOAT + 3);
     yylval.nd->val.i = strtol(yytext, NULL, 16);
     return INT;
             }
 {OCT}       {
+    if (!check_oct(yytext, yyleng, yylineno)) {
+        is_lex_error = 1;
+        return UND;
+    }
     yylval.nd = new_node(INT - FLOAT + 3);
     yylval.nd->val.i = strtol(yytext, NULL, 8);
     return INT;
@@ -116,7 +127,7 @@ WS [[:blank:]]
 #endif
 }
 {WS} {}
-. { ErrorMsg("Mysterious character", yytext, yylineno); return 0; }
+. { ErrorMsg("Mysterious character", yytext, yylineno); is_lex_error = 1; return UND; }
 
 %%
 
@@ -132,9 +143,7 @@ int check_oct(char *yytext, int yyleng, int yylineno)
         }
     }
     LOG(OCT);
-    yylval.nd = (node_t *)malloc(sizeof(node_t));
-    yylval.nd->val.i = strtol(yytext, NULL, 16);
-    return INT;
+    return 1;
 }
 
 int check_hex(char *yytext, int yyleng, int yylineno)
@@ -145,13 +154,10 @@ int check_hex(char *yytext, int yyleng, int yylineno)
         char ch = yytext[i];
         if ((ch > 'f' && ch <= 'z') || (ch > 'F' && ch <= 'Z')) {
             ErrorMsg("Illegal hexadecimal number", yytext, yylineno);
-            return 0;
         }
     }
     LOG(HEX);
-    yylval.nd = (node_t *)malloc(sizeof(node_t));
-    yylval.nd->val.i = strtol(yytext, NULL, 8);
-    return INT;
+    return 1;
 }
 
 /*
@@ -169,4 +175,9 @@ Type lex_handle(Type type)
         case ID: yylval.nd->val.s = strdup(yytext); break;
     }
     return type;
+}
+
+void ErrorMsg(char *desc, char *lexeme, int lineno)
+{
+    printf("Error type A at Line %d: %s '%s'\n", lineno, desc, lexeme);
 }

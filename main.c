@@ -7,6 +7,9 @@ extern int yyparse();
 extern int yydebug;
 extern void ast();
 
+int is_lex_error = 0;
+int is_syn_error = 0;
+
 int main(int argc, char *argv[])
 {
     if (argc <= 1) return 1;
@@ -19,7 +22,12 @@ int main(int argc, char *argv[])
     yyrestart(f);
     //yydebug = 1;
     yyparse();
-    ast();
+    if (is_syn_error) {
+        printf("Failed to print ast due to previous errors.\n");
+    }
+    else {
+        ast();
+    }
     return 0;
 }
 
