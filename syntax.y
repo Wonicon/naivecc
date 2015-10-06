@@ -204,7 +204,7 @@ DefList : Def DefList   { LINK(DefList, 2); }
         |               { $$ = NULL; }
         ;
 Def : Specifier DecList SEMI { LINK(Def, 3); }
-    | error SEMI { yyclearin; }
+    | error SEMI {}
     ;
 
 DecList : Dec               { LINK(DecList, 1); }
