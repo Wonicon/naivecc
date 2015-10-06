@@ -69,6 +69,7 @@ ID ({letter}|_)({letter}|{digit}|_)*
 HEX 0(x|X)({digit}|{letter})+
 OCT 0[0-9]+
 INT 0|[1-9][0-9]*
+FLOAT [0-9]+\.[0-9]+
 WS [[:blank:]]
 
 %%
@@ -98,10 +99,15 @@ WS [[:blank:]]
 {ELSE}      HANDLE(ELSE)
 {WHILE}     HANDLE(WHILE)
 {ID}        HANDLE(ID)
+{FLOAT}     {
+    yylval.nd = new_node(FLOAT - FLOAT + 3);
+    yylval.nd->val.f = atof(yytext);
+    return FLOAT;
+            }
 {HEX}       {
     if (!check_hex(yytext, yyleng, yylineno)) {
         is_lex_error = 1;
-        return UND;
+        return 1;
     }
     yylval.nd = new_node(INT - FLOAT + 3);
     yylval.nd->val.i = strtol(yytext, NULL, 16);
@@ -110,7 +116,7 @@ WS [[:blank:]]
 {OCT}       {
     if (!check_oct(yytext, yyleng, yylineno)) {
         is_lex_error = 1;
-        return UND;
+        return 1;
     }
     yylval.nd = new_node(INT - FLOAT + 3);
     yylval.nd->val.i = strtol(yytext, NULL, 8);
@@ -127,7 +133,7 @@ WS [[:blank:]]
 #endif
 }
 {WS} {}
-. { ErrorMsg("Mysterious character", yytext, yylineno); is_lex_error = 1; return UND; }
+. { ErrorMsg("Mysterious character", yytext, yylineno); return yylex(); }
 
 %%
 

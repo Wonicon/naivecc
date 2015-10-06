@@ -20,7 +20,7 @@ int main(int argc, char *argv[])
         return 1;
     }
     yyrestart(f);
-    //yydebug = 1;
+    yydebug = 1;
     yyparse();
     if (is_syn_error) {
         printf("Failed to print ast due to previous errors.\n");

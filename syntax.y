@@ -37,6 +37,7 @@ extern int is_syn_error;
     yyval.nd->lineno = yyloc.first_line;\
     yyval.nd->child = yyvsp[1 - n].nd;\
     node_t *cur = yyvsp[1 - n].nd;\
+    if (cur == NULL) break;\
     cur->sibling = NULL;\
     int i = 2;\
     while (i <= n) {\
@@ -203,7 +204,7 @@ DefList : Def DefList   { LINK(DefList, 2); }
         |               { $$ = NULL; }
         ;
 Def : Specifier DecList SEMI { LINK(Def, 3); }
-    | error {}
+    | error SEMI { yyclearin; }
     ;
 
 DecList : Dec               { LINK(DecList, 1); }
@@ -249,6 +250,9 @@ void midorder(node_t *nd, int level)
     }
     else if (nd->type == YY_INT) {
         printf(": %d", nd->val.i);
+    }
+    else if (nd->type == YY_FLOAT) {
+        printf(": %f", nd->val.f);
     }
     if (nd->type > YYNTOKENS) {
         printf(" (%d)", nd->lineno);
