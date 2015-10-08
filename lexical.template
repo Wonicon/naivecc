@@ -105,11 +105,16 @@ WS [[:blank:]]
             }
 "\n" {
 #ifdef DEBUG
-    yylineno++; yycolumn = 1;
+    yylineno++;
 #endif
+    yycolumn = 1;
 }
 {WS} {}
-. { ErrorMsg("Mysterious character", yytext, yylineno); return yylex(); }
+. {
+    ErrorMsg("Mysterious character", yytext, yylineno);
+    is_lex_error = 1;
+    return 1;
+}
 
 %%
 

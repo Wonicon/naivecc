@@ -41,7 +41,7 @@ file.read.each_line do |line|
         end
     end
 
-    if nt_flag && /\w+ :/ =~ line
+    if nt_flag && /^\w+[[:blank:]]*:/ =~ line
         nt = line.split[0]
         puts "Add non-terminal #{nt}"
         nonterminals << nt
@@ -54,8 +54,8 @@ end
 file = open("yytname.h", "w")
 
 start_num = 3 # jump $end error $undefined
-file.write("\#ifndef __YYTNAME_INDEX_H__\n")
-file.write("\#define __YYTNAME_INDEX_H__\n")
+file.write("#ifndef __YYTNAME_INDEX_H__\n")
+file.write("#define __YYTNAME_INDEX_H__\n")
 
 file.write("\nenum YYTNAME_INDEX {\n")
 

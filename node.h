@@ -15,6 +15,7 @@ typedef struct Node {
     struct Node *child, *sibling;
 } node_t;
 
-int add_node(node_t *src, int n, ...);
 node_t *new_node(int type);
+void free_node(node_t *nd);
+
 #endif /* NODE_H */

@@ -2,11 +2,15 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* from syntax.tab.c */
 extern int yyrestart(FILE *);
 extern int yyparse();
-extern int yydebug;
 extern void ast();
+extern void free_ast();
 
+#ifdef YYDEBUG
+extern int yydebug;
+#endif
 int is_lex_error = 0;
 int is_syn_error = 0;
 
@@ -20,7 +24,9 @@ int main(int argc, char *argv[])
         return 1;
     }
     yyrestart(f);
+#ifdef YYDEBUG
     yydebug = 1;
+#endif
     yyparse();
     if (is_syn_error) {
         printf("Failed to print ast due to previous errors.\n");
@@ -28,21 +34,6 @@ int main(int argc, char *argv[])
     else {
         ast();
     }
+    free_ast();
     return 0;
-}
-
-char *split(char *msg)
-{
-    char *s = msg;
-    char *err = strtok(s, ",");
-    char *unexp = strtok(NULL, ",");
-    char *exp = strtok(NULL, "");
-
-    unexp = strtok(unexp, " ");
-    unexp = strtok(NULL, " ");
-
-    exp = strtok(exp, " ");
-    exp = strtok(NULL, " ");
-
-    return exp;
 }

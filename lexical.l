@@ -17,7 +17,7 @@
 Type lex_handle(Type type);
 void ErrorMsg(char *desc, char *lexeme, int lineno);
 int yycolumn = 1;
-
+int token_on_line = 0;
 extern int is_lex_error;
 
 /*
@@ -129,11 +129,17 @@ WS [[:blank:]]
             }
 "\n" {
 #ifdef DEBUG
-    yylineno++; yycolumn = 1;
+    yylineno++;
 #endif
+    token_on_line = 0;
+    yycolumn = 1;
 }
 {WS} {}
-. { ErrorMsg("Mysterious character", yytext, yylineno); return yylex(); }
+. {
+    ErrorMsg("Mysterious character", yytext, yylineno);
+    is_lex_error = 1;
+    return 1;
+}
 
 %%
 
@@ -180,6 +186,7 @@ Type lex_handle(Type type)
         case TYPE: yylval.nd->val.s = strdup(yytext); break;
         case ID: yylval.nd->val.s = strdup(yytext); break;
     }
+    token_on_line++;
     return type;
 }
 
