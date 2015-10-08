@@ -5,8 +5,9 @@
 #include "node.h"
 #include "yytname.h"
 
-int is_lex_error;
-int is_syn_error;
+int is_lex_error = 0;
+int is_syn_error = 0;
+extern is_greedy;
 
 //#define YYDEBUG 1
 #include "lex.yy.c"
@@ -59,9 +60,9 @@ static union YYSTYPE *YYVSP = NULL;
 #define _str(x) # x
 //#define ERR
 #ifdef ERR
-#define LOGERR(x) do { printf("Hit " _str(x) "\n"); is_lex_error = 0; yyerrok; } while (0)
+#define LOGERR(x) do { printf("Hit " _str(x) "\n"); is_lex_error = 0; if (is_greedy) yyerrok; } while (0)
 #else // !ERR
-#define LOGERR(x) is_lex_error = 0; yyerrok
+#define LOGERR(x) is_lex_error = 0; if (is_greedy) yyerrok
 #endif
 
 %}
@@ -208,12 +209,12 @@ Stmt            : Exp SEMI                         { LINK(Stmt, 2); }
                 | IF LP Exp RP Stmt %prec SUB_ELSE { LINK(Stmt, 5); }
                 | IF LP Exp RP Stmt ELSE Stmt      { LINK(Stmt, 6); }
                 | WHILE LP Exp RP Stmt             { LINK(Stmt, 5); }
-                | Exp error                        { LOGERR(Stmt EXP error); }
                 | error SEMI                       { LOGERR(Stmt ... SEMI); }
                 | error ELSE                       { LOGERR(Stmt ... ELSE); }
                 | error IF                         { LOGERR(Stmt ... IF); }
                 | error WHILE                      { LOGERR(Stmt ... WHILE); }
                 | error RETURN                     { LOGERR(Stmt ... RETURN); }
+                | Exp error                    { LOGERR(Stmt Exp error); }
                 ;
 
 /* Local Definitions */

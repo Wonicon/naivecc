@@ -11,16 +11,26 @@ extern void free_ast();
 #ifdef YYDEBUG
 extern int yydebug;
 #endif
-int is_lex_error = 0;
-int is_syn_error = 0;
+
+extern int is_lex_error;
+extern int is_syn_error;
+
+int is_greedy = 0;
 
 int main(int argc, char *argv[])
 {
     if (argc <= 1) return 1;
-    FILE* f = fopen(argv[1], "r");
+    int i = 1;
+    if (argc >= 3) {
+        i++;
+        if (!strcmp(argv[1], "-g") || !strcmp(argv[1], "greedy")) {
+            is_greedy = 1;
+        }
+    }
+    FILE* f = fopen(argv[i], "r");
     if (!f)
     {
-        perror(argv[1]);
+        perror(argv[i]);
         return 1;
     }
     yyrestart(f);
