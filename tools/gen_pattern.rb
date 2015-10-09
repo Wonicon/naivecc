@@ -1,6 +1,6 @@
 #!/usr/bin/env ruby
 
-filename = ARGV[0]
+filename = "lexical.template"
 
 puts "Open #{filename}"
 
@@ -28,7 +28,7 @@ file.read.each_line do |line|
 end
 
 file = open(filename, "r")
-output = open("lexical.l", "w")
+output = open("../lexical.l", "w")
 gen_flag = false
 file.read.each_line do |line|
     if /GEN HERE/ =~ line
