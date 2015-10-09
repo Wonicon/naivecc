@@ -214,7 +214,7 @@ Stmt            : Exp SEMI                         { LINK(Stmt, 2); }
                 | error IF                         { LOGERR(Stmt ... IF); }
                 | error WHILE                      { LOGERR(Stmt ... WHILE); }
                 | error RETURN                     { LOGERR(Stmt ... RETURN); }
-                | Exp error                    { LOGERR(Stmt Exp error); }
+                | Exp error                        { LOGERR(Stmt Exp error); }
                 ;
 
 /* Local Definitions */
@@ -323,8 +323,11 @@ int yyerror(char *msg)
     ast();
 #endif
     int lineno = yylineno;
-    if (token_on_line == 1 && prog->lineno != yylineno) {
-        lineno = prog->lineno;
+    node_t *nd = prog;
+    if (nd != NULL && nd->child != NULL) nd = nd->child;
+    while (nd != NULL && nd->sibling != NULL) nd = nd->sibling;
+    if (token_on_line == 1 && (nd->type != YY_SEMI && nd->type != YY_RC)) {
+        lineno = nd->lineno;
     }
     printf("Error type B at line %d: %s.\n", lineno, msg);
     return 0;

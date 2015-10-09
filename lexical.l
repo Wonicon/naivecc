@@ -101,7 +101,9 @@ WS [[:blank:]]
 {ID}        HANDLE(ID)
 {FLOAT}     {
     yylval.nd = new_node(FLOAT - FLOAT + 3);
+    yylval.nd->lineno = yylineno;
     yylval.nd->val.f = atof(yytext);
+    token_on_line++;
     return FLOAT;
             }
 {HEX}       {
@@ -110,7 +112,9 @@ WS [[:blank:]]
         return 1;
     }
     yylval.nd = new_node(INT - FLOAT + 3);
+    yylval.nd->lineno = yylineno;
     yylval.nd->val.i = strtol(yytext, NULL, 16);
+    token_on_line++;
     return INT;
             }
 {OCT}       {
@@ -119,12 +123,16 @@ WS [[:blank:]]
         return 1;
     }
     yylval.nd = new_node(INT - FLOAT + 3);
+    yylval.nd->lineno = yylineno;
     yylval.nd->val.i = strtol(yytext, NULL, 8);
+    token_on_line++;
     return INT;
             }
 {INT}       {
     yylval.nd = new_node(INT - FLOAT + 3);
+    yylval.nd->lineno = yylineno;
     yylval.nd->val.i = strtol(yytext, NULL, 10);
+    token_on_line++;
     return INT;
             }
 "\n" {
@@ -182,6 +190,7 @@ Type lex_handle(Type type)
     // Currently FLOAT is the first token defined in syntax.y
     // In lexical phase we don't pay attention to non-terminals
     yylval.nd = new_node(type - FLOAT + 3);
+    yylval.nd->lineno = yylineno;
     switch (type) {
         case TYPE: yylval.nd->val.s = strdup(yytext); break;
         case ID: yylval.nd->val.s = strdup(yytext); break;
