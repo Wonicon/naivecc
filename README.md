@@ -43,10 +43,6 @@ Because the project folder was first opened under windows, we get '^M' at the en
 syntax.tab.c will define YYDEBUG in ifndef block, we must provide a YYDEBUG definition before it.
 ## 编译原理：实验一
 
-姓名：王诲喆
-
-学号：131220159
-
 ### 程序功能
 
 程序使用方法 `$ ./parser [-g|greedy] source.cmm`
@@ -104,7 +100,7 @@ Bison也没有提供基于下标的访问方法和产生式体的符号数量。
 
 #### 错误恢复
 
-我花了大量的时间考虑丢失分号时的恢复问题，和组员张帆进交流后发现在产生式末尾加error有比较好的效果。
+我花了大量的时间考虑丢失分号时的恢复问题，和组员交流后发现在产生式末尾加error有比较好的效果。
 不过产生式末尾加error有个问题，有些可以通过寻找终结符来恢复的错误会被这一模式抢占，可能会重复触发错误，在使用`yyerrok`的情况下就是如此（开启`-g`或`greedy`选项）。
 不过Bison默认的模式是消费掉3个token后才可以报新的错误，所以默认情况下从表面上看起来不一定会出现重复报错的情况。
 
