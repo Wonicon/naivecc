@@ -1,0 +1,5 @@
+constructor_helper(array)
+constructor_helper(field)
+constructor_helper(param)
+constructor_helper(struct)
+constructor_helper(func)

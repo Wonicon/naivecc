@@ -4,5 +4,8 @@
 *.o
 *.output
 *.cmm
+*.pyc
+*.vim
+tags
 parser
 play

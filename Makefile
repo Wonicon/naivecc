@@ -69,3 +69,20 @@ play:
 	@echo $(C_OBJS)
 	@echo $(L_OBJ)
 	@echo $(Y_OBJ)
+
+AWKFLAGS := 'BEGIN{printf("syntax keyword Type\t")}{printf("%s ", $$1)}END{print ""}'
+CTAGSFLAGS := --c-kinds=gstu -o- 
+
+# prototype: gen_types
+define gen_types
+	-@ctags $(CTAGSFLAGS) $^ | awk $(AWKFLAGS) > $@
+endef
+
+CHFILES = $(shell find -type f -name "*.[ch]")
+types: types.vim
+types.vim: $(CHFILES)
+	@echo $(CHFILES)
+	$(call gen_types)
+
+cmm: cmm_type.c cmm_type.h
+	$(CC) $(CFLAGS) -D TEST_TYPE -D DEBUG -o cmm_test cmm_type.c
