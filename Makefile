@@ -84,5 +84,5 @@ types.vim: $(CHFILES)
 	@echo $(CHFILES)
 	$(call gen_types)
 
-cmm: cmm_type.c cmm_type.h
-	$(CC) $(CFLAGS) -D TEST_TYPE -D DEBUG -o cmm_test cmm_type.c
+cmm: cmm_type.c cmm_type.h lib.h
+	$(CC) $(CFLAGS) -D TEST_TYPE -D DEBUG -o cmm_test cmm_type.c lib.c

@@ -1,4 +1,5 @@
 #include "cmm_type.h"
+#include "lib.h"
 #include <stdlib.h> /* malloc */
 #include <string.h> /* strlen */
 #include <assert.h> /* assert */
@@ -7,12 +8,6 @@
 TypeHead type_int = { NULL, "int", CMM_TYPE_int };
 TypeHead type_float = { NULL, "float", CMM_TYPE_float };
 
-char *strdup(const char *str)
-{
-    char *s = (char *)malloc(sizeof(char) * strlen(str) + 1);
-    strcpy(s, str);
-    return s;
-}
 /* Constructors {{{ */
 
 /* Common initialization routine */
@@ -24,16 +19,14 @@ new_type_init
     assert(name != NULL);
     this->type = base;
     /* Deep copy the name */
-    this->name = strdup(name);
+    this->name = cmm_strdup(name);
     this->type_code = code;
 }
 
 #define NEW(var, type) type *var = (type *)malloc(sizeof(type))
 #define INIT(var, base, name, code) new_type_init((TypeHead *)var, base, name, code)
 
-#define concat(x, y) x ## y
-
-#define constructor_helper(type)                      \
+#define ctor_helper(type)                             \
     concat(CMM_, type) *                              \
     concat(new_, type)(TypeHead *base, char *name) {  \
         NEW(t, concat(CMM_, type));                   \
@@ -46,16 +39,9 @@ new_type_init
 
 #undef NEW
 #undef INIT
-#undef concat
+
 /* }}} constructors end */
 
-#ifdef DEBUG
-#define LOG(s, ...) fprintf(stderr, "[%s] " s "\n", __func__, ## __VA_ARGS__)
-#else
-#define LOG(s, ...)
-#endif
-
-#define STRUCTURE
 int typecmp(TypeHead *x, TypeHead *y)
 {
     LOG("Now compare %s and %s", x->name, y->name);
@@ -109,15 +95,20 @@ int typecmp(TypeHead *x, TypeHead *y)
                 return 0;
             }
 #ifdef STRICT_ARRAY
-            if (x->type_code != CMM_TYPE_array) {
-                return 0;
-            }
+            /* 
+             * The array type-list should only have array type
+             * and the base type should not be an array
+             */
+            assert(x->type_code != CMM_TYPE_array);
 #endif /* ifdef STRICT_ARRAY */
             arr_x = arr_x->type;
             arr_y = arr_y->type;
             loopno++;
         }
 
+#ifdef STRICT_ARRAY
+        assert(arr_x->type != CMM_array);
+#endif /* STRICT_ARRAY */
         if (arr_x->type != NULL || arr_y->type != NULL) {
             /* The dimension differs */
             return 0;

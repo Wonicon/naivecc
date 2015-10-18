@@ -1,6 +1,7 @@
 #ifndef CMM_TYPE_H
 #define CMM_TYPE_H
 
+#include "lib.h"
 #include <stdio.h>
 
 enum CMM_TYPE {
@@ -60,5 +61,9 @@ typedef struct __CMM_FUNC__ {
     TypeHeader; /* For return value */
     CMM_param *param_list;
 } CMM_func;
+
+#define ctor_helper(type) concat(CMM_, type) *concat(new_, type)(TypeHead *base, char *name);
+#include "cmm_type.template"
+#undef ctor_helper
 
 #endif /* CMM_TYPE_H */
