@@ -18,6 +18,7 @@ typedef enum __CMM_TYPE__ {
  */
 
 typedef CmmType CmmInt;
+
 typedef CmmType CmmFloat;
 
 /* The fixed size array type */
@@ -53,5 +54,21 @@ typedef struct __CMM_FUNC__ {
     char *name;            /* The function name, must have */
     TypeNode *param_list;
 } CmmFunc;
+
+/* Compare two cmm type, return 1 if they are the same, 0 otherwise */
+int typecmp(CmmType *x, CmmType *y);
+void print_type(CmmType *x);
+
+extern CmmType *global_int;
+extern CmmType *global_float;
+CmmArray *new_type_array(int size, CmmType *base);
+CmmStruct *new_type_struct(char *name);
+TypeNode *new_type_node(CmmType *type, TypeNode *next);
+CmmFunc *new_type_func(char *name, CmmType *ret);
+
+#define GENERIC(x) ((CmmType *)x)
+#define ARRAY(x) ((CmmArray *)(x))
+#define STRUCT(x) ((CmmStruct *)(x))
+#define FUNC(x) ((CmmFunc *)(x))
 
 #endif /* CMM_TYPE_H */

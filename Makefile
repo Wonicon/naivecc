@@ -56,7 +56,7 @@ $(OBJ_DIR)/%.o: %.c
 test:
 	./parser ../Test/test1.cmm
 clean:
-	rm -f parser lex.yy.c syntax.tab.c syntax.tab.h syntax.output
+	rm -f parser cmm_test lex.yy.c syntax.tab.c syntax.tab.h syntax.output
 	rm -f $(C_OBJS) $(OBJS:.o=.d)
 	rm -f $(LFC) $(YFC) $(YFC:.c=.h)
 	rm -f *~
@@ -86,3 +86,6 @@ types.vim: $(CHFILES)
 
 cmm: cmm_type.c cmm_type.h lib.h
 	$(CC) $(CFLAGS) -D TEST_TYPE -D DEBUG -ggdb -o cmm_test cmm_type.c lib.c
+
+sym: cmm_symtab.c cmm_symtab.h
+	$(CC) $(CFLAGS) -D TEST_SYM -D DEBUG -ggdb -o cmm_sym cmm_symtab.c cmm_type.c

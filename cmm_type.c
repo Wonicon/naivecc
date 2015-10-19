@@ -11,11 +11,15 @@ const char *type_s[] =
     "struct",
     "function"
 };
+
 /* Constructors */
+
+CmmType basic_type[2] = { CMM_TYPE_INT, CMM_TYPE_FLOAT };
+CmmType *global_int = &basic_type[0];
+CmmType *global_float = &basic_type[1];
 
 CmmArray *new_type_array(int size, CmmType *base)
 {
-    /* Todo: avoid the cross reference! */
     CmmArray *p = (CmmArray *)malloc(sizeof(CmmArray));
     p->type = CMM_TYPE_ARRAY;
     p->size = size;
@@ -56,11 +60,6 @@ const char *typename(CmmType *x)
 }
 
 /* constructors end */
-
-#define ARRAY(x) ((CmmArray *)(x))
-#define STRUCT(x) ((CmmStruct *)(x))
-#define FUNC(x) ((CmmFunc *)(x))
-#define GENERIC(x) ((CmmType *)(x))
 
 int typecmp(CmmType *x, CmmType *y)
 {
