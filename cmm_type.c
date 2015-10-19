@@ -1,72 +1,88 @@
 #include "cmm_type.h"
-#include "lib.h"
 #include <stdlib.h> /* malloc */
 #include <string.h> /* strlen */
 #include <assert.h> /* assert */
 
-/* The basic type */
-TypeHead type_int = { NULL, "int", CMM_TYPE_int };
-TypeHead type_float = { NULL, "float", CMM_TYPE_float };
-
-/* Constructors {{{ */
-
-/* Common initialization routine */
-static void
-new_type_init
-(TypeHead *this, TypeHead *base, char *name, enum CMM_TYPE code)
+const char *type_s[] =
 {
-    assert(this != NULL);
-    assert(name != NULL);
-    this->type = base;
-    /* Deep copy the name */
-    this->name = cmm_strdup(name);
-    this->type_code = code;
+    "int",
+    "float",
+    "array",
+    "struct",
+    "function"
+};
+/* Constructors */
+
+CmmArray *new_type_array(int size, CmmType *base)
+{
+    /* Todo: avoid the cross reference! */
+    CmmArray *p = (CmmArray *)malloc(sizeof(CmmArray));
+    p->type = CMM_TYPE_ARRAY;
+    p->size = size;
+    p->base = base;
+    return p;
 }
 
-#define NEW(var, type) type *var = (type *)malloc(sizeof(type))
-#define INIT(var, base, name, code) new_type_init((TypeHead *)var, base, name, code)
-
-#define ctor_helper(type)                             \
-    concat(CMM_, type) *                              \
-    concat(new_, type)(TypeHead *base, char *name) {  \
-        NEW(t, concat(CMM_, type));                   \
-        memset(t, 0, sizeof(*t));                     \
-        INIT(t, base, name, concat(CMM_TYPE_, type)); \
-        return (concat(CMM_, type) *)t;               \
-    }
-
-#include "cmm_type.template"
-
-#undef NEW
-#undef INIT
-
-/* }}} constructors end */
-
-int typecmp(TypeHead *x, TypeHead *y)
+CmmStruct *new_type_struct(char *name)
 {
-    LOG("Now compare %s and %s", x->name, y->name);
+    CmmStruct *p = (CmmStruct *) malloc(sizeof(CmmStruct));
+    p->type = CMM_TYPE_STRUCT;
+    p->tag = name;
+    p->field_list = NULL;
+    return p;
+}
+
+CmmFunc *new_type_func(char *name, CmmType *ret)
+{
+    CmmFunc *p = (CmmFunc *)malloc(sizeof(CmmFunc));
+    p->type = CMM_TYPE_FUNC;
+    p->name = name;
+    p->ret = ret;
+    p->param_list = NULL;
+    return p;
+}
+
+TypeNode *new_type_node(CmmType *type, TypeNode *next)
+{
+    TypeNode *p = (TypeNode *)malloc(sizeof(TypeNode));
+    p->type = type;
+    p->next = next;
+    return p;
+}
+
+const char *typename(CmmType *x)
+{
+    return type_s[*x];
+}
+
+/* constructors end */
+
+#define ARRAY(x) ((CmmArray *)(x))
+#define STRUCT(x) ((CmmStruct *)(x))
+#define FUNC(x) ((CmmFunc *)(x))
+#define GENERIC(x) ((CmmType *)(x))
+
+int typecmp(CmmType *x, CmmType *y)
+{
+    LOG("Now compare %s and %s", typename(x), typename(y));
     /* Totally different! */
-    if (x->type_code != y->type_code) {
+    if (*x != *y) {
         LOG("Totally different!");
         return 0;
     }
 
-    assert(x->type_code == y->type_code);
-
     /* The function only use name to differ */
-    if (x->type_code == CMM_TYPE_func) {
+    if (*x == CMM_TYPE_FUNC) {
         LOG("Then we fall into func comparision");
-        if (strcmp(x->name, y->name) != 0) {
+        CmmFunc *func_x, *func_y;
+        func_x = FUNC(x);
+        func_y = FUNC(y);
+        if (strcmp(func_x->name, func_y->name) != 0) {
             return 0;
         } else {
-            CMM_func *func_x, *func_y;
-            func_x = (CMM_func *)x;
-            func_y = (CMM_func *)y;
-            CMM_param *param_x, *param_y;
-            param_x = func_x->param_list;
-            param_y = func_y->param_list;
-            while (param_x != NULL && param_y != NULL &&
-                    typecmp((TypeHead *)param_x, (TypeHead *)param_y)) {
+            TypeNode *param_x = func_x->param_list;
+            TypeNode *param_y = func_y->param_list;
+            while (param_x != NULL && param_y != NULL && typecmp(param_x->type, param_y->type)) {
                 param_x = param_x->next;
                 param_y = param_y->next;
             }
@@ -77,76 +93,124 @@ int typecmp(TypeHead *x, TypeHead *y)
             }
 
             /* Compare return type */
-            return typecmp(x->type, y->type);
+            return typecmp(FUNC(x)->ret, FUNC(y)->ret);
         }
     }
 
-    if (x->type_code == CMM_TYPE_array) {
+    if (*x == CMM_TYPE_ARRAY) {
         LOG("Then we fall into array comparision");
-        /* The array differs from its dimension! */
-        TypeHead *arr_x, *arr_y;
-        arr_x = x;
-        arr_y = y;
-        /* Use ->type to reserve the base type */
+        /* The array differs from its dimension and basic type */
         int loopno = 1;
-        while (arr_x->type != NULL && arr_y->type != NULL) {
-            LOG("loop %d %s <-> %s", loopno, arr_x->name, arr_y->name);
-            if (x->type_code != y->type_code) {
+        /* End loop when reach the basic type */
+        while (*x == CMM_TYPE_ARRAY && *y == CMM_TYPE_ARRAY) {
+            LOG("loop %d", loopno);
+            if (*x != *y) {
                 return 0;
             }
-#ifdef STRICT_ARRAY
-            /* 
-             * The array type-list should only have array type
-             * and the base type should not be an array
-             */
-            assert(x->type_code != CMM_TYPE_array);
-#endif /* ifdef STRICT_ARRAY */
-            arr_x = arr_x->type;
-            arr_y = arr_y->type;
+            x = ARRAY(x)->base;
+            y = ARRAY(y)->base;
             loopno++;
         }
 
-#ifdef STRICT_ARRAY
-        assert(arr_x->type != CMM_array);
-#endif /* STRICT_ARRAY */
-        if (arr_x->type != NULL || arr_y->type != NULL) {
+        if (*x == CMM_TYPE_ARRAY || *y == CMM_TYPE_ARRAY) {
             /* The dimension differs */
             return 0;
         }
         else {
             /* Compare the base type */
-            return typecmp(arr_x, arr_y);
+            return typecmp(x, y);
         }
     }
 
-    if (x->type_code == CMM_TYPE_struct) {
+    if (*x == CMM_TYPE_STRUCT) {
         LOG("Then we fall into struct comparision");
 #ifdef STRUCTURE
-        CMM_field *field_x = (CMM_field *)x, *field_y = (CMM_field *)y;
+        TypeNode *field_x = STRUCT(x)->field_list;
+        TypeNode *field_y = STRUCT(y)->field_list;
         /* Compare the field one by one */
-        while (field_x != NULL && field_y != NULL && 
-                typecmp((TypeHead *)field_x, (TypeHead *)field_y)) {
+        while (field_x != NULL && field_y != NULL && typecmp(field_x->type, field_y->type)) {
             field_x = field_x->next;
             field_y = field_y->next;
         }
 
-        if (field_x != NULL && field_y != NULL) {  /* Mismatch */
+        if (field_x == NULL && field_y == NULL) {
+            return 1;  /* The fields' numbers are the same, and the type is the same respectively */
+        } else {
             return 0;
-        } else if (field_x != field_y) {  /* Number mismatch, one should be 0 */
-            assert(field_x == NULL || field_y == NULL);
-            return 0;
-        } else {  /* x's and y's param list reach the end at the same time */
-            return 1;
         }
 #else /* just the name */
-        return strcmp(x->name, y->name) == 0;
+        return strcmp(STRUCT(x)->tag, STRUCT(y)->name) == 0;
 #endif /* ifdef STRUCTURE */
     }
 
-    assert(x->type_code == CMM_TYPE_int || CMM_TYPE_float);
+    assert(*x == CMM_TYPE_INT || *x == CMM_TYPE_FLOAT);
 
     return 1;
 } /* typecmp */
+
+void _print_type(CmmType *generic, char *end)
+{
+    CmmType *base;
+    TypeNode *nd = NULL;
+    switch (*generic) {
+        case CMM_TYPE_INT:
+            printf("int");
+            break;
+        case CMM_TYPE_FLOAT:
+            printf("float");
+            break;
+        case CMM_TYPE_ARRAY:
+            /* Find the base */
+            base = ARRAY(generic)->base;
+            while (*base == CMM_TYPE_ARRAY) {
+                base = ARRAY(base)->base;
+            }
+            /* Print the base recursively */
+            _print_type(base, " ");
+            /* Print dimension from left to right */
+            while (*generic == CMM_TYPE_ARRAY) {
+                printf("[%d]", ARRAY(generic)->size);
+                generic = ARRAY(generic)->base;
+            }
+            break;
+        case CMM_TYPE_STRUCT:
+            printf("struct %s { ", STRUCT(generic)->tag);
+            /* Print field list */
+            nd = STRUCT(generic)->field_list;
+            while (nd != NULL) {
+                _print_type(nd->type, "; ");
+                nd = nd->next;
+            }
+            printf("}");
+            break;
+        case CMM_TYPE_FUNC:
+            /* Print return type */
+            _print_type(FUNC(generic)->ret, " ");
+            /* Print function name */
+            printf("%s (", FUNC(generic)->name);
+            /* Print param list */
+            nd = FUNC(generic)->param_list;
+            while (nd != NULL && nd->next != NULL) {
+                _print_type(nd->type, ", ");
+                nd = nd->next;
+            }
+            /* Tail param handling */
+            if (nd != NULL) {
+                _print_type(nd->type, "");
+            }
+            printf(")");
+            break;
+        default:
+            assert(0);
+    }
+
+    printf("%s", end);
+}
+
+void print_type(CmmType *x)
+{
+    _print_type(x, "\n");
+}
 
 /* Test */
 #ifdef TEST_TYPE
@@ -155,73 +219,40 @@ int main()
 int test_cmm_type()
 #endif /* endif  TEST_TYPE */
 {
-    TypeHead top;
-    top.name = "bottom";
-    top.type_code = CMM_TYPE_int;
-    top.type = &type_int;
-    TypeHead *current = &top;
-    unsigned int rd;
+    CmmType top = CMM_TYPE_INT;
+    CmmType *current = &top;
+    CmmType *types[100];
     for (int i = 0; i < 100; i++) {
-        rd = rand();
-        int idx = rd % 3;
+        int rd = rand();
+        int idx = (unsigned)rd % 3;
 
         switch (idx) {
             case 0:
-                current = (TypeHead *)new_array(current, "array");
-                ((CMM_array *)current)->size = rd;
+                current = (CmmType *)new_type_array(rd, current);
                 break;
             case 1:
-                current = (TypeHead *)new_struct(current, "struct");
-                ((CMM_struct *)current)->field_list = new_field(&type_float, "field1");
-                ((CMM_struct *)current)->field_list->next = new_field(&type_float, "field2");
+                current = (CmmType *)new_type_struct("hello");
+                STRUCT(current)->field_list = new_type_node(&top, NULL);
+                STRUCT(current)->field_list->next = new_type_node(&top, NULL);
                 break;
             case 2:
-                current = (TypeHead *)new_func(current, "func");
-                ((CMM_func *)current)->param_list = new_field(&type_int, "param1");
-                ((CMM_func *)current)->param_list->next = new_field(&type_int, "param2");
+                current = (CmmType *)new_type_func("foo", current);
+                FUNC(current)->param_list = new_type_node(&top, NULL);
+                FUNC(current)->param_list->next = new_type_node(&top, NULL);
                 break;
             default:
                 assert(0);
         }
+
+        types[i] = current;
     }
 
-    assert(typecmp(current, current));
+    for (int k = 0; k < 100; k++) {
+        assert(typecmp(types[k], types[k]));
+    }
 
-    int i = 1;
-    int listno = 0;
-    CMM_field *field = NULL;
-    CMM_param *param = NULL;
-    while (current != NULL) {
-        switch (current->type_code) {
-            case CMM_TYPE_array:
-                printf("%d: array [name]%s [size]%d\n", i, current->name, ((CMM_array *)current)->size);
-                break;
-            case CMM_TYPE_struct:
-                printf("%d: struct [name]%s\n", i, current->name);
-                field = ((CMM_struct *)current)->field_list;
-                listno = 1;
-                while (field != NULL) {
-                    printf("    field %d: [name]%s [type]%s\n", listno, field->name, field->type->name);
-                    field = field->next;
-                }
-                break;
-            case CMM_TYPE_func:
-                printf("%d: func [name]%s\n", i, current->name);
-                param = ((CMM_func *)current)->param_list;
-                listno = 1;
-                while (param != NULL) {
-                    printf("    param %d: [name]%s [type]%s\n", listno, param->name, param->type->name);
-                    param = param->next;
-                }
-                break;
-            case CMM_TYPE_int:
-                printf("HIT GOOD TRAP\n");
-                break;
-            default:
-                printf("Unexpected: %d\n", current->type_code);
-                assert(0);
-        }
-        current = current->type;
+    for (int k = 0; k < 100; k++) {
+        print_type(types[k]);
     }
 
     return 0;

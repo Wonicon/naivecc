@@ -4,66 +4,54 @@
 #include "lib.h"
 #include <stdio.h>
 
-enum CMM_TYPE {
-    CMM_TYPE_int,
-    CMM_TYPE_float,
-    CMM_TYPE_array,
-    CMM_TYPE_field,
-    CMM_TYPE_struct,
-    CMM_TYPE_param,
-    CMM_TYPE_func
-};
+typedef enum __CMM_TYPE__ {
+    CMM_TYPE_INT,
+    CMM_TYPE_FLOAT,
+    CMM_TYPE_ARRAY,
+    CMM_TYPE_STRUCT,
+    CMM_TYPE_FUNC
+} CmmType;
 
 /*
- * The common part of the type structs,
- * used as a generic type to store multiple types.
+ * A CmmType * field is the common part of the Type structures,
+ * which is used as a generic type pointer to store multiple types.
  */
-typedef struct __TypeHead__ {
-    struct __TypeHead__ *type;
-    char *name;
-    enum CMM_TYPE type_code;
-} TypeHead;
 
-/*
- * This anonymous struct declaration withous
- * semi comma is only use to allow direct access
- * to the field of the common parts of all types
- */
-#define TypeHeader struct {       \
-    TypeHead *type;               \
-    char *name;                   \
-    enum CMM_TYPE type_code;      \
-}
+typedef CmmType CmmInt;
+typedef CmmType CmmFloat;
 
 /* The fixed size array type */
 typedef struct __CMM_ARRAY__ {
-    TypeHeader;
-    int size; /* The number of elements in the array */
-} CMM_array;
+    CmmType type;  /* The type indicator to recognize itself */
+    CmmType *base; /* The array type is an array of another base */
+    int size;      /* The number of elements in the array */
+} CmmArray;
 
-/* The commonly repeated variable type */
-typedef struct __CMM_VAR_LIST_NODE__ {
-    TypeHeader;
-    struct __CMM_VAR_LIST_NODE__ *next;
-} CMM_var_list_node;
-
-typedef CMM_var_list_node CMM_field;
-typedef CMM_var_list_node CMM_param;
+/*
+ * The field and param cannot be considered as an individual type, which
+ * is a part of the structure or function. So the meaning of fields in this
+ * struct type may be somewhat different.
+ * The type field is a pointer but not a value because the node has no needs
+ * to recognized itself, it links to the real type this field owns.
+ */
+typedef struct __TYPE_NODE__ {
+    CmmType *type;
+    struct __TYPE_NODE__ *next;
+} TypeNode;
 
 /* The struct field */
 typedef struct __CMM_STRUCT__ {
-    TypeHeader;
-    CMM_field *field_list;
-} CMM_struct;
+    CmmType type;
+    char *tag;            /* Optional, can be NULL */
+    TypeNode *field_list;
+} CmmStruct;
 
 /* The function type */
 typedef struct __CMM_FUNC__ {
-    TypeHeader; /* For return value */
-    CMM_param *param_list;
-} CMM_func;
-
-#define ctor_helper(type) concat(CMM_, type) *concat(new_, type)(TypeHead *base, char *name);
-#include "cmm_type.template"
-#undef ctor_helper
+    CmmType type;
+    CmmType *ret;          /* The type of return value */
+    char *name;            /* The function name, must have */
+    TypeNode *param_list;
+} CmmFunc;
 
 #endif /* CMM_TYPE_H */

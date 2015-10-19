@@ -6,6 +6,9 @@
 *.cmm
 *.pyc
 *.vim
+.idea/
 tags
 parser
 play
+cmm_test
+CMakeLists.txt
