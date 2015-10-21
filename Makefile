@@ -56,7 +56,7 @@ $(OBJ_DIR)/%.o: %.c
 test:
 	./parser ../Test/test1.cmm
 clean:
-	rm -f parser cmm_test lex.yy.c syntax.tab.c syntax.tab.h syntax.output
+	rm -f parser cmm_test cmm_sym lex.yy.c syntax.tab.c syntax.tab.h syntax.output
 	rm -f $(C_OBJS) $(OBJS:.o=.d)
 	rm -f $(LFC) $(YFC) $(YFC:.c=.h)
 	rm -f *~
