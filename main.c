@@ -1,3 +1,4 @@
+#include "lib.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -8,9 +9,7 @@ extern int yyparse();
 extern void ast();
 extern void free_ast();
 
-#ifdef YYDEBUG
 extern int yydebug;
-#endif
 
 extern int is_lex_error;
 extern int is_syn_error;
@@ -34,9 +33,7 @@ int main(int argc, char *argv[])
         return 1;
     }
     yyrestart(f);
-#ifdef YYDEBUG
-    yydebug = 1;
-#endif
+    //yydebug = 1;
     yyparse();
     if (is_syn_error) {
         printf("Failed to print ast due to previous errors.\n");

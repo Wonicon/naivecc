@@ -61,6 +61,7 @@ void print_type(CmmType *x);
 
 extern CmmType *global_int;
 extern CmmType *global_float;
+
 CmmArray *new_type_array(int size, CmmType *base);
 CmmStruct *new_type_struct(char *name);
 TypeNode *new_type_node(CmmType *type, TypeNode *next);

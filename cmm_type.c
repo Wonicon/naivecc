@@ -15,6 +15,7 @@ const char *type_s[] =
 /* Constructors */
 
 CmmType basic_type[2] = { CMM_TYPE_INT, CMM_TYPE_FLOAT };
+
 CmmType *global_int = &basic_type[0];
 CmmType *global_float = &basic_type[1];
 

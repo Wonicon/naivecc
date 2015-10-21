@@ -2,8 +2,13 @@
 %error-verbose
 %{
 
-#include "node.h"
 #include "yytname.h"
+#include "node.h"
+#include "cmm_type.h"
+#include "cmm_symtab.h"
+#include "lib.h"
+#include <assert.h>
+
 
 int is_lex_error = 0;
 int is_syn_error = 0;
@@ -65,6 +70,7 @@ static union YYSTYPE *YYVSP = NULL;
 #define LOGERR(x) is_lex_error = 0; if (is_greedy) yyerrok
 #endif
 
+void midorder(node_t *, int);
 %}
 
 /* declared types */
@@ -162,7 +168,15 @@ ExtDecList      : VarDec                  { LINK(ExtDecList, 1); }
 
 /* Specifiers */
 
-Specifier       : TYPE            { LINK(Specifier, 1); }
+Specifier       : TYPE { 
+                    LINK(Specifier, 1);
+                    assert($1 != NULL && $1->val.s != NULL);
+                    if (!strcmp($1->val.s, "int")) {
+                        $$->cmm_type = global_int;
+                    } else {
+                        $$->cmm_type = global_float;
+                    }
+                }
                 | StructSpecifier { LINK(Specifier, 1); }
                 ;
 
@@ -223,22 +237,51 @@ DefList         : Def DefList   { LINK(DefList, 2); }
                 |               { $$ = NULL; }
                 ;
 
-Def             : Specifier DecList SEMI  { LINK(Def, 3); }
+Def             : Specifier DecList SEMI  {
+                    LINK(Def, 3);
+                    assert($1->cmm_type != NULL);
+                    assert($2->cmm_type != NULL);
+                    if (!typecmp($1->cmm_type, $2->cmm_type)) {
+                        LOG("Bad at line %d", yylineno);
+                    }
+                }
                 | Specifier DecList error { LOGERR(Def spec decl err); }
                 | Specifier error SEMI    { LOGERR(def: spec err semi); }
                 ;
 
-DecList         : Dec               { LINK(DecList, 1); }
-                | Dec COMMA DecList { LINK(DecList, 3); }
+DecList         : Dec {
+                    LINK(DecList, 1);
+                    assert($1->cmm_type != NULL);
+                    $$->cmm_type = $1->cmm_type;
+                }
+                | Dec COMMA DecList {
+                    LINK(DecList, 3);
+                    // Now we can also check type consistency
+                    assert($1->cmm_type != NULL);
+                    assert($3->cmm_type != NULL);
+                    if (!typecmp($1->cmm_type, $3->cmm_type)) {
+                        LOG("Bad at line %d", yylineno);
+                    }
+                    $$->cmm_type = $1->cmm_type;
+                }
                 ;
 
 Dec             : VarDec              { LINK(Dec, 1); }
-                | VarDec ASSIGNOP Exp { LINK(Dec, 3); }
+                | VarDec ASSIGNOP Exp {
+                    LINK(Dec, 3);
+                    assert($3->cmm_type != NULL);
+                    assert($1->cmm_type == NULL);
+                    // Synthesis
+                    $$->cmm_type = $1->cmm_type = $3->cmm_type;
+                }
                 ;
 
 /* Expressions */
 
-Exp             : Exp ASSIGNOP Exp { LINK(Exp, 3); }
+Exp             : Exp ASSIGNOP Exp {
+                    LINK(Exp, 3);
+                    //assert($3->cmm_type != NULL);
+                }
                 | Exp AND Exp      { LINK(Exp, 3); }
                 | Exp OR Exp       { LINK(Exp, 3); }
                 | Exp RELOP Exp    { LINK(Exp, 3); }
@@ -254,8 +297,14 @@ Exp             : Exp ASSIGNOP Exp { LINK(Exp, 3); }
                 | Exp LB Exp RB    { LINK(Exp, 4); }
                 | Exp DOT ID       { LINK(Exp, 3); }
                 | ID               { LINK(Exp, 1); }
-                | INT              { LINK(Exp, 1); }
-                | FLOAT            { LINK(Exp, 1); }
+                | INT {
+                    LINK(Exp, 1);
+                    $$->cmm_type = global_int;
+                }
+                | FLOAT {
+                    LINK(Exp, 1);
+                    $$->cmm_type = global_float;
+                }
                 ;
 
 Args            : Exp COMMA Args  { LINK(Args, 3); }
