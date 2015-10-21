@@ -1,18 +1,11 @@
 %{
 
 #include "node.h"
-#include "token.h"
 #include "syntax.tab.h"
 #include <stdio.h>
 #include <stdlib.h>
 
-#ifndef DEBUG
 #define Type enum yytokentype
-#define LOG(x) ;
-#else
-#define Type enum TOKEN_Type
-#define LOG(x) printf("\033[0;35;40m" #x "\033[0m" " ")
-#endif
 
 Type lex_handle(Type type);
 void ErrorMsg(char *desc, char *lexeme, int lineno);
@@ -23,7 +16,7 @@ extern int is_lex_error;
 /*
  * Wrapper of lex_handle aimed to use LOG
  */
-#define HANDLE(type) { LOG(type); return lex_handle(type); }
+#define HANDLE(type) { LOG("type %d, lexeme %s", type, yytext); return lex_handle(type); }
 
 #define YY_USER_ACTION \
 yylloc.first_line = yylloc.last_line = yylineno;\
@@ -104,6 +97,7 @@ WS [[:blank:]]
     yylval.nd->lineno = yylineno;
     yylval.nd->val.f = atof(yytext);
     token_on_line++;
+    LOG("type %d, lexeme %s", FLOAT, yytext);
     return FLOAT;
             }
 {HEX}       {
@@ -115,6 +109,7 @@ WS [[:blank:]]
     yylval.nd->lineno = yylineno;
     yylval.nd->val.i = strtol(yytext, NULL, 16);
     token_on_line++;
+    LOG("type %d, lexeme %s", INT, yytext);
     return INT;
             }
 {OCT}       {
@@ -122,10 +117,10 @@ WS [[:blank:]]
         is_lex_error = 1;
         return 1;
     }
-    yylval.nd = new_node(INT - FLOAT + 3);
     yylval.nd->lineno = yylineno;
     yylval.nd->val.i = strtol(yytext, NULL, 8);
     token_on_line++;
+    LOG("type %d, lexeme %s", INT, yytext);
     return INT;
             }
 {INT}       {
@@ -133,12 +128,10 @@ WS [[:blank:]]
     yylval.nd->lineno = yylineno;
     yylval.nd->val.i = strtol(yytext, NULL, 10);
     token_on_line++;
+    LOG("type %d, lexeme %s", INT, yytext);
     return INT;
             }
 "\n" {
-#ifdef DEBUG
-    yylineno++;
-#endif
     token_on_line = 0;
     yycolumn = 1;
 }
@@ -162,7 +155,6 @@ int check_oct(char *yytext, int yyleng, int yylineno)
             return 0;
         }
     }
-    LOG(OCT);
     return 1;
 }
 
@@ -176,7 +168,6 @@ int check_hex(char *yytext, int yyleng, int yylineno)
             ErrorMsg("Illegal hexadecimal number", yytext, yylineno);
         }
     }
-    LOG(HEX);
     return 1;
 }
 
