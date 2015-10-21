@@ -14,7 +14,7 @@ typedef struct Node {
         char *s;
         void *p;
     } val;
-    CmmType *inh_type;
+    CmmType *cmm_type;
     struct Node *child, *sibling;
 } node_t;
 
