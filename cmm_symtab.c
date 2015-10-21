@@ -5,17 +5,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-typedef struct _sym_ent_t
-{
-    char *symbol;   /* The symbol string */
-    CmmType *type;  /* The generic type pointer, we can know the real type by dereferncing it */
-    int line;       /* The line number this symbol first DECLARED */
-    int size;       /* The size this symbol will occupy the memory, maybe we can get it from the type? */
-    int address;    /* The memory address, or register code */
-    int scope;      /* The scope index, each symbol will get exactly one */
-    struct _sym_ent_t *link;  /* Used for open hashing */
-} sym_ent_t;
-
 #define SIZE 0x3fff
 static sym_ent_t *symtab[SIZE] = { 0 };
 
@@ -35,10 +24,8 @@ unsigned int hash(char *name)
 int insert(char *sym, CmmType *type, int line, int scope) {
     assert(sym != NULL);
 
-
     unsigned int index = hash(sym);
     LOG("Hash index %u", index);
-
 
     // Find collision or reach the end
     sym_ent_t *dest = symtab[index];
@@ -72,7 +59,7 @@ int insert(char *sym, CmmType *type, int line, int scope) {
     return 1;
 }
 
-int query(char *sym, int scope)
+sym_ent_t *query(char *sym, int scope)
 {
     assert(sym);
     unsigned int index = hash(sym);
@@ -88,14 +75,16 @@ int query(char *sym, int scope)
         if (!strcmp(sym, scanner->symbol)) {
             LOG("To query %s: collision detected at slot %d, list %d", sym, index, listno);
             // TODO: check scope
-            return 1;
+            sym_ent_t *sym_clone = NEW(sym_ent_t);
+            *sym_clone = *scanner;
+            return sym_clone;
         } else {
             listno++;
             scanner = scanner->link;
         }
     }
 
-    return 0;
+    return NULL;
 }
 
 void print_symtab()
@@ -130,8 +119,15 @@ int test_sym()
     insert("a_new_array", GENERIC(a3), 10, 0);
     print_symtab();
 
-    if (query("a_new_array", 0)) {
+    sym_ent_t *ret = query("a_new_array", 0);
+    if (ret != NULL) {
         printf("Found!\n");
+        free(ret);
+    }
+
+    ret = query("sdf", 0);
+    if (ret == NULL) {
+        printf("Miss\n");
     }
     return 0;
 }
