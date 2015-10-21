@@ -191,10 +191,7 @@ Type lex_handle(Type type)
     // In lexical phase we don't pay attention to non-terminals
     yylval.nd = new_node(type - FLOAT + 3);
     yylval.nd->lineno = yylineno;
-    switch (type) {
-        case TYPE: yylval.nd->val.s = strdup(yytext); break;
-        case ID: yylval.nd->val.s = strdup(yytext); break;
-    }
+    yylval.nd->val.s = strdup(yytext);
     token_on_line++;
     return type;
 }

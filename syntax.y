@@ -279,6 +279,9 @@ void midorder(node_t *nd, int level)
     else if (nd->type == YY_FLOAT) {
         printf(": %f", nd->val.f);
     }
+    else if (nd->type == YY_RELOP) {
+        printf(": %s", nd->val.s);
+    }
     if (nd->type > YYNTOKENS) {
         printf(" (%d)", nd->lineno);
     }

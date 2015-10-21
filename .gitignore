@@ -11,4 +11,5 @@ tags
 parser
 play
 cmm_test
+cmm_sym
 CMakeLists.txt
