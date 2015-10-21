@@ -54,4 +54,8 @@ enum YYTNAME_INDEX {
     YY_Args            = 53,
 };
 
+const char *get_token_name(int type_code);
+
+int is_terminal(int type_code);
+
 #endif

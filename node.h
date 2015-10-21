@@ -3,11 +3,9 @@
 
 #include "cmm_type.h"
 
-typedef struct Node {
+typedef struct _node_t {
     int type;
-    int code;
     int lineno;
-    int colno;
     union {
         int i;
         float f;
@@ -15,10 +13,11 @@ typedef struct Node {
         void *p;
     } val;
     CmmType *cmm_type;
-    struct Node *child, *sibling;
+    struct _node_t *child, *sibling;
 } node_t;
 
 node_t *new_node(int type);
 void free_node(node_t *nd);
+void puts_tree(node_t *nd);
 
-#endif /* NODE_H */
+#endif // NODE_H

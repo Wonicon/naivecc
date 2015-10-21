@@ -13,10 +13,10 @@ int yycolumn = 1;
 int token_on_line = 0;
 extern int is_lex_error;
 
-/*
- * Wrapper of lex_handle aimed to use LOG
- */
-#define HANDLE(type) { LOG("type %d, lexeme %s", type, yytext); return lex_handle(type); }
+//
+// Wrapper of lex_handle aimed to use LOG
+//
+#define HANDLE(type) { return lex_handle(type); }
 
 #define YY_USER_ACTION \
 yylloc.first_line = yylloc.last_line = yylineno;\
@@ -97,7 +97,6 @@ WS [[:blank:]]
     yylval.nd->lineno = yylineno;
     yylval.nd->val.f = atof(yytext);
     token_on_line++;
-    LOG("type %d, lexeme %s", FLOAT, yytext);
     return FLOAT;
             }
 {HEX}       {
@@ -109,7 +108,6 @@ WS [[:blank:]]
     yylval.nd->lineno = yylineno;
     yylval.nd->val.i = strtol(yytext, NULL, 16);
     token_on_line++;
-    LOG("type %d, lexeme %s", INT, yytext);
     return INT;
             }
 {OCT}       {
@@ -120,7 +118,6 @@ WS [[:blank:]]
     yylval.nd->lineno = yylineno;
     yylval.nd->val.i = strtol(yytext, NULL, 8);
     token_on_line++;
-    LOG("type %d, lexeme %s", INT, yytext);
     return INT;
             }
 {INT}       {
@@ -128,7 +125,6 @@ WS [[:blank:]]
     yylval.nd->lineno = yylineno;
     yylval.nd->val.i = strtol(yytext, NULL, 10);
     token_on_line++;
-    LOG("type %d, lexeme %s", INT, yytext);
     return INT;
             }
 "\n" {
@@ -144,8 +140,7 @@ WS [[:blank:]]
 
 %%
 
-int check_oct(char *yytext, int yyleng, int yylineno)
-{
+int check_oct(char *yytext, int yyleng, int yylineno) {
     int i;
     // all zero here is considered oct
     for (i = 0; i < yyleng; i++) {
@@ -158,8 +153,7 @@ int check_oct(char *yytext, int yyleng, int yylineno)
     return 1;
 }
 
-int check_hex(char *yytext, int yyleng, int yylineno)
-{
+int check_hex(char *yytext, int yyleng, int yylineno) {
     int i;
     // Jump over '0x'
     for (i = 2; i < yyleng; i++) {
@@ -171,13 +165,12 @@ int check_hex(char *yytext, int yyleng, int yylineno)
     return 1;
 }
 
-/*
- * lex_handle : the common handle routine
- * PARAM type : the type of the lexeme
- * RETURN     : the type of the lexeme 
- */
-Type lex_handle(Type type)
-{
+//
+// lex_handle : the common handle routine
+// PARAM type : the type of the lexeme
+// RETURN     : the type of the lexeme 
+//
+Type lex_handle(Type type) {
     // Currently FLOAT is the first token defined in syntax.y
     // In lexical phase we don't pay attention to non-terminals
     yylval.nd = new_node(type - FLOAT + 3);
@@ -187,7 +180,6 @@ Type lex_handle(Type type)
     return type;
 }
 
-void ErrorMsg(char *desc, char *lexeme, int lineno)
-{
+void ErrorMsg(char *desc, char *lexeme, int lineno) {
     printf("Error type A at Line %d: %s '%s'\n", lineno, desc, lexeme);
 }
