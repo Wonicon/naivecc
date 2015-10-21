@@ -17,7 +17,7 @@ typedef struct _sym_ent_t
 } sym_ent_t;
 
 #define SIZE 0x3fff
-static sym_ent_t symtab[SIZE] = { 0 };
+static sym_ent_t *symtab[SIZE] = { 0 };
 
 unsigned int hash(char *name)
 {
@@ -32,61 +32,53 @@ unsigned int hash(char *name)
     return val;
 }
 
-int insert(char *sym, CmmType *type, int line, int scope)
-{
+int insert(char *sym, CmmType *type, int line, int scope) {
     assert(sym != NULL);
-    int ret = 0;
-    sym_ent_t *dest = NULL;
+
+
     unsigned int index = hash(sym);
     LOG("Hash index %u", index);
-    if (symtab[index].symbol == NULL) {
-        LOG("Symbol %s attained the first blood at slot %d. Congratulations!", sym, index);
-        dest = &symtab[index];
-    } else {
-        if (!strcmp(sym, symtab[index].symbol)) {
-            LOG("To query %s: collision detected at slot %d", sym, index);
+
+
+    // Find collision or reach the end
+    sym_ent_t *dest = symtab[index];
+    sym_ent_t *pre = NULL;
+    int listno = 0;
+    while (dest != NULL) {
+        if (!strcmp(sym, symtab[index]->symbol)) {
+            LOG("To insert %s: collision detected at slot %d, list %d", sym, index, listno);
             return -1;
         } else {
-            LOG("Unfortunately, slot %d is occupied by '%s'", index, symtab[index].symbol);
-        }
-
-        dest = symtab[index].link;
-        sym_ent_t *pre = NULL;
-        ret = 1;
-        while (dest != NULL) {
-            ret++;
-            if (!strcmp(sym, symtab[index].symbol)) {
-                LOG("To query %s: collision detected at slot %d, list %d", sym, index, ret);
-                return -1;
-            } else {
-                LOG("Unfortunately, slot %d's list has '%s'", index, dest->symbol);
-            }
+            LOG("Unfortunately, slot %d's list has '%s'", index, dest->symbol);
             pre = dest;
             dest = dest->link;
         }
-
-        if (pre == NULL) {
-            dest = symtab[index].link = (sym_ent_t *)malloc(sizeof(sym_ent_t));
-        } else {
-            dest = pre->link = (sym_ent_t *)malloc(sizeof(sym_ent_t));
-        }
+        listno++;
     }
+
+    if (pre == NULL) {
+        LOG("The slot %d is empty, insert %s here", index, sym);
+        assert(dest == symtab[index]);
+        dest = symtab[index] = NEW(sym_ent_t);
+    } else {
+        dest = pre->link = NEW(sym_ent_t);
+    }  // NOTE we should modify the pointer stored in the hash table, but not only `dest'
 
     dest->symbol = sym;
     dest->type = type;
     dest->line  = line;
     dest->scope = scope;
 
-    return ret;
+    return 1;
 }
 
 int query(char *sym, int scope)
 {
     assert(sym);
     unsigned int index = hash(sym);
-    sym_ent_t *scanner = &symtab[index];
+    sym_ent_t *scanner = symtab[index];
 
-    if (scanner->symbol == NULL) {
+    if (scanner == NULL) {
         LOG("To query %s: totaly emtpy slot", sym);
         return 0;
     }
@@ -95,11 +87,12 @@ int query(char *sym, int scope)
     while (scanner != NULL) {
         if (!strcmp(sym, scanner->symbol)) {
             LOG("To query %s: collision detected at slot %d, list %d", sym, index, listno);
-            /* TODO: check scope */
+            // TODO: check scope
             return 1;
+        } else {
+            listno++;
+            scanner = scanner->link;
         }
-        listno++;
-        scanner = scanner->link;
     }
 
     return 0;
@@ -108,10 +101,10 @@ int query(char *sym, int scope)
 void print_symtab()
 {
     for (int i = 0; i < SIZE; i++) {
-        if (symtab[i].symbol == NULL) {
+        if (symtab[i] == NULL) {
             continue;
         }
-        sym_ent_t *ent = &symtab[i];
+        sym_ent_t *ent = symtab[i];
         for (int k = 0; ent != NULL; i++, ent = ent->link) {
             printf("Slot %d, list %d: symbol '%s'\n", i, k, ent->symbol);
             printf("  Type: ");
@@ -134,6 +127,11 @@ int test_sym()
 
     insert(s->name, GENERIC(s), 10, -1);
     insert(s->name, GENERIC(s), 10, -1);
+    insert("a_new_array", GENERIC(a3), 10, 0);
     print_symtab();
+
+    if (query("a_new_array", 0)) {
+        printf("Found!\n");
+    }
     return 0;
 }

@@ -14,4 +14,7 @@ char *cmm_strdup(const char *src);
 /* Our assigned task */
 #define STRUCTURE
 
+/* Some useful macro */
+#define NEW(type) (type *)malloc(sizeof(type))
+#define NEW_ARRAY(type, n) (type *)malloc(sizeof(x) * n)
 #endif /* LIB_H */
