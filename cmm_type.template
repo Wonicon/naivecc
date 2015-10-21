@@ -1,5 +1,0 @@
-ctor_helper(array)
-ctor_helper(field)
-ctor_helper(param)
-ctor_helper(struct)
-ctor_helper(func)

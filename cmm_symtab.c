@@ -128,6 +128,10 @@ int test_sym()
 #endif /* TEST_SYM */
 {
     CmmFunc *s = new_type_func("helloworld", global_int);
+    CmmArray *a1 = new_type_array(10, global_float);
+    CmmArray *a2 = new_type_array(10, GENERIC(a1));
+    CmmArray *a3 = new_type_array(10, GENERIC(a2));
+
     insert(s->name, GENERIC(s), 10, -1);
     insert(s->name, GENERIC(s), 10, -1);
     print_symtab();
