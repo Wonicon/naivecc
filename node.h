@@ -9,10 +9,10 @@ typedef struct _node_t {
     union {
         int i;
         float f;
-        char *s;
+        const char *s;
         void *p;
     } val;
-    CmmType *cmm_type;
+    const CmmType *cmm_type;
     struct _node_t *child, *sibling;
 } node_t;
 

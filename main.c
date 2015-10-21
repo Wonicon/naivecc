@@ -1,6 +1,5 @@
-#include "lib.h"
+#include "cmm_strtab.h"
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 /* from syntax.tab.c */
@@ -32,6 +31,8 @@ int main(int argc, char *argv[])
         perror(argv[i]);
         return 1;
     }
+
+    init_strtab();
     yyrestart(f);
     //yydebug = 1;
     yyparse();

@@ -1,7 +1,9 @@
 %{
 
-#include "node.h"
+
 #include "syntax.tab.h"
+#include "node.h"
+#include "cmm_strtab.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -175,7 +177,7 @@ Type lex_handle(Type type) {
     // In lexical phase we don't pay attention to non-terminals
     yylval.nd = new_node(type - FLOAT + 3);
     yylval.nd->lineno = yylineno;
-    yylval.nd->val.s = strdup(yytext);
+    yylval.nd->val.s = register_str(yytext);
     token_on_line++;
     return type;
 }

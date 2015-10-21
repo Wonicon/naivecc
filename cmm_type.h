@@ -24,7 +24,7 @@ typedef CmmType CmmFloat;
 /* The fixed size array type */
 typedef struct __CMM_ARRAY__ {
     CmmType type;  /* The type indicator to recognize itself */
-    CmmType *base; /* The array type is an array of another base */
+    const CmmType *base; /* The array type is an array of another base */
     int size;      /* The number of elements in the array */
 } CmmArray;
 
@@ -36,49 +36,54 @@ typedef struct __CMM_ARRAY__ {
  * to recognized itself, it links to the real type this field owns.
  */
 typedef struct __TYPE_FIELD__ {
-    CmmType *type;
-    char *name;
-    struct __TYPE_FIELD__ *next;
+    const CmmType *type;
+    const char *name;
+    const struct __TYPE_FIELD__ *next;
 } CmmField;
 
 // The param list don't have name attribute.
 // But name is one of the fundamental attribute in structure.
 typedef struct __TYPE_PARAM__ {
-    CmmType *type;
-    struct __TYPE_PARAM__ *next;
+    const CmmType *type;
+    const struct __TYPE_PARAM__ *next;
 } CmmParam;
 
 /* The struct field */
 typedef struct __CMM_STRUCT__ {
     CmmType type;
-    char *tag;            /* Optional, can be NULL */
-    CmmField *field_list;
+    const char *tag;            /* Optional, can be NULL */
+    const CmmField *field_list;
 } CmmStruct;
 
 /* The function type */
 typedef struct __CMM_FUNC__ {
     CmmType type;
-    CmmType *ret;          /* The type of return value */
-    char *name;            /* The function name, must have */
-    CmmParam *param_list;
+    const CmmType *ret;          /* The type of return value */
+    const char *name;            /* The function name, must have */
+    const CmmParam *param_list;
 } CmmFunc;
 
+
+extern const CmmType *global_int;
+extern const CmmType *global_float;
+
+
+CmmArray *new_type_array(int size, const CmmType *base);
+CmmStruct *new_type_struct(const char *name);
+CmmField *new_type_field(const CmmType *type, const char *name, const CmmField *next);
+CmmParam *new_type_param(const CmmType *type, const CmmParam *next);
+CmmFunc *new_type_func(const char *name, const CmmType *ret);
+const CmmType *query_field(const CmmType *target_struct, const char *field_name);
+const char *typename(const CmmType *x);
 /* Compare two cmm type, return 1 if they are the same, 0 otherwise */
-int typecmp(CmmType *x, CmmType *y);
-void print_type(CmmType *x);
+int typecmp(const CmmType *x, const CmmType *y);
+void print_type(const CmmType *x);
 
-extern CmmType *global_int;
-extern CmmType *global_float;
-
-CmmArray *new_type_array(int size, CmmType *base);
-CmmStruct *new_type_struct(char *name);
-CmmField *new_type_field(CmmType *type, char *name, CmmField *next);
-CmmParam *new_type_param(CmmType *type, CmmParam *next);
-CmmFunc *new_type_func(char *name, CmmType *ret);
 
 #define GENERIC(x) ((CmmType *)x)
 #define ARRAY(x) ((CmmArray *)(x))
 #define STRUCT(x) ((CmmStruct *)(x))
 #define FUNC(x) ((CmmFunc *)(x))
+
 
 #endif /* CMM_TYPE_H */

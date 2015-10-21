@@ -1,6 +1,4 @@
 #include "cmm_symtab.h"
-#include "cmm_type.h"
-#include "lib.h"
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
@@ -8,7 +6,7 @@
 #define SIZE 0x3fff
 static sym_ent_t *symtab[SIZE] = { 0 };
 
-unsigned int hash(char *name)
+unsigned int hash(const char *name)
 {
     unsigned int val = 0, i;
     for (; *name; ++name) {
@@ -21,7 +19,7 @@ unsigned int hash(char *name)
     return val;
 }
 
-int insert(char *sym, CmmType *type, int line, int scope) {
+int insert(const char *sym, const CmmType *type, int line, int scope) {
     assert(sym != NULL);
 
     unsigned int index = hash(sym);
@@ -59,7 +57,7 @@ int insert(char *sym, CmmType *type, int line, int scope) {
     return 1;
 }
 
-sym_ent_t *query(char *sym, int scope)
+const sym_ent_t *query(const char *sym, int scope)
 {
     assert(sym);
     unsigned int index = hash(sym);
@@ -75,9 +73,7 @@ sym_ent_t *query(char *sym, int scope)
         if (!strcmp(sym, scanner->symbol)) {
             LOG("To query %s: collision detected at slot %d, list %d", sym, index, listno);
             // TODO: check scope
-            sym_ent_t *sym_clone = NEW(sym_ent_t);
-            *sym_clone = *scanner;
-            return sym_clone;
+            return scanner;
         } else {
             listno++;
             scanner = scanner->link;
@@ -119,10 +115,9 @@ int test_sym()
     insert("a_new_array", GENERIC(a3), 10, 0);
     print_symtab();
 
-    sym_ent_t *ret = query("a_new_array", 0);
+    const sym_ent_t *ret = query("a_new_array", 0);
     if (ret != NULL) {
         printf("Found!\n");
-        free(ret);
     }
 
     ret = query("sdf", 0);
