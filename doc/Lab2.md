@@ -25,10 +25,18 @@ function
 
 函数的属性有返回类型以及参数个数, 顺序, 类型. 可以看做是加了返回类型的struct.
 
-## Error type 12
+## Errors
 
 ```c
 a[1.5 + 2]
 ```
 
 how many errors should it report?
+
+```c
+struct A { int a; int b; };
+A a;
+a.a?
+```
+
+will this cause name collision?

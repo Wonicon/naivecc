@@ -35,16 +35,24 @@ typedef struct __CMM_ARRAY__ {
  * The type field is a pointer but not a value because the node has no needs
  * to recognized itself, it links to the real type this field owns.
  */
-typedef struct __TYPE_NODE__ {
+typedef struct __TYPE_FIELD__ {
     CmmType *type;
-    struct __TYPE_NODE__ *next;
-} TypeNode;
+    char *name;
+    struct __TYPE_FIELD__ *next;
+} CmmField;
+
+// The param list don't have name attribute.
+// But name is one of the fundamental attribute in structure.
+typedef struct __TYPE_PARAM__ {
+    CmmType *type;
+    struct __TYPE_PARAM__ *next;
+} CmmParam;
 
 /* The struct field */
 typedef struct __CMM_STRUCT__ {
     CmmType type;
     char *tag;            /* Optional, can be NULL */
-    TypeNode *field_list;
+    CmmField *field_list;
 } CmmStruct;
 
 /* The function type */
@@ -52,7 +60,7 @@ typedef struct __CMM_FUNC__ {
     CmmType type;
     CmmType *ret;          /* The type of return value */
     char *name;            /* The function name, must have */
-    TypeNode *param_list;
+    CmmParam *param_list;
 } CmmFunc;
 
 /* Compare two cmm type, return 1 if they are the same, 0 otherwise */
@@ -64,7 +72,8 @@ extern CmmType *global_float;
 
 CmmArray *new_type_array(int size, CmmType *base);
 CmmStruct *new_type_struct(char *name);
-TypeNode *new_type_node(CmmType *type, TypeNode *next);
+CmmField *new_type_field(CmmType *type, char *name, CmmField *next);
+CmmParam *new_type_param(CmmType *type, CmmParam *next);
 CmmFunc *new_type_func(char *name, CmmType *ret);
 
 #define GENERIC(x) ((CmmType *)x)
