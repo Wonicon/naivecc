@@ -40,7 +40,7 @@ int main(int argc, char *argv[])
         printf("Failed to print ast due to previous errors.\n");
     }
     else {
-        ast();
+        //ast();
     }
     free_ast();
     return 0;

@@ -155,7 +155,7 @@ ExtDefList      : ExtDef ExtDefList { LINK_NULL(ExtDefList, 2); }
                 ;
 
 
-ExtDef          : Specifier ExtDecList SEMI  { LINK(ExtDef, 3); }
+ExtDef          : Specifier ExtDecList SEMI  { /*print_type((analyze_specifier($1).type)); */LINK(ExtDef, 3); }
                 | Specifier SEMI             { LINK(ExtDef, 2); }
                 | Specifier FunDec CompSt    { LINK(ExtDef, 3); }
                 | Specifier error            { LOGERR(....); }
@@ -170,12 +170,6 @@ ExtDecList      : VarDec                  { LINK(ExtDecList, 1); }
 
 Specifier       : TYPE { 
                     LINK(Specifier, 1);
-                    assert($1 != NULL && $1->val.s != NULL);
-                    if (!strcmp($1->val.s, "int")) {
-                        $$->cmm_type = global_int;
-                    } else {
-                        $$->cmm_type = global_float;
-                    }
                 }
                 | StructSpecifier { LINK(Specifier, 1); }
                 ;
@@ -239,11 +233,22 @@ DefList         : Def DefList   { LINK(DefList, 2); }
 
 Def             : Specifier DecList SEMI  {
                     LINK(Def, 3);
+                    /*
                     assert($1->cmm_type != NULL);
-                    assert($2->cmm_type != NULL);
-                    if (!typecmp($1->cmm_type, $2->cmm_type)) {
-                        LOG("Bad at line %d", yylineno);
+                    const node_t *dec_list = $2;
+                    while (dec_list != NULL) {
+                        const node_t *vardec = dec_list->child->child;
+                        if (vardec->cmm_type == NULL) {
+                            insert(vardec->child->val.s, $1->cmm_type, vardec->child->lineno, -1);
+                        } else if (!typecmp(vardec->cmm_type, $1->cmm_type)) {
+                            insert(vardec->child->val.s, $1->cmm_type, vardec->child->lineno, -1);
+                        } else {
+                            LOG("type mismatch at %d", vardec->lineno);
+                        }
+                        dec_list = dec_list->child->sibling;
+                        if (dec_list != NULL) dec_list = dec_list->sibling;
                     }
+                    */
                 }
                 | Specifier DecList error { LOGERR(Def spec decl err); }
                 | Specifier error SEMI    { LOGERR(def: spec err semi); }
@@ -251,37 +256,21 @@ Def             : Specifier DecList SEMI  {
 
 DecList         : Dec {
                     LINK(DecList, 1);
-                    assert($1->cmm_type != NULL);
-                    $$->cmm_type = $1->cmm_type;
                 }
                 | Dec COMMA DecList {
                     LINK(DecList, 3);
                     // Now we can also check type consistency
-                    assert($1->cmm_type != NULL);
-                    assert($3->cmm_type != NULL);
-                    if (!typecmp($1->cmm_type, $3->cmm_type)) {
-                        LOG("Bad at line %d", yylineno);
-                    }
-                    $$->cmm_type = $1->cmm_type;
+                    // But let `Def' to check it is better
                 }
                 ;
 
-Dec             : VarDec              { LINK(Dec, 1); }
-                | VarDec ASSIGNOP Exp {
-                    LINK(Dec, 3);
-                    assert($3->cmm_type != NULL);
-                    assert($1->cmm_type == NULL);
-                    // Synthesis
-                    $$->cmm_type = $1->cmm_type = $3->cmm_type;
-                }
+Dec             : VarDec { LINK(Dec, 1); }
+                | VarDec ASSIGNOP Exp { LINK(Dec, 3); }
                 ;
 
 /* Expressions */
 
-Exp             : Exp ASSIGNOP Exp {
-                    LINK(Exp, 3);
-                    //assert($3->cmm_type != NULL);
-                }
+Exp             : Exp ASSIGNOP Exp { LINK(Exp, 3); }
                 | Exp AND Exp      { LINK(Exp, 3); }
                 | Exp OR Exp       { LINK(Exp, 3); }
                 | Exp RELOP Exp    { LINK(Exp, 3); }
@@ -296,15 +285,12 @@ Exp             : Exp ASSIGNOP Exp {
                 | ID LP RP         { LINK(Exp, 3); }
                 | Exp LB Exp RB    { LINK(Exp, 4); }
                 | Exp DOT ID       { LINK(Exp, 3); }
-                | ID               { LINK(Exp, 1); }
-                | INT {
+                | ID {
                     LINK(Exp, 1);
-                    $$->cmm_type = global_int;
+                    analyze_id($1);
                 }
-                | FLOAT {
-                    LINK(Exp, 1);
-                    $$->cmm_type = global_float;
-                }
+                | INT              { LINK(Exp, 1); }
+                | FLOAT            { LINK(Exp, 1); }
                 ;
 
 Args            : Exp COMMA Args  { LINK(Args, 3); }

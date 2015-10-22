@@ -3,6 +3,7 @@
 
 char *cmm_strdup(const char *src);
 
+#define DEBUG
 #define concat(x, y) x ## y
 
 #ifdef DEBUG
@@ -17,4 +18,5 @@ char *cmm_strdup(const char *src);
 /* Some useful macro */
 #define NEW(type) (type *)malloc(sizeof(type))
 #define NEW_ARRAY(type, n) (type *)malloc(sizeof(x) * n)
+#define CONCAT(x, y) x ## y
 #endif /* LIB_H */

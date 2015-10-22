@@ -5,7 +5,7 @@
 CC = gcc
 FLEX = flex
 BISON = bison
-CFLAGS = -std=c99 -ggdb
+CFLAGS = -std=c99 -ggdb -Wall
 
 # 编译目标：src目录下的所有.c文件
 CFILES = $(shell find ./ -name "*.c")
@@ -30,11 +30,11 @@ L_OBJ = $(addprefix $(OBJ_DIR)/, $(notdir $(LFO)))
 # 链接parser和外部函数
 # filter-out: 去掉$(OBJS)可能含有的$(LFO)
 parser: syntax $(filter-out $(L_OBJ) $(Y_OBJ),$(C_OBJS))
-	$(CC) -DDEBUG -ggdb -o parser $(Y_OBJ) $(filter-out $(L_OBJ) $(Y_OBJ), $(C_OBJS)) -lfl -ly
+	$(CC) -ggdb -o parser $(Y_OBJ) $(filter-out $(L_OBJ) $(Y_OBJ), $(C_OBJS)) -lfl -ly
 
 # 生成可重定位的parser
 syntax: lexical syntax-c
-	$(CC) -DDEBUG -c -ggdb $(YFC) -o $(Y_OBJ)
+	$(CC) -c -ggdb $(YFC) -o $(Y_OBJ)
 
 # 执行FLex
 lexical: $(LFILE)

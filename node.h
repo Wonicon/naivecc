@@ -20,4 +20,17 @@ node_t *new_node(int type);
 void free_node(node_t *nd);
 void puts_tree(node_t *nd);
 
+
+typedef struct _attr_t {
+    const CmmType *type;
+    const char *name;
+    int lval_flag;
+} attr_t;
+
+
+attr_t analyze_id(const node_t *id);
+attr_t analyze_struct_spec(const node_t *struct_spec);
+attr_t analyze_specifier(const node_t *specifier);
+attr_t analyze_field_dec(const node_t *dec, const CmmType *type, const CmmField *next);
+
 #endif // NODE_H

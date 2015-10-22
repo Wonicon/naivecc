@@ -169,7 +169,7 @@ int check_hex(char *yytext, int yyleng, int yylineno) {
 
 //
 // lex_handle : the common handle routine
-// PARAM type : the type of the lexeme
+// Param type : the type of the lexeme
 // RETURN     : the type of the lexeme 
 //
 Type lex_handle(Type type) {

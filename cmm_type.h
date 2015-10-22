@@ -9,7 +9,9 @@ typedef enum __CMM_TYPE__ {
     CMM_TYPE_FLOAT,
     CMM_TYPE_ARRAY,
     CMM_TYPE_STRUCT,
-    CMM_TYPE_FUNC
+    CMM_TYPE_FUNC,
+    CMM_TYPE_FIELD,
+    CMM_TYPE_PARAM
 } CmmType;
 
 /*
@@ -36,7 +38,8 @@ typedef struct __CMM_ARRAY__ {
  * to recognized itself, it links to the real type this field owns.
  */
 typedef struct __TYPE_FIELD__ {
-    const CmmType *type;
+    CmmType type;
+    const CmmType *base;
     const char *name;
     const struct __TYPE_FIELD__ *next;
 } CmmField;
@@ -44,7 +47,8 @@ typedef struct __TYPE_FIELD__ {
 // The param list don't have name attribute.
 // But name is one of the fundamental attribute in structure.
 typedef struct __TYPE_PARAM__ {
-    const CmmType *type;
+    CmmType type;
+    const CmmType *base;
     const struct __TYPE_PARAM__ *next;
 } CmmParam;
 
@@ -79,11 +83,21 @@ const char *typename(const CmmType *x);
 int typecmp(const CmmType *x, const CmmType *y);
 void print_type(const CmmType *x);
 
-
 #define GENERIC(x) ((CmmType *)x)
+#define SAFE
+#ifndef SAFE
 #define ARRAY(x) ((CmmArray *)(x))
 #define STRUCT(x) ((CmmStruct *)(x))
 #define FUNC(x) ((CmmFunc *)(x))
-
+#define FIELD(x) ((CmmField *)(x))
+#define PARAM(x) ((CmmParam *)(x))
+#else
+#include <assert.h>
+static inline const CmmArray *Array(const CmmType *type) { assert(*type == CMM_TYPE_ARRAY); return (CmmArray *)type; }
+static inline const CmmStruct *Struct(const CmmType *type) { assert(*type == CMM_TYPE_STRUCT); return (CmmStruct *)type; }
+static inline const CmmFunc *Fun(const CmmType *type) { assert(*type == CMM_TYPE_FUNC); return (CmmFunc *)type; }
+static inline const CmmField *Field(const CmmType *type) { assert(*type == CMM_TYPE_FIELD); return (CmmField *)type; }
+static inline const CmmParam *Param(const CmmType *type) { assert(*type == CMM_TYPE_PARAM); return (CmmParam *)type; }
+#endif
 
 #endif /* CMM_TYPE_H */
