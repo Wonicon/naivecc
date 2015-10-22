@@ -155,9 +155,9 @@ ExtDefList      : ExtDef ExtDefList { LINK_NULL(ExtDefList, 2); }
                 ;
 
 
-ExtDef          : Specifier ExtDecList SEMI  { /*print_type((analyze_specifier($1).type)); */LINK(ExtDef, 3); }
-                | Specifier SEMI             { LINK(ExtDef, 2); }
-                | Specifier FunDec CompSt    { LINK(ExtDef, 3); }
+ExtDef          : Specifier ExtDecList SEMI  { print_type(analyze_specifier($1).type); LINK(ExtDef, 3); }
+                | Specifier SEMI             { print_type(analyze_specifier($1).type); LINK(ExtDef, 2); }
+                | Specifier FunDec CompSt    { print_type(analyze_specifier($1).type); LINK(ExtDef, 3); }
                 | Specifier error            { LOGERR(....); }
                 | Specifier ExtDecList error { LOGERR(...); }
                 ;
@@ -168,7 +168,7 @@ ExtDecList      : VarDec                  { LINK(ExtDecList, 1); }
 
 /* Specifiers */
 
-Specifier       : TYPE { 
+Specifier       : TYPE {
                     LINK(Specifier, 1);
                 }
                 | StructSpecifier { LINK(Specifier, 1); }
@@ -231,25 +231,7 @@ DefList         : Def DefList   { LINK(DefList, 2); }
                 |               { $$ = NULL; }
                 ;
 
-Def             : Specifier DecList SEMI  {
-                    LINK(Def, 3);
-                    /*
-                    assert($1->cmm_type != NULL);
-                    const node_t *dec_list = $2;
-                    while (dec_list != NULL) {
-                        const node_t *vardec = dec_list->child->child;
-                        if (vardec->cmm_type == NULL) {
-                            insert(vardec->child->val.s, $1->cmm_type, vardec->child->lineno, -1);
-                        } else if (!typecmp(vardec->cmm_type, $1->cmm_type)) {
-                            insert(vardec->child->val.s, $1->cmm_type, vardec->child->lineno, -1);
-                        } else {
-                            LOG("type mismatch at %d", vardec->lineno);
-                        }
-                        dec_list = dec_list->child->sibling;
-                        if (dec_list != NULL) dec_list = dec_list->sibling;
-                    }
-                    */
-                }
+Def             : Specifier DecList SEMI  { LINK(Def, 3); }
                 | Specifier DecList error { LOGERR(Def spec decl err); }
                 | Specifier error SEMI    { LOGERR(def: spec err semi); }
                 ;

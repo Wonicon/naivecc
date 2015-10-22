@@ -122,6 +122,7 @@ attr_t analyze_vardec(const node_t *vardec, const CmmType *inh_type) {
 }
 
 
+// next comes from the declist behind
 attr_t analyze_field_dec(const node_t *dec, const CmmType *type, const CmmField *next) {
     assert(dec->type == YY_Dec);
 
@@ -130,26 +131,29 @@ attr_t analyze_field_dec(const node_t *dec, const CmmType *type, const CmmField 
     if (vardec->sibling != NULL) {
         SEMA_ERROR_MSG(15, dec->lineno, "Initialization in the structure definition is not allowed");
     }
-    return analyze_vardec(vardec, type);
+
+    attr_t vardec_attr = analyze_vardec(vardec, type);
+    return vardec_attr;
 }
 
 
+// next comes from the deflist behind
 attr_t analyze_field_declist(const node_t *declist, const CmmType *type, const CmmField *next) {
     assert(declist->type == YY_DecList);
 
     // The first child is always dec
     const node_t *dec = declist->child;
 
-    // Handle declist if it exists, otherwise the analysis of dec will use the default next_attr which contains null.
-    attr_t next_attr = error_attr;
+    // Handle declist if it exists, otherwise the analysis of dec will use the default next_attr which contains next.
+    attr_t next_attr = { GENERIC(next), NULL, 0 };
     if (dec->sibling != NULL) {
         // declist -> dec comma declist
         const node_t *sub_list = dec->sibling->sibling;
         next_attr = analyze_field_declist(sub_list, type, next);
     }
 
-    // Analyze the dec later because we want the list head of the declist
-    // If we don't have a declist here, the next_attr.type remains null
+    // Analyze the dec later because we want the list head of the declist to link up.
+    // If we don't have a declist here, the next_attr.type remains next in parameters.
     attr_t this_attr = analyze_field_dec(dec, type, Field(next_attr.type));
 
     LOG("Generate a new field: %s", this_attr.name);
@@ -159,8 +163,9 @@ attr_t analyze_field_declist(const node_t *declist, const CmmType *type, const C
     return return_attr;
 }
 
-/*
-attr_t analyze_field_def(const node_t *def, const CmmType *type, const CmmField *next) {
+
+// next comes from the deflist behind
+attr_t analyze_field_def(const node_t *def, const CmmField *next) {
     // Get body symbols
     const node_t *spec = def->child;
     const node_t *declist = spec->sibling;
@@ -170,15 +175,16 @@ attr_t analyze_field_def(const node_t *def, const CmmType *type, const CmmField 
     assert(semi->type == YY_SEMI);
 
     // Handle Specifier
-    const CmmType *type = Field(analyze_specifier(def->child).type);
+    const CmmType *field_type = analyze_specifier(def->child).type;
 
     // Handle DecList and get a field list
-    attr_t declist_attr = analyze_field_declist(declist, next);
+    attr_t declist_attr = analyze_field_declist(declist, field_type, next);
 
-
-    return error_attr;
+    return declist_attr;
 }
 
+
+// no next!
 attr_t analyze_field_deflist(const node_t *deflist) {
     if (deflist == NULL) {
         return error_attr;
@@ -186,13 +192,15 @@ attr_t analyze_field_deflist(const node_t *deflist) {
     const node_t *def = deflist->child;
     const node_t *sub_list = def->sibling;
     attr_t sub_field = analyze_field_deflist(sub_list);
-    attr_t this_field = analyze_field_def(def, sub_field.type);
+    attr_t this_field = analyze_field_def(def, Field(sub_field.type));
     return this_field;
 }
 
 
 attr_t analyze_struct_spec(const node_t *struct_spec) {
+    assert(struct_spec->type == YY_StructSpecifier);
     node_t *body = struct_spec->child->sibling;
+    LOG("The second child of struct spec is %s", get_token_name(body->type));
     if (body->type == YY_Tag) {
         // No new struct type will be registered;
         // Get name
@@ -219,7 +227,7 @@ attr_t analyze_struct_spec(const node_t *struct_spec) {
         body = body->sibling;
     } else {
         // Get name
-        assert(body->child->type == YY_OptTag);
+        assert(body->type == YY_OptTag);
         name = body->child->val.s;
         body = body->sibling->sibling;
     }
@@ -229,12 +237,13 @@ attr_t analyze_struct_spec(const node_t *struct_spec) {
     CmmStruct *this = new_type_struct(name);
 
     // Get field list
-    attr_t field = analyze_field_deflist(body->sibling);
+    attr_t field = analyze_field_deflist(body);
     assert(*(field.type) == CMM_TYPE_FIELD);
     this->field_list = Field(field.type);
 
     // Use the struct name to register in the symbol table
-    int insert_rst = insert(this->tag, GENERIC(this), struct_spec->lineno, -1);
+    int insert_rst = !strcmp(this->tag, "") ? 1 :
+                     insert(this->tag, GENERIC(this), struct_spec->lineno, -1);
     if (insert_rst < 1) {
         SEMA_ERROR_MSG(16, struct_spec->lineno, "The struct name '%s' has collision with previous one(s)", name);
     }
@@ -242,6 +251,7 @@ attr_t analyze_struct_spec(const node_t *struct_spec) {
     attr_t attr_ret = {GENERIC(this), this->tag, 0};
     return attr_ret;
 }
+
 
 attr_t analyze_specifier(const node_t *specifier) {
     attr_t ret = {NULL, NULL, 0};
@@ -257,4 +267,3 @@ attr_t analyze_specifier(const node_t *specifier) {
         return analyze_struct_spec(specifier->child);
     }
 }
-*/

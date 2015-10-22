@@ -93,11 +93,11 @@ void print_type(const CmmType *x);
 #define PARAM(x) ((CmmParam *)(x))
 #else
 #include <assert.h>
-static inline const CmmArray *Array(const CmmType *type) { assert(*type == CMM_TYPE_ARRAY); return (CmmArray *)type; }
-static inline const CmmStruct *Struct(const CmmType *type) { assert(*type == CMM_TYPE_STRUCT); return (CmmStruct *)type; }
-static inline const CmmFunc *Fun(const CmmType *type) { assert(*type == CMM_TYPE_FUNC); return (CmmFunc *)type; }
-static inline const CmmField *Field(const CmmType *type) { assert(*type == CMM_TYPE_FIELD); return (CmmField *)type; }
-static inline const CmmParam *Param(const CmmType *type) { assert(*type == CMM_TYPE_PARAM); return (CmmParam *)type; }
+static inline const CmmArray *Array(const CmmType *type) { assert(type == NULL || *type == CMM_TYPE_ARRAY); return (CmmArray *)type; }
+static inline const CmmStruct *Struct(const CmmType *type) { assert(type == NULL || *type == CMM_TYPE_STRUCT); return (CmmStruct *)type; }
+static inline const CmmFunc *Fun(const CmmType *type) { assert(type == NULL || *type == CMM_TYPE_FUNC); return (CmmFunc *)type; }
+static inline const CmmField *Field(const CmmType *type) { assert(type == NULL || *type == CMM_TYPE_FIELD); return (CmmField *)type; }
+static inline const CmmParam *Param(const CmmType *type) { assert(type == NULL || *type == CMM_TYPE_PARAM); return (CmmParam *)type; }
 #endif
 
 #endif /* CMM_TYPE_H */
