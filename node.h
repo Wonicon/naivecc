@@ -30,5 +30,6 @@ typedef struct _attr_t {
 
 attr_t analyze_exp_id(const node_t *id);
 attr_t analyze_specifier(const node_t *specifier);
+attr_t analyze_paramdec(const node_t * paramdec);
 
 #endif // NODE_H

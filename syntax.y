@@ -195,7 +195,7 @@ FunDec          : ID LP VarList RP { LINK(FunDec, 4); }
                 | ID LP RP         { LINK(FunDec, 3); }
                 ;
 
-ParamDec        : Specifier VarDec { LINK(ParamDec, 2); }
+ParamDec        : Specifier VarDec { LINK(ParamDec, 2); analyze_paramdec($$); }
                 ;
 
 VarList         : ParamDec COMMA VarList { LINK(VarList, 3); }

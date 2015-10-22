@@ -1,4 +1,5 @@
 #include "cmm_strtab.h"
+#include "cmm_symtab.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -43,5 +44,7 @@ int main(int argc, char *argv[])
         //ast();
     }
     free_ast();
+
+    print_symtab();
     return 0;
 }

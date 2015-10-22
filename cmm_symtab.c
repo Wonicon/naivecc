@@ -94,7 +94,7 @@ void print_symtab()
             printf("Slot %d, list %d: symbol '%s'\n", i, k, ent->symbol);
             printf("  Type: ");
             print_type(ent->type);
-            printf("  Link: %d\n", ent->line);
+            printf("  Line: %d\n", ent->line);
         }
     }
 }

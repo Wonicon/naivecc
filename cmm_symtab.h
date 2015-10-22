@@ -36,5 +36,6 @@ int insert(const char *sym, const CmmType *type, int line, int scope);
 // NOTE the return value is a shallow copy of the found symbol
 // Release it directly through free, DO NOT release any of its pointer fields.
 const sym_ent_t *query(const char *sym, int scope);
+void print_symtab();
 
 #endif /* CMM_SYMTAB_H */

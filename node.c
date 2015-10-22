@@ -162,7 +162,6 @@ attr_t analyze_field_declist(const node_t *declist, const CmmType *type, const C
     const node_t *find_id = dec->child;
     while (find_id->type != YY_ID) {
         find_id = find_id->child;
-        LOG("find_id is %s", get_token_name(find_id->type));
     }
     CmmField *field = new_type_field(this_attr.type, this_attr.name, find_id->lineno, Field(next_attr.type));
 
@@ -206,16 +205,19 @@ attr_t analyze_field_deflist(const node_t *deflist) {
 
 attr_t analyze_struct_spec(const node_t *struct_spec) {
     assert(struct_spec->type == YY_StructSpecifier);
-    node_t *body = struct_spec->child->sibling;
+
+    const node_t *body = struct_spec->child->sibling;  // Jump tag 'struct'
     LOG("The second child of struct spec is %s", get_token_name(body->type));
     if (body->type == YY_Tag) {
-        // No new struct type will be registered;
-        // Get name
-        assert(body->child->type == YY_ID);
-        const sym_ent_t *ent = query(body->child->val.s, -1);
+        // No new struct type will be registered.
+        // Get name from symbol table.
+        const node_t *id = body->child;
+        assert(id->type == YY_ID);
+        const sym_ent_t *ent = query(id->val.s, -1);
         attr_t ret = error_attr;
-        if (ent == NULL) {
+        if (ent == NULL) {  // The symbol is not found
             SEMA_ERROR_MSG(17, body->lineno, "Undefined struct name '%s'", body->child->val.s);
+            // Create an empty anonymous struct for this variable to allow it stored in the symbol table.
             CmmStruct *this = new_type_struct("");
             ret.type = GENERIC(this);
             ret.name = "";
@@ -234,6 +236,7 @@ attr_t analyze_struct_spec(const node_t *struct_spec) {
         body = body->sibling;
     } else {
         // Get name
+        LOG("Get name from tag %s", body->child->val.s);
         assert(body->type == YY_OptTag);
         name = body->child->val.s;
         body = body->sibling->sibling;
@@ -263,7 +266,10 @@ attr_t analyze_struct_spec(const node_t *struct_spec) {
         }
         outer = outer->next;
     }
-    // Use the struct name to register in the symbol table
+
+    // Use the struct name to register in the symbol table.
+    // Ignore the struct with empty tag.
+    LOG("struct %s is inserting", this->tag);
     int insert_rst = !strcmp(this->tag, "") ? 1 :
                      insert(this->tag, GENERIC(this), struct_spec->lineno, -1);
     if (insert_rst < 1) {
@@ -289,3 +295,41 @@ attr_t analyze_specifier(const node_t *specifier) {
         return analyze_struct_spec(specifier->child);
     }
 }
+
+
+
+//
+// Analyze FunDec production:
+//   FunDec -> ID LP VarList RP
+//   FunDec -> ID LP RP
+// The most important part is the analysis of VarList.
+// It is a param list, which is akin to the field list.
+// But we cannot reuse the analyze_field_declist because the production is so different.
+//
+
+// First we should analyze the VarList part. Because a parameter must follow a Specifier,
+// so we can avoid the hell of declist that inherits the same Specifier.
+// The return attribute should care about the type, which shoudl be a CmmParam in order to link up the param list.
+// We can just register the parameter here.
+attr_t analyze_paramdec(const node_t * paramdec) {
+    assert(paramdec->type == YY_ParamDec);
+
+    attr_t spec_attr, var_attr;
+
+    const node_t *specifier = paramdec->child;
+    const node_t *vardec = specifier->sibling;
+
+    spec_attr = analyze_specifier(specifier);
+    var_attr = analyze_vardec(vardec, spec_attr.type);
+#ifdef DEBUG
+    LOG("The param type is:");
+    print_type(var_attr.type);
+#endif
+
+    int insert_ret = insert(var_attr.name, var_attr.type, paramdec->lineno, -1);
+    if (insert_ret < 1) {
+        SEMA_ERROR_MSG(3, vardec->lineno, "Duplicated variable definition of '%s'", var_attr.name);
+    }
+    return var_attr;
+}
+
