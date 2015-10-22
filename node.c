@@ -85,7 +85,7 @@ static attr_t error_attr = {NULL, NULL, 0};
 #define SEMA_ERROR_MSG(type, lineno, fmt, ...) \
 fprintf(stderr, "Error type %d at Line %d: " fmt "\n", type, lineno, ## __VA_ARGS__)
 
-attr_t analyze_id(const node_t *id) {
+attr_t analyze_exp_id(const node_t *id) {
     const sym_ent_t *var = query(id->val.s, -1);
     if (var == NULL) {
         SEMA_ERROR_MSG(1, id->lineno, "undefined %s", id->val.s);
@@ -157,7 +157,14 @@ attr_t analyze_field_declist(const node_t *declist, const CmmType *type, const C
     attr_t this_attr = analyze_field_dec(dec, type, Field(next_attr.type));
 
     LOG("Generate a new field: %s", this_attr.name);
-    CmmField *field = new_type_field(this_attr.type, this_attr.name, Field(next_attr.type));
+
+    // Get id line number
+    const node_t *find_id = dec->child;
+    while (find_id->type != YY_ID) {
+        find_id = find_id->child;
+        LOG("find_id is %s", get_token_name(find_id->type));
+    }
+    CmmField *field = new_type_field(this_attr.type, this_attr.name, find_id->lineno, Field(next_attr.type));
 
     attr_t return_attr = { GENERIC(field), NULL, 0 };
     return return_attr;
@@ -241,6 +248,21 @@ attr_t analyze_struct_spec(const node_t *struct_spec) {
     assert(*(field.type) == CMM_TYPE_FIELD);
     this->field_list = Field(field.type);
 
+    // Check fields
+    const CmmField *outer = this->field_list;
+    const CmmField *inner;
+    while (outer != NULL) {
+        inner = outer->next;
+        while (inner != NULL) {
+            if (!strcmp(outer->name, inner->name)) {
+                SEMA_ERROR_MSG(15, inner->def_line_no, "Duplicated decleration of field %s, the previous one is at %d",
+                               outer->name, outer->def_line_no);
+                break;  // Avoid duplicated error msg when more than two duplications
+            }
+            inner = inner->next;
+        }
+        outer = outer->next;
+    }
     // Use the struct name to register in the symbol table
     int insert_rst = !strcmp(this->tag, "") ? 1 :
                      insert(this->tag, GENERIC(this), struct_spec->lineno, -1);

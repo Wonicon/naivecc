@@ -269,7 +269,7 @@ Exp             : Exp ASSIGNOP Exp { LINK(Exp, 3); }
                 | Exp DOT ID       { LINK(Exp, 3); }
                 | ID {
                     LINK(Exp, 1);
-                    analyze_id($1);
+                    analyze_exp_id($1);
                 }
                 | INT              { LINK(Exp, 1); }
                 | FLOAT            { LINK(Exp, 1); }

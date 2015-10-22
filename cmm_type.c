@@ -47,12 +47,13 @@ CmmFunc *new_type_func(const char *name, const CmmType *ret)
     return p;
 }
 
-CmmField *new_type_field(const CmmType *type, const char *name, const CmmField *next) {
+CmmField *new_type_field(const CmmType *type, const char *name, int lineno, const CmmField *next) {
     CmmField *p = NEW(CmmField);
     p->type = CMM_TYPE_FIELD;
     p->base = type;
     p->next = next;
     p->name = name;
+    p->def_line_no = lineno;
     return p;
 }
 
@@ -263,8 +264,8 @@ int test_cmm_type()
                 break;
             case 1:
                 struc = new_type_struct("hello");
-                struc->field_list = new_type_field(&top, "a", NULL);
-                struc->field_list = new_type_field(&top, "b", Struct(current)->field_list);
+                struc->field_list = new_type_field(&top, "a", 0, NULL);
+                struc->field_list = new_type_field(&top, "b", 1, Struct(current)->field_list);
                 current = GENERIC(struc);
                 break;
             case 2:

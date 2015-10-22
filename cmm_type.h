@@ -41,6 +41,7 @@ typedef struct __TYPE_FIELD__ {
     CmmType type;
     const CmmType *base;
     const char *name;
+    int def_line_no;
     const struct __TYPE_FIELD__ *next;
 } CmmField;
 
@@ -74,7 +75,7 @@ extern const CmmType *global_float;
 
 CmmArray *new_type_array(int size, const CmmType *base);
 CmmStruct *new_type_struct(const char *name);
-CmmField *new_type_field(const CmmType *type, const char *name, const CmmField *next);
+CmmField *new_type_field(const CmmType *type, const char *name, int lineno, const CmmField *next);
 CmmParam *new_type_param(const CmmType *type, const CmmParam *next);
 CmmFunc *new_type_func(const char *name, const CmmType *ret);
 const CmmType *query_field(const CmmType *target_struct, const char *field_name);

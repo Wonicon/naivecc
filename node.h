@@ -28,9 +28,7 @@ typedef struct _attr_t {
 } attr_t;
 
 
-attr_t analyze_id(const node_t *id);
-attr_t analyze_struct_spec(const node_t *struct_spec);
+attr_t analyze_exp_id(const node_t *id);
 attr_t analyze_specifier(const node_t *specifier);
-attr_t analyze_field_dec(const node_t *dec, const CmmType *type, const CmmField *next);
 
 #endif // NODE_H
