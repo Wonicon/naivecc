@@ -45,7 +45,8 @@ int main(int argc, char *argv[])
         semantic_analysis();
     }
     free_ast();
-
+#ifdef DEBUG
     print_symtab();
+#endif
     return 0;
 }

@@ -3,7 +3,7 @@
 
 char *cmm_strdup(const char *src);
 
-#define DEBUG
+//#define DEBUG
 #define concat(x, y) x ## y
 
 #ifdef DEBUG
