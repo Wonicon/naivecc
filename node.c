@@ -99,6 +99,7 @@ const CmmType *analyze_specifier(const node_t *);                     // require
 const CmmType *analyze_exp(const node_t *exp, int scope);             // required by check_param_lsit, analyze_vardec
 const CmmType *analyze_compst(const node_t *, const CmmType *, int);  // required by analyze_stmt
 
+
 var_t analyze_vardec(const node_t *vardec, const CmmType *inh_type) {
     assert(vardec->type == YY_VarDec);
 
@@ -124,26 +125,26 @@ var_t analyze_vardec(const node_t *vardec, const CmmType *inh_type) {
 
 
 // next comes from the declist behind
-var_t analyze_dec(const node_t *dec, const CmmType *inh_type, int inh_scope) {
+var_t analyze_dec(const node_t *dec, const CmmType *type, int scope) {
     assert(dec->type == YY_Dec);
 
     const node_t *vardec = dec->child;
-    var_t var = analyze_vardec(vardec, inh_type);
+    var_t var = analyze_vardec(vardec, type);
 
     // TODO is field need insert symbol?
-    if (insert(var.name, var.type, dec->child->child->lineno, inh_scope) < 0) {
+    if (scope != STRUCT_SCOPE && (insert(var.name, var.type, dec->child->child->lineno, scope) < 0)) {
         SEMA_ERROR_MSG(4, dec->child->child->lineno, "Duplicated variable '%s'", var.name);
         // TODO handle memory leak
     }
 
     // Assignment / Initialization
     if (vardec->sibling != NULL) {
-        if (inh_scope == STRUCT_SCOPE) {  // Field does not allow assignment
+        if (scope == STRUCT_SCOPE) {  // Field does not allow assignment
             SEMA_ERROR_MSG(15, dec->lineno, "Initialization in the structure definition is not allowed");
         } else {  // Assignment consistency check
             const node_t *exp = vardec->sibling->sibling;
-            const CmmType *exp_type = analyze_exp(exp, inh_scope);
-            if (!typecmp(exp_type, inh_type)) {
+            const CmmType *exp_type = analyze_exp(exp, scope);
+            if (!typecmp(exp_type, type)) {
                 SEMA_ERROR_MSG(5, vardec->sibling->lineno, "Type mismatch");
             }
         }
@@ -190,7 +191,7 @@ const CmmField *analyze_declist(const node_t *declist, const CmmType *type, cons
 
 
 // next comes from the deflist behind
-const CmmField *analyze_def(const node_t *def, const int scope, const CmmField *next_field_list) {
+const CmmField *analyze_def(const node_t *def, const int scope, const CmmField *next) {
     assert(def->type == YY_Def);
 
     // Get body symbols
@@ -201,7 +202,7 @@ const CmmField *analyze_def(const node_t *def, const int scope, const CmmField *
     const CmmType *type = analyze_specifier(def->child);
 
     // Handle DecList and get a field list if we are in struct scope
-    return analyze_declist(declist, type, scope, next_field_list);
+    return analyze_declist(declist, type, scope, next);
 }
 
 
@@ -326,16 +327,12 @@ var_t analyze_paramdec(const node_t *paramdec) {
     const node_t *specifier = paramdec->child;
     const node_t *vardec = specifier->sibling;
     const CmmType *spec = analyze_specifier(specifier);
-    var_t var_attr = analyze_vardec(vardec, spec);
-#ifdef DEBUG
-    LOG("The param type is:");
-    print_type(var_attr.type);
-#endif
-    int insert_ret = insert(var_attr.name, var_attr.type, paramdec->lineno, -1);
+    var_t var = analyze_vardec(vardec, spec);
+    int insert_ret = insert(var.name, var.type, paramdec->lineno, -1);
     if (insert_ret < 1) {
-        SEMA_ERROR_MSG(3, vardec->lineno, "Duplicated variable definition of '%s'", var_attr.name);
+        SEMA_ERROR_MSG(3, vardec->lineno, "Duplicated variable definition of '%s'", var.name);
     }
-    return var_attr;
+    return var;
 }
 
 // Then we should link the paramdec's type up to form a param type list.
@@ -460,6 +457,19 @@ const CmmType *analyze_exp(const node_t *exp, int scope) {
     const CmmType *lexp_type = NULL, *rexp_type = NULL;
     const sym_ent_t *query_result = NULL;
     switch (exp->child->type) {
+        case YY_INT:
+            return global_int;
+        case YY_FLOAT:
+            return global_float;
+        case YY_MINUS:
+            rexp = exp->child->sibling;
+            return analyze_exp(rexp, scope);
+        case YY_NOT:
+            rexp = exp->child->sibling;
+            return analyze_exp(rexp, scope);
+        case YY_LP:
+            lexp = exp->child->sibling;
+            return analyze_exp(lexp, scope);
         case YY_ID:
             // TODO: func
             id = exp->child;
@@ -488,21 +498,8 @@ const CmmType *analyze_exp(const node_t *exp, int scope) {
                     return query_result->type;
                 }
             }
-        case YY_INT:
-            return global_int;
-        case YY_FLOAT:
-            return global_float;
-        case YY_MINUS:
-            rexp = exp->child->sibling;
-            return analyze_exp(rexp, scope);
-        case YY_NOT:
-            rexp = exp->child->sibling;
-            return analyze_exp(rexp, scope);
-        case YY_LP:
-            lexp = exp->child->sibling;
-            return analyze_exp(lexp, scope);
         case YY_Exp:
-            lexp = exp->child->sibling;
+            lexp = exp->child;
             op = lexp->sibling;
             rexp = op->sibling;
             lexp_type = analyze_exp(lexp, scope);
@@ -605,13 +602,13 @@ const CmmType *analyze_stmt(const node_t *stmt, const CmmType *inh_func_type, in
 }
 
 const CmmType *analyze_stmtlist(const node_t *stmtlist, const CmmType *inh_func_type, int scope) {
-    if (stmtlist == NULL) {
-        LOG("Can this occur?");
-        return NULL;
-    }
     const node_t *stmt = stmtlist->child;
-    analyze_stmt(stmt, inh_func_type, scope);
-    return analyze_stmtlist(stmt->sibling, inh_func_type, scope);
+    const CmmType *return_type = analyze_stmt(stmt, inh_func_type, scope);
+    if (stmt->sibling != NULL) {
+        return analyze_stmtlist(stmt->sibling, inh_func_type, scope);
+    } else {
+        return return_type;
+    }
 }
 
 //
