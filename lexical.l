@@ -103,8 +103,7 @@ WS [[:blank:]]
             }
 {HEX}       {
     if (!check_hex(yytext, yyleng, yylineno)) {
-        is_lex_error = 1;
-        return 1;
+        is_syn_error = 1;
     }
     yylval.nd = new_node(INT - FLOAT + 3);
     yylval.nd->lineno = yylineno;
@@ -114,8 +113,7 @@ WS [[:blank:]]
             }
 {OCT}       {
     if (!check_oct(yytext, yyleng, yylineno)) {
-        is_lex_error = 1;
-        return 1;
+        is_syn_error = 1;
     }
     yylval.nd = new_node(INT - FLOAT + 3);
     yylval.nd->lineno = yylineno;
@@ -137,7 +135,7 @@ WS [[:blank:]]
 {WS} {}
 . {
     ErrorMsg("Mysterious character", yytext, yylineno);
-    //is_lex_error = 1;
+    is_syn_error = 1;
 
     return yylex();
 }
@@ -151,6 +149,7 @@ int check_oct(char *yytext, int yyleng, int yylineno) {
         char ch = yytext[i];
         if (ch == '8' || ch == '9') {
             ErrorMsg("Illegal octal number", yytext, yylineno);
+            is_syn_error = 1;
             return 0;
         }
     }
@@ -164,6 +163,8 @@ int check_hex(char *yytext, int yyleng, int yylineno) {
         char ch = yytext[i];
         if ((ch > 'f' && ch <= 'z') || (ch > 'F' && ch <= 'Z')) {
             ErrorMsg("Illegal hexadecimal number", yytext, yylineno);
+            is_syn_error = 1;
+            return 0;
         }
     }
     return 1;

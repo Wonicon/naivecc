@@ -35,7 +35,7 @@ int main(int argc, char *argv[])
 
     init_strtab();
     yyrestart(f);
-    yydebug = 1;
+    //yydebug = 1;
     yyparse();
     if (!is_syn_error) {
         ast();

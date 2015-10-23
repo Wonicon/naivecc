@@ -30,9 +30,7 @@ static union YYSTYPE *YYVSP = NULL;
     yyval.nd = new_node(name(x));\
     yyval.nd->lineno = yyloc.first_line;\
     yyval.nd->val.s = yytname[name(x)];\
-    printf("yyval %s %d\n", yytname[name(x)], yyloc.first_line);\
     yyval.nd->child = yyvsp[1 - n].nd;\
-    printf("child %s %d\n", yytname[yyval.nd->child->type], yyval.nd->child->lineno);\
     node_t *cur = yyvsp[1 - n].nd;\
     cur->sibling = NULL;\
     int i = 2;\
@@ -220,28 +218,28 @@ Stmt            : Exp SEMI                         { LINK(Stmt, 2); }
 
 /* Local Definitions */
 
-DefList         : Def DefList   { LINK(DefList, 2); }
-                |               { $$ = NULL; }
+DefList         : Def DefList { LINK(DefList, 2); }
+                |             { $$ = NULL; }
                 ;
 
 Def             : Specifier DecList SEMI  { LINK(Def, 3); }
                 | Specifier error SEMI    { LOGERR(def: spec err semi); }
                 ;
 
-DecList         : Dec { LINK(DecList, 1); }
+DecList         : Dec               { LINK(DecList, 1); }
                 | Dec COMMA DecList { LINK(DecList, 3); }
                 ;
 
-Dec             : VarDec { LINK(Dec, 1); }
-                | VarDec ASSIGNOP Exp { printf("hit\n"); LINK(Dec, 3);  }
+Dec             : VarDec              { LINK(Dec, 1); }
+                | VarDec ASSIGNOP Exp { LINK(Dec, 3);  }
                 ;
 
 /* Expressions */
 
 Exp             : Exp ASSIGNOP Exp { LINK(Exp, 3); }
-                | Exp error ID {LOGERR(Exp -> Exp error ID);}
-                | Exp error INT {LOGERR(Exp -> Exp error INT);}
-                | Exp error FLOAT {LOGERR(Exp -> Exp error FLOAT);}
+                | Exp error ID     {LOGERR(Exp -> Exp error ID);}
+                | Exp error INT    {LOGERR(Exp -> Exp error INT);}
+                | Exp error FLOAT  {LOGERR(Exp -> Exp error FLOAT);}
                 | Exp AND Exp      { LINK(Exp, 3); }
                 | Exp OR Exp       { LINK(Exp, 3); }
                 | Exp RELOP Exp    { LINK(Exp, 3); }
@@ -257,7 +255,7 @@ Exp             : Exp ASSIGNOP Exp { LINK(Exp, 3); }
                 | ID LP Args RP    { LINK(Exp, 4); }
                 | ID LP RP         { LINK(Exp, 3); }
                 | ID               { LINK(Exp, 1); }
-                | INT              { LINK(Exp, 1); while(1);}
+                | INT              { LINK(Exp, 1); }
                 | FLOAT            { LINK(Exp, 1); }
                 ;
 
