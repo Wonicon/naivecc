@@ -26,7 +26,7 @@ typedef CmmType CmmFloat;
 /* The fixed size array type */
 typedef struct __CMM_ARRAY__ {
     CmmType type;  /* The type indicator to recognize itself */
-    const CmmType *base; /* The array type is an array of another base */
+    CmmType *base; /* The array type is an array of another base */
     int size;      /* The number of elements in the array */
 } CmmArray;
 
@@ -39,50 +39,50 @@ typedef struct __CMM_ARRAY__ {
  */
 typedef struct __TYPE_FIELD__ {
     CmmType type;
-    const CmmType *base;
+    CmmType *base;
     const char *name;
     int def_line_no;
-    const struct __TYPE_FIELD__ *next;
+    struct __TYPE_FIELD__ *next;
 } CmmField;
 
 // The param list don't have name attribute.
 // But name is one of the fundamental attribute in structure.
 typedef struct __TYPE_PARAM__ {
     CmmType type;
-    const CmmType *base;
-    const struct __TYPE_PARAM__ *next;
+    CmmType *base;
+    struct __TYPE_PARAM__ *next;
 } CmmParam;
 
 /* The struct field */
 typedef struct __CMM_STRUCT__ {
     CmmType type;
     const char *tag;            /* Optional, can be NULL */
-    const CmmField *field_list;
+    CmmField *field_list;
 } CmmStruct;
 
 /* The function type */
 typedef struct __CMM_FUNC__ {
     CmmType type;
-    const CmmType *ret;          /* The type of return value */
+    CmmType *ret;          /* The type of return value */
     const char *name;            /* The function name, must have */
-    const CmmParam *param_list;
+    CmmParam *param_list;
 } CmmFunc;
 
 
-extern const CmmType *global_int;
-extern const CmmType *global_float;
+extern CmmType *global_int;
+extern CmmType *global_float;
 
 
-CmmArray *new_type_array(int size, const CmmType *base);
+CmmArray *new_type_array(int size, CmmType *base);
 CmmStruct *new_type_struct(const char *name);
-CmmField *new_type_field(const CmmType *type, const char *name, int lineno, const CmmField *next);
-CmmParam *new_type_param(const CmmType *type, const CmmParam *next);
-CmmFunc *new_type_func(const char *name, const CmmType *ret);
-const CmmType *query_field(const CmmType *target_struct, const char *field_name);
-const char *typename(const CmmType *x);
+CmmField *new_type_field(CmmType *type, const char *name, int lineno, CmmField *next);
+CmmParam *new_type_param(CmmType *type, CmmParam *next);
+CmmFunc *new_type_func(const char *name, CmmType *ret);
+CmmType *query_field(CmmType *target_struct, const char *field_name);
+const char *typename(CmmType *x);
 /* Compare two cmm type, return 1 if they are the same, 0 otherwise */
-int typecmp(const CmmType *x, const CmmType *y);
-void print_type(const CmmType *x);
+int typecmp(CmmType *x, CmmType *y);
+void print_type(CmmType *x);
 
 #define GENERIC(x) ((CmmType *)x)
 #define SAFE
@@ -94,11 +94,11 @@ void print_type(const CmmType *x);
 #define PARAM(x) ((CmmParam *)(x))
 #else
 #include <assert.h>
-static inline const CmmArray *Array(const CmmType *type) { assert(type == NULL || *type == CMM_TYPE_ARRAY); return (CmmArray *)type; }
-static inline const CmmStruct *Struct(const CmmType *type) { assert(type == NULL || *type == CMM_TYPE_STRUCT); return (CmmStruct *)type; }
-static inline const CmmFunc *Fun(const CmmType *type) { assert(type == NULL || *type == CMM_TYPE_FUNC); return (CmmFunc *)type; }
-static inline const CmmField *Field(const CmmType *type) { assert(type == NULL || *type == CMM_TYPE_FIELD); return (CmmField *)type; }
-static inline const CmmParam *Param(const CmmType *type) { assert(type == NULL || *type == CMM_TYPE_PARAM); return (CmmParam *)type; }
+static inline CmmArray *Array(CmmType *type) { assert(type == NULL || *type == CMM_TYPE_ARRAY); return (CmmArray *)type; }
+static inline CmmStruct *Struct(CmmType *type) { assert(type == NULL || *type == CMM_TYPE_STRUCT); return (CmmStruct *)type; }
+static inline CmmFunc *Fun(CmmType *type) { assert(type == NULL || *type == CMM_TYPE_FUNC); return (CmmFunc *)type; }
+static inline CmmField *Field(CmmType *type) { assert(type == NULL || *type == CMM_TYPE_FIELD); return (CmmField *)type; }
+static inline CmmParam *Param(CmmType *type) { assert(type == NULL || *type == CMM_TYPE_PARAM); return (CmmParam *)type; }
 #endif
 
 #endif /* CMM_TYPE_H */

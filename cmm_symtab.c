@@ -19,7 +19,7 @@ unsigned int hash(const char *name)
     return val;
 }
 
-int insert(const char *sym, const CmmType *type, int line, int scope) {
+int insert(const char *sym, CmmType *type, int line, int scope) {
     assert(sym != NULL);
 
     unsigned int index = hash(sym);
@@ -57,7 +57,7 @@ int insert(const char *sym, const CmmType *type, int line, int scope) {
     return 1;
 }
 
-const sym_ent_t *query(const char *sym, int scope)
+sym_ent_t *query(const char *sym, int scope)
 {
     assert(sym);
     unsigned int index = hash(sym);
@@ -115,7 +115,7 @@ int test_sym()
     insert("a_new_array", GENERIC(a3), 10, 0);
     print_symtab();
 
-    const sym_ent_t *ret = query("a_new_array", 0);
+    sym_ent_t *ret = query("a_new_array", 0);
     if (ret != NULL) {
         printf("Found!\n");
     }

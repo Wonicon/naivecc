@@ -12,12 +12,11 @@ typedef struct _node_t {
         const char *s;
         void *p;
     } val;
-    const CmmType *cmm_type;
     struct _node_t *child, *sibling;
 } node_t;
 
 node_t *new_node(int type);
 void free_node(node_t *nd);
 void puts_tree(node_t *nd);
-void analyze_program(const node_t *program);
+void analyze_program(node_t *program);
 #endif // NODE_H
