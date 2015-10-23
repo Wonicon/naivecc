@@ -73,6 +73,11 @@ const char *typename(const CmmType *x) {
 /* constructors end */
 
 int typecmp(const CmmType *x, const CmmType *y) {
+    if (x == y) {  // Allow void
+        return 1;
+    } else if (x == NULL || y == NULL) {  // void vs others
+        return 0;
+    }
     LOG("Now compare %s and %s", typename(x), typename(y));
     /* Totally different! */
     if (*x != *y) {

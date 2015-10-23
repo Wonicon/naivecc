@@ -155,9 +155,9 @@ ExtDefList      : ExtDef ExtDefList { LINK_NULL(ExtDefList, 2); }
                 ;
 
 
-ExtDef          : Specifier ExtDecList SEMI  { print_type(analyze_specifier($1).type); LINK(ExtDef, 3); }
-                | Specifier SEMI             { print_type(analyze_specifier($1).type); LINK(ExtDef, 2); }
-                | Specifier FunDec CompSt    { print_type(analyze_specifier($1).type); LINK(ExtDef, 3); }
+ExtDef          : Specifier ExtDecList SEMI  { LINK(ExtDef, 3); }
+                | Specifier SEMI             { LINK(ExtDef, 2); }
+                | Specifier FunDec CompSt    { LINK(ExtDef, 3); }
                 | Specifier error            { LOGERR(....); }
                 | Specifier ExtDecList error { LOGERR(...); }
                 ;
@@ -168,9 +168,7 @@ ExtDecList      : VarDec                  { LINK(ExtDecList, 1); }
 
 /* Specifiers */
 
-Specifier       : TYPE {
-                    LINK(Specifier, 1);
-                }
+Specifier       : TYPE { LINK(Specifier, 1); }
                 | StructSpecifier { LINK(Specifier, 1); }
                 ;
 
@@ -195,7 +193,7 @@ FunDec          : ID LP VarList RP { LINK(FunDec, 4); }
                 | ID LP RP         { LINK(FunDec, 3); }
                 ;
 
-ParamDec        : Specifier VarDec { LINK(ParamDec, 2); analyze_paramdec($$); }
+ParamDec        : Specifier VarDec { LINK(ParamDec, 2); }
                 ;
 
 VarList         : ParamDec COMMA VarList { LINK(VarList, 3); }
@@ -236,14 +234,8 @@ Def             : Specifier DecList SEMI  { LINK(Def, 3); }
                 | Specifier error SEMI    { LOGERR(def: spec err semi); }
                 ;
 
-DecList         : Dec {
-                    LINK(DecList, 1);
-                }
-                | Dec COMMA DecList {
-                    LINK(DecList, 3);
-                    // Now we can also check type consistency
-                    // But let `Def' to check it is better
-                }
+DecList         : Dec { LINK(DecList, 1); }
+                | Dec COMMA DecList { LINK(DecList, 3); }
                 ;
 
 Dec             : VarDec { LINK(Dec, 1); }
@@ -260,17 +252,14 @@ Exp             : Exp ASSIGNOP Exp { LINK(Exp, 3); }
                 | Exp MINUS Exp    { LINK(Exp, 3); }
                 | Exp STAR Exp     { LINK(Exp, 3); }
                 | Exp DIV Exp      { LINK(Exp, 3); }
+                | Exp LB Exp RB    { LINK(Exp, 4); }
+                | Exp DOT ID       { LINK(Exp, 3); }
                 | LP Exp RP        { LINK(Exp, 3); }
                 | MINUS Exp        { LINK(Exp, 2); }
                 | NOT Exp          { LINK(Exp, 2); }
                 | ID LP Args RP    { LINK(Exp, 4); }
                 | ID LP RP         { LINK(Exp, 3); }
-                | Exp LB Exp RB    { LINK(Exp, 4); }
-                | Exp DOT ID       { LINK(Exp, 3); }
-                | ID {
-                    LINK(Exp, 1);
-                    analyze_exp_id($1);
-                }
+                | ID               { LINK(Exp, 1); }
                 | INT              { LINK(Exp, 1); }
                 | FLOAT            { LINK(Exp, 1); }
                 ;
@@ -309,6 +298,12 @@ void ast() {
     puts_tree(prog);
 }
 
+//
+// Analyze the parsing tree
+//
+void semantic_analysis() {
+    analyze_program(prog);
+}
 
 //
 // Release the parsing tree

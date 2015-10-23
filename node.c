@@ -1,6 +1,7 @@
 #include "node.h"
 #include "yytname.h"
 #include "cmm_symtab.h"
+#include "../../../../usr/lib/gcc/x86_64-linux-gnu/4.8/include/stdbool.h"
 #include <stdlib.h>
 #include <assert.h>
 #include <memory.h>
@@ -84,18 +85,6 @@ static attr_t error_attr = {NULL, NULL, 0};
 
 #define SEMA_ERROR_MSG(type, lineno, fmt, ...) \
 fprintf(stderr, "Error type %d at Line %d: " fmt "\n", type, lineno, ## __VA_ARGS__)
-
-attr_t analyze_exp_id(const node_t *id) {
-    const sym_ent_t *var = query(id->val.s, -1);
-    if (var == NULL) {
-        SEMA_ERROR_MSG(1, id->lineno, "undefined %s", id->val.s);
-        return error_attr;
-    }
-    else {
-        attr_t ret = {var->type, var->symbol, 0};
-        return ret;
-    }
-}
 
 
 attr_t analyze_vardec(const node_t *vardec, const CmmType *inh_type) {
@@ -309,9 +298,8 @@ attr_t analyze_specifier(const node_t *specifier) {
 
 // First we should analyze the VarList part. Because a parameter must follow a Specifier,
 // so we can avoid the hell of declist that inherits the same Specifier.
-// The return attribute should care about the type, which shoudl be a CmmParam in order to link up the param list.
 // We can just register the parameter here.
-attr_t analyze_paramdec(const node_t * paramdec) {
+attr_t analyze_paramdec(const node_t *paramdec) {
     assert(paramdec->type == YY_ParamDec);
 
     attr_t spec_attr, var_attr;
@@ -333,3 +321,394 @@ attr_t analyze_paramdec(const node_t * paramdec) {
     return var_attr;
 }
 
+// Then we should link the paramdec's type up to form a param type list.
+// varlist should return a type of CmmParam, and the generation of CmmParam occurs here.
+attr_t analyze_varlist(const node_t *varlist) {
+    const node_t *paramdec = varlist->child;
+    const node_t *sub_varlist = paramdec->sibling == NULL ? NULL : paramdec->sibling->sibling;
+    assert(paramdec->type == YY_ParamDec);
+    assert(sub_varlist == NULL || sub_varlist->type == YY_VarList);
+
+    attr_t param_attr = analyze_paramdec(paramdec);
+    attr_t sub_list_attr = sub_varlist == NULL ? error_attr : analyze_varlist(sub_varlist);
+    CmmParam *param = new_type_param(param_attr.type, Param(sub_list_attr.type));
+
+    attr_t return_attr = { GENERIC(param), NULL, 0 };
+    return return_attr;
+}
+
+// Analyze the function and register it
+//   FunDec -> ID LP VarList RP
+//   FunDec -> ID LP RP
+void analyze_fundec(const node_t *fundec, const CmmType *inh_type) {
+    assert(fundec->type == YY_FunDec);
+    const node_t *id = fundec->child;
+    const node_t *varlist = id->sibling->sibling;
+
+    // Get id
+    attr_t id_attr = { NULL, id->val.s, 0 };
+
+    // Get param list if exists
+    const CmmParam *param_list = NULL;
+    if (varlist->type == YY_VarList) {
+        param_list = Param(analyze_varlist(varlist).type);
+    } else {
+        assert(varlist->type == YY_RP);
+    }
+
+    // Generate function symbol
+    CmmFunc *func = new_type_func(id_attr.name, inh_type);
+    func->param_list = param_list;
+
+    if (insert(func->name, GENERIC(func), fundec->lineno, -1) < 0) {
+        SEMA_ERROR_MSG(4, fundec->lineno, "Duplicated function defination of '%s'", func->name);
+        // TODO handle memory leak!
+    }
+}
+
+
+void analyze_extdeclist(const node_t *extdeclist, const CmmType *inh_type) {
+    assert(extdeclist->type == YY_ExtDecList);
+
+    const node_t *vardec = extdeclist->child;
+    assert(vardec->type == YY_VarDec);
+    attr_t var_attr = analyze_vardec(vardec, inh_type);
+    if (insert(var_attr.name, var_attr.type, vardec->lineno, -1) < 0) {
+        SEMA_ERROR_MSG(3, vardec->child->lineno, "Duplicated identifier '%s'", var_attr.name);
+        // TODO handle memory leak
+    }
+
+    if (vardec->sibling != NULL) {
+        analyze_extdeclist(vardec->sibling, inh_type);
+    }
+}
+
+// TODO analyze exp and analyze statement
+// TODO if-elseif-else return routes analysis
+
+//
+// exp only return its type.
+// We use stmt analyzer to check the return type.
+//
+static inline int is_lval(const node_t *exp) {
+    assert(exp != NULL && exp->type == YY_Exp);
+    if (exp->child->type == YY_ID) {
+        return 1;
+    } else if (exp->child->sibling != NULL && exp->child->sibling->type == YY_LB) {
+        return 1;
+    } else if (exp->child->sibling != NULL && exp->child->sibling->type == YY_DOT) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+const CmmType *analyze_exp(const node_t *exp, int scope);
+static int check_param_lsit(const CmmParam *param, const node_t *args, int scope) {
+    if (param == NULL && args->type == YY_RP) {
+        return 1;
+    } else if ((param == NULL && args->type != YY_RP) ||
+            (param != NULL && args->type == YY_RP)) {
+        SEMA_ERROR_MSG(9, args->lineno, "parameter mismatch");
+        return 0;
+    } else {
+        assert(args->type == YY_Args);
+        const node_t *arg = NULL;
+        while (param != NULL) {
+            arg = args->child;
+            const CmmType *param_type = analyze_exp(arg, scope);
+            if (!typecmp(param_type, param->base)) {
+                SEMA_ERROR_MSG(9, arg->lineno, "parameter type mismatches");
+            }
+            param = param->next;
+            if (arg->sibling == NULL) {
+                args = arg;
+                break;
+            } else {
+                args = arg->sibling->sibling;
+            }
+        }
+
+        if (!(param == NULL && args == NULL)) {
+            SEMA_ERROR_MSG(9, arg->lineno, "parameter number mismatches");
+            return 0;
+        } else {
+            return 1;
+        }
+    }
+}
+
+const CmmType *analyze_exp(const node_t *exp, int scope) {
+    assert(exp->type == YY_Exp);
+
+    const node_t *id, *lexp, *rexp, *op, *args;
+    id = lexp = rexp = op = args = NULL;
+    const CmmType *lexp_type = NULL, *rexp_type = NULL;
+    const sym_ent_t *query_result = NULL;
+    switch (exp->child->type) {
+        case YY_ID:
+            // TODO: func
+            id = exp->child;
+            // Regardless of whether it is an id or func call, let's query it first~
+            query_result = query(id->val.s, scope);
+
+            if (id->sibling != NULL && id->sibling->type == YY_LP) {
+                if (query_result == NULL) {
+                    SEMA_ERROR_MSG(2, id->lineno, "Function '%s' is not defined.", id->val.s);
+                    return NULL;
+                } else if (*(query_result->type) != CMM_TYPE_FUNC) {
+                    SEMA_ERROR_MSG(11, id->lineno, "The identifier '%s' is not a function", id->val.s);
+                    return NULL;
+                } else if (!check_param_lsit(Fun(query_result->type)->param_list, id->sibling->sibling, scope)) {
+                    // Error report in the check function
+                    return NULL;
+                } else {
+                    // Return the return value
+                    return Fun(query_result->type)->ret;
+                }
+            } else {
+                if (query_result == NULL) {
+                    SEMA_ERROR_MSG(1, id->lineno, "Variable '%s' is not defined.", id->val.s);
+                    return NULL;
+                } else {
+                    return query_result->type;
+                }
+            }
+        case YY_INT:
+            return global_int;
+        case YY_FLOAT:
+            return global_float;
+        case YY_MINUS:
+            rexp = exp->child->sibling;
+            return analyze_exp(rexp, scope);
+        case YY_NOT:
+            rexp = exp->child->sibling;
+            return analyze_exp(rexp, scope);
+        case YY_LP:
+            lexp = exp->child->sibling;
+            return analyze_exp(lexp, scope);
+        case YY_Exp:
+            lexp = exp->child->sibling;
+            op = lexp->sibling;
+            rexp = op->sibling;
+            lexp_type = analyze_exp(lexp, scope);
+            rexp_type = analyze_exp(rexp, scope);
+            switch (op->type) {
+                case YY_DOT:
+                    id = rexp;
+                    if (*lexp_type != CMM_TYPE_STRUCT) {
+                        SEMA_ERROR_MSG(13, op->lineno, "The left identifier of '.' is not a struct");
+                    } else if ((rexp_type = query_field(lexp_type, id->val.s)) == NULL) {
+                        SEMA_ERROR_MSG(14, id->lineno,
+                                       "Undefined field '%s' in struct '%s'.",
+                                       id->val.s, Struct(lexp_type)->tag);
+                        return NULL;
+                    } else {
+                        // Commonly we return the type of the field
+                        return rexp_type;
+                    }
+                case YY_LB:
+                    if (*rexp_type != CMM_TYPE_INT) {
+                        SEMA_ERROR_MSG(12, rexp->lineno, "The index's type is not 'int'");
+                    }
+                    if (*lexp_type != CMM_TYPE_ARRAY) {
+                        SEMA_ERROR_MSG(10, lexp->lineno, "The expression before '[' is not an array type");
+                        return NULL;
+                    } else {
+                        return Array(lexp_type)->base;
+                    }
+                default:
+                    if (!typecmp(lexp_type, rexp_type)) {
+                        SEMA_ERROR_MSG(7, op->lineno, "Operands' types mismatch");
+                        // TODO: Return int as default, is this right?
+                        return global_int;
+                    } else if (op->type != YY_ASSIGNOP &&
+                                (!typecmp(lexp_type, global_int)
+                                 || !typecmp(lexp_type, global_float))) {
+                        SEMA_ERROR_MSG(7, op->lineno, "The type is not allowed in operation '%s'", op->val.s);
+                        return global_int;
+                    } else if (op->type == YY_ASSIGNOP && !is_lval(lexp)) {
+                        SEMA_ERROR_MSG(6, op->lineno, "The left expression of the '%s' is not a lvalue.",
+                                        op->val.s);
+                        return NULL;
+                    } else {
+                        return lexp_type;
+                    }
+            }
+        default:
+            LOG("HELL");
+            assert(0);
+    }
+}
+
+const CmmType *analyze_compst(const node_t *, const CmmType *, int);
+const CmmType *analyze_stmt(const node_t *stmt, const CmmType *inh_func_type, int scope) {
+    assert(stmt->type == YY_Stmt);
+    const node_t *first = stmt->child;
+    const CmmType *stmt_type = NULL;
+    const node_t *exp = NULL, *sub_stmt = NULL;
+    switch (first->type) {
+        case YY_Exp:
+            analyze_exp(first, scope);
+            break;
+        case YY_CompSt:
+            analyze_compst(first, inh_func_type, scope);
+            break;
+        case YY_IF:
+            exp = first->sibling->sibling;
+            stmt_type = analyze_exp(exp, scope);
+            if (!typecmp(stmt_type, global_int)) {
+                SEMA_ERROR_MSG(7, exp->lineno, "The condition expression must return int");
+            }
+            sub_stmt = exp->sibling->sibling;
+            analyze_compst(sub_stmt, inh_func_type, scope);
+            if (sub_stmt->sibling != NULL) {
+                // ELSE
+                analyze_stmt(sub_stmt->sibling->sibling, inh_func_type, scope);
+            }
+            break;
+        case YY_WHILE:
+            exp = first->sibling->sibling;
+            stmt_type = analyze_exp(exp, scope);
+            if (!typecmp(stmt_type, global_int)) {
+                SEMA_ERROR_MSG(7, exp->lineno, "The condition expression must return int");
+            }
+            sub_stmt = exp->sibling->sibling;
+            analyze_stmt(sub_stmt, inh_func_type, scope);
+            break;
+        case YY_RETURN:
+            exp = first->sibling;
+            stmt_type = analyze_exp(exp, scope);
+            if (!typecmp(stmt_type, inh_func_type)) {
+                SEMA_ERROR_MSG(8, exp->lineno, "Return type mismatch");
+            }
+            break;
+        default:
+            LOG("Awful statement");
+            assert(0);
+    }
+
+    return stmt_type;
+}
+
+const CmmType *analyze_stmtlist(const node_t *stmtlist, const CmmType *inh_func_type, int scope) {
+    if (stmtlist == NULL) {
+        LOG("Can this occur?");
+        return NULL;
+    }
+    const node_t *stmt = stmtlist->child;
+    analyze_stmt(stmt, inh_func_type, scope);
+    return analyze_stmtlist(stmt->sibling, inh_func_type, scope);
+}
+
+void analyze_dec(const node_t *dec, const CmmType *inh_type, int scope) {
+    assert(dec->type == YY_Dec);
+
+    const node_t *vardec = dec->child;
+    attr_t var_attr = analyze_vardec(vardec, inh_type);
+    if (insert(var_attr.name, var_attr.type, dec->child->child->lineno, scope) < 0) {
+        SEMA_ERROR_MSG(4, dec->child->child->lineno, "Duplicated variable '%s'", var_attr.name);
+        // TODO handle memory leak
+    }
+    // Assignment consistency check
+    if (vardec->sibling != NULL) {
+        const node_t *exp = vardec->sibling->sibling;
+        const CmmType *exp_type = analyze_exp(exp, scope);
+        if (exp_type != inh_type && !typecmp(exp_type, inh_type)) {
+            // Avoid null pointer
+            SEMA_ERROR_MSG(5, vardec->sibling->lineno, "Type mismatch");
+        }
+    }
+}
+
+void analyze_declist(const node_t *declist, const CmmType *inh_type, int scope) {
+    assert(declist->type == YY_DecList);
+    // The first child is always dec
+    const node_t *dec = declist->child;
+    analyze_dec(dec, inh_type, scope);
+    // Handle declist if it exists
+    if (dec->sibling != NULL) {
+        // declist -> dec comma declist
+        const node_t *sub_list = dec->sibling->sibling;
+        analyze_declist(sub_list, inh_type, scope);
+    }
+}
+
+void analyze_def(const node_t *def, int scope) {
+    assert(def->type == YY_Def);
+    const CmmType *spec_syn_type = analyze_specifier(def->child).type;
+    analyze_declist(def->child->sibling, spec_syn_type, scope);
+}
+
+void analyze_deflist(const node_t *deflist, int scope) {
+    assert(deflist->type == YY_DefList);
+    const node_t *def = deflist->child;
+    analyze_def(def, scope);
+    const node_t *sub_list = def->sibling;
+    if (sub_list != NULL) {
+        analyze_deflist(sub_list, scope);
+    }
+}
+
+//
+// Second level analyzer router : CompSt
+// Currently the scope has no thing to do with analysis
+//
+const CmmType *analyze_compst(const node_t *compst, const CmmType *inh_func_type, int scope) {
+    assert(compst->type == YY_CompSt);
+
+    const node_t *list = compst->child->sibling;
+
+    const CmmType *return_type = NULL;
+
+    while (list != NULL) {
+        if (list->type == YY_DefList) {
+            analyze_deflist(list, scope);
+        } else if (list->type == YY_StmtList) {
+            return_type = analyze_stmtlist(list, inh_func_type, scope);
+        }
+        list = list->sibling;
+    }
+
+    return return_type;
+}
+
+//
+// Top level analyzer of extdef acting as a router
+// Production:
+//   ExtDef -> Specifier ExtDecList SEMI
+//   ExtDef -> Specifier FunDec CompSt
+//   ExtDef -> Specifier SEMI
+//
+void analyze_extdef(const node_t *extdef) {
+    assert(extdef->type == YY_ExtDef);
+
+    const node_t *spec = extdef->child;
+    attr_t spec_attr = analyze_specifier(spec);
+    switch (spec->sibling->type) {
+        case YY_ExtDecList:
+            analyze_extdeclist(spec->sibling, spec_attr.type);
+            break;
+        case YY_FunDec:
+            analyze_fundec(spec->sibling, spec_attr.type);
+            analyze_compst(spec->sibling->sibling, spec_attr.type, 0);
+            break;
+        case YY_SEMI:
+            LOG("Well, I think this is used for struct");
+            break;
+        default:
+            LOG("WTF");
+    }
+}
+
+void analyze_program(const node_t *prog) {
+    const node_t *extdef = prog->child->child;
+    while (extdef != NULL) {
+        analyze_extdef(extdef);
+        if (extdef->sibling != NULL) {
+            extdef = extdef->sibling->child;
+        } else {
+            break;
+        }
+    }
+}

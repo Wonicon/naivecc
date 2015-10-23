@@ -1,12 +1,12 @@
 #include "cmm_strtab.h"
 #include "cmm_symtab.h"
-#include <stdio.h>
 #include <string.h>
 
 /* from syntax.tab.c */
 extern int yyrestart(FILE *);
 extern int yyparse();
 extern void ast();
+extern void semantic_analysis();
 extern void free_ast();
 
 extern int yydebug;
@@ -42,6 +42,7 @@ int main(int argc, char *argv[])
     }
     else {
         //ast();
+        semantic_analysis();
     }
     free_ast();
 
