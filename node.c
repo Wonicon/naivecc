@@ -304,7 +304,7 @@ const CmmStruct *analyze_struct_spec(node_t *struct_spec) {
     int insert_rst = !strcmp(this->tag, "") ? 1 :
                      insert(this->tag, GENERIC(this), struct_spec->lineno, -1);
     if (insert_rst < 1) {
-        SEMA_ERROR_MSG(16, struct_spec->lineno, "The struct name '%s' has collision with previous one(s)", name);
+        SEMA_ERROR_MSG(16, struct_spec->lineno, "Duplicated name \"%s\".", name);
     }
 
     return this;
@@ -391,7 +391,7 @@ void analyze_fundec(node_t *fundec, CmmType *inh_type) {
     func->param_list = param_list;
 
     if (insert(func->name, GENERIC(func), fundec->lineno, -1) < 0) {
-        SEMA_ERROR_MSG(4, fundec->lineno, "Duplicated function defination of '%s'", func->name);
+        SEMA_ERROR_MSG(4, fundec->lineno, "Redefined function \"%s\"", func->name);
         // TODO handle memory leak!
     }
 }
@@ -498,7 +498,7 @@ CmmType *analyze_exp(node_t *exp, int scope) {
                     SEMA_ERROR_MSG(2, id->lineno, "Undefined function \"%s\".", id->val.s);
                     return NULL;
                 } else if (*(query_result->type) != CMM_TYPE_FUNC) {
-                    SEMA_ERROR_MSG(11, id->lineno, "The identifier '%s' is not a function", id->val.s);
+                    SEMA_ERROR_MSG(11, id->lineno, "\"%s\" is not a function.", id->val.s);
                     return query_result->type;
                 } else if (!check_param_list(Fun(query_result->type)->param_list, id->sibling->sibling, scope)) {
                     // Error report in the check function
@@ -520,12 +520,12 @@ CmmType *analyze_exp(node_t *exp, int scope) {
             op = lexp->sibling;
             rexp = op->sibling;
             lexp_type = analyze_exp(lexp, scope);
-            rexp_type = analyze_exp(rexp, scope);
             switch (op->type) {
                 case YY_DOT:
                     id = rexp;
                     if (*lexp_type != CMM_TYPE_STRUCT) {
                         SEMA_ERROR_MSG(13, op->lineno, "The left identifier of '.' is not a struct");
+                        return NULL;
                     } else if ((rexp_type = query_field(lexp_type, id->val.s)) == NULL) {
                         SEMA_ERROR_MSG(14, id->lineno,
                                        "Undefined field '%s' in struct '%s'.",
@@ -536,28 +536,35 @@ CmmType *analyze_exp(node_t *exp, int scope) {
                         return rexp_type;
                     }
                 case YY_LB:
+                    rexp_type = analyze_exp(rexp, scope);
                     if (*rexp_type != CMM_TYPE_INT) {
                         SEMA_ERROR_MSG(12, rexp->lineno, "The index's type is not 'int'");
                     }
                     if (*lexp_type != CMM_TYPE_ARRAY) {
-                        SEMA_ERROR_MSG(10, lexp->lineno, "The expression before '[' is not an array type");
+                        assert(lexp->child->type == YY_ID);
+                        SEMA_ERROR_MSG(10, lexp->lineno, " \"%s\" is not an array.", lexp->child->val.s);
                         return NULL;
                     } else {
                         return Array(lexp_type)->base;
                     }
                 default:
+                    rexp_type = analyze_exp(rexp, scope);
                     if (!typecmp(lexp_type, rexp_type)) {
-                        SEMA_ERROR_MSG(7, op->lineno, "Operand type mismatch");
-                        // TODO: Return int as default, is this right?
-                        return global_int;
+                        if (op->type == YY_ASSIGNOP) {
+                            SEMA_ERROR_MSG(5, op->lineno, "Type mismatched for assignment.");
+                            // TODO: Return int as default, is this right?
+                            return global_int;
+                        } else {
+                            SEMA_ERROR_MSG(7, op->lineno, "Type mismatched for operands");
+                            return NULL;
+                        }
                     } else if (op->type != YY_ASSIGNOP &&
                                 (!typecmp(lexp_type, global_int)
                                  && !typecmp(lexp_type, global_float))) {
                         SEMA_ERROR_MSG(7, op->lineno, "The type is not allowed in operation '%s'", op->val.s);
                         return global_int;
                     } else if (op->type == YY_ASSIGNOP && !is_lval(lexp)) {
-                        SEMA_ERROR_MSG(6, op->lineno, "The left expression of the '%s' is not a lvalue.",
-                                        op->val.s);
+                        SEMA_ERROR_MSG(6, op->lineno, "The left-hand side of an assignment must be a variable.");
                         return NULL;
                     } else {
                         return lexp_type;
@@ -588,7 +595,7 @@ CmmType *analyze_stmt(node_t *stmt, CmmType *inh_func_type, int scope) {
                 SEMA_ERROR_MSG(7, exp->lineno, "The condition expression must return int");
             }
             sub_stmt = exp->sibling->sibling;
-            analyze_compst(sub_stmt, inh_func_type, scope);
+            analyze_stmt(sub_stmt, inh_func_type, scope);
             if (sub_stmt->sibling != NULL) {
                 // ELSE
                 analyze_stmt(sub_stmt->sibling->sibling, inh_func_type, scope);
@@ -607,7 +614,7 @@ CmmType *analyze_stmt(node_t *stmt, CmmType *inh_func_type, int scope) {
             exp = first->sibling;
             stmt_type = analyze_exp(exp, scope);
             if (!typecmp(stmt_type, inh_func_type)) {
-                SEMA_ERROR_MSG(8, exp->lineno, "Return type mismatch");
+                SEMA_ERROR_MSG(8, exp->lineno, "Type mismatched for return.");
             }
             break;
         default:

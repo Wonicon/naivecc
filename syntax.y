@@ -29,6 +29,7 @@ static union YYSTYPE *YYVSP = NULL;
     YYVSP = yyvsp;\
     yyval.nd = new_node(name(x));\
     yyval.nd->lineno = yyloc.first_line;\
+    yyval.nd->val.s = yytname[name(x)];\
     yyval.nd->child = yyvsp[1 - n].nd;\
     node_t *cur = yyvsp[1 - n].nd;\
     cur->sibling = NULL;\
@@ -45,6 +46,7 @@ static union YYSTYPE *YYVSP = NULL;
     YYVSP = yyvsp;\
     yyval.nd = new_node(name(x));\
     yyval.nd->lineno = yyloc.first_line;\
+    yyval.nd->val.s = yytname[name(x)];\
     yyval.nd->child = yyvsp[1 - n].nd;\
     node_t *cur = yyvsp[1 - n].nd;\
     if (cur == NULL) break;\
