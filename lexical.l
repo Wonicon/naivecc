@@ -117,6 +117,7 @@ WS [[:blank:]]
         is_lex_error = 1;
         return 1;
     }
+    yylval.nd = new_node(INT - FLOAT + 3);
     yylval.nd->lineno = yylineno;
     yylval.nd->val.i = strtol(yytext, NULL, 8);
     token_on_line++;
