@@ -19,17 +19,5 @@ typedef struct _node_t {
 node_t *new_node(int type);
 void free_node(node_t *nd);
 void puts_tree(node_t *nd);
-
-
-typedef struct _attr_t {
-    const CmmType *type;
-    const char *name;
-    int lval_flag;
-} attr_t;
-
-
-attr_t analyze_exp_id(const node_t *id);
-attr_t analyze_specifier(const node_t *specifier);
-attr_t analyze_paramdec(const node_t *paramdec);
 void analyze_program(const node_t *program);
 #endif // NODE_H
