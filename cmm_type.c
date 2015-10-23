@@ -73,10 +73,11 @@ const char *typename(const CmmType *x) {
 /* constructors end */
 
 int typecmp(const CmmType *x, const CmmType *y) {
+    // TODO allow void ?
     if (x == y) {  // Allow void
         return 1;
     } else if (x == NULL || y == NULL) {  // void vs others
-        return 0;
+        return 2;  // This is error, but NULL is used for undefined variables, return true allow not reporting error recursively.
     }
     LOG("Now compare %s and %s", typename(x), typename(y));
     /* Totally different! */

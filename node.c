@@ -133,7 +133,7 @@ var_t analyze_dec(const node_t *dec, const CmmType *type, int scope) {
 
     // TODO is field need insert symbol?
     if (scope != STRUCT_SCOPE && (insert(var.name, var.type, dec->child->child->lineno, scope) < 0)) {
-        SEMA_ERROR_MSG(4, dec->child->child->lineno, "Duplicated variable '%s'", var.name);
+        SEMA_ERROR_MSG(3, dec->child->child->lineno, "Redefined variable \"%s\".", var.name);
         // TODO handle memory leak
     }
 
@@ -478,7 +478,7 @@ const CmmType *analyze_exp(const node_t *exp, int scope) {
 
             if (id->sibling != NULL && id->sibling->type == YY_LP) {
                 if (query_result == NULL) {
-                    SEMA_ERROR_MSG(2, id->lineno, "Function '%s' is not defined.", id->val.s);
+                    SEMA_ERROR_MSG(2, id->lineno, "Undefined function \"%s\".", id->val.s);
                     return NULL;
                 } else if (*(query_result->type) != CMM_TYPE_FUNC) {
                     SEMA_ERROR_MSG(11, id->lineno, "The identifier '%s' is not a function", id->val.s);
@@ -492,7 +492,7 @@ const CmmType *analyze_exp(const node_t *exp, int scope) {
                 }
             } else {
                 if (query_result == NULL) {
-                    SEMA_ERROR_MSG(1, id->lineno, "Variable '%s' is not defined.", id->val.s);
+                    SEMA_ERROR_MSG(1, id->lineno, "Undefined variable \"%s\"", id->val.s);
                     return NULL;
                 } else {
                     return query_result->type;
@@ -530,12 +530,12 @@ const CmmType *analyze_exp(const node_t *exp, int scope) {
                     }
                 default:
                     if (!typecmp(lexp_type, rexp_type)) {
-                        SEMA_ERROR_MSG(7, op->lineno, "Operands' types mismatch");
+                        SEMA_ERROR_MSG(7, op->lineno, "Operand type mismatch");
                         // TODO: Return int as default, is this right?
                         return global_int;
                     } else if (op->type != YY_ASSIGNOP &&
                                 (!typecmp(lexp_type, global_int)
-                                 || !typecmp(lexp_type, global_float))) {
+                                 && !typecmp(lexp_type, global_float))) {
                         SEMA_ERROR_MSG(7, op->lineno, "The type is not allowed in operation '%s'", op->val.s);
                         return global_int;
                     } else if (op->type == YY_ASSIGNOP && !is_lval(lexp)) {
