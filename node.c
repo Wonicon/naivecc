@@ -541,9 +541,13 @@ CmmType *analyze_exp(node_t *exp, int scope) {
                     if (*rexp_type != CMM_TYPE_INT) {
                         SEMA_ERROR_MSG(12, rexp->lineno, "%s is not a integer", expr_to_s(rexp));
                     }
-                    if (*lexp_type != CMM_TYPE_ARRAY) {
-                        assert(lexp->child->type == YY_ID);
-                        SEMA_ERROR_MSG(10, lexp->lineno, " \"%s\" is not an array.", lexp->child->val.s);
+
+                    // If lexp_type is null, it means that an semantic error has occurred, then we can ignore the
+                    // consecutive errors.
+                    if (lexp_type == NULL) {
+                        return NULL;
+                    } else if (*lexp_type != CMM_TYPE_ARRAY) {
+                        SEMA_ERROR_MSG(10, lexp->lineno, " \"%s\" is not an array.", expr_to_s(lexp));
                         return NULL;
                     } else {
                         return Array(lexp_type)->base;
@@ -770,15 +774,18 @@ void print_expr(const node_t *nd, FILE *fp) {
                 assert(0);
         }
     }
-
 }
 
 const char *expr_to_s(node_t *exp) {
+    static char *s = NULL;
     assert(exp->type == YY_Exp);
     FILE *tmp = tmpfile();
     print_expr(exp->child, tmp);
     int len = (int)ftell(tmp);
-    char *s = (char *)malloc((size_t)(len + 1));
+    if (s != NULL) {
+        free(s);
+    }
+    s = (char *)malloc((size_t)(len + 1));
     rewind(tmp);
     fgets(s, len + 1, tmp);
     fclose(tmp);

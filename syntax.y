@@ -18,7 +18,6 @@ extern is_greedy;
 #include "lex.yy.c"
 
 #include <stdio.h>
-
 static node_t *prog;
 static union YYSTYPE *YYVSP = NULL;
 #define S(x) # x
@@ -213,6 +212,7 @@ Stmt            : Exp SEMI                         { LINK(Stmt, 2); }
                 | CompSt                           { LINK(Stmt, 1); }
                 | RETURN Exp SEMI                  { LINK(Stmt, 3); }
                 | IF LP Exp RP Stmt %prec SUB_ELSE { LINK(Stmt, 5); }
+                | IF LP Exp RP Stmt ELSE Stmt      { LINK(Stmt, 7); }
                 | WHILE LP Exp RP Stmt             { LINK(Stmt, 5); }
                 ;
 

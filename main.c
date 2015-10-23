@@ -38,8 +38,8 @@ int main(int argc, char *argv[])
     //yydebug = 1;
     yyparse();
     if (!is_syn_error) {
-        ast();
-        //semantic_analysis();
+        //ast();
+        semantic_analysis();
     }
     free_ast();
 #ifdef DEBUG
