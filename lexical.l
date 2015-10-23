@@ -136,8 +136,9 @@ WS [[:blank:]]
 {WS} {}
 . {
     ErrorMsg("Mysterious character", yytext, yylineno);
-    is_lex_error = 1;
-    return 1;
+    //is_lex_error = 1;
+
+    return yylex();
 }
 
 %%

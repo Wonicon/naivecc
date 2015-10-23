@@ -451,7 +451,7 @@ static int check_param_list(CmmParam *param, node_t *args, int scope) {
             }
             param = param->next;
             if (arg->sibling == NULL) {
-                args = arg;
+                args = arg->sibling;
                 break;
             } else {
                 args = arg->sibling->sibling;
@@ -467,6 +467,7 @@ static int check_param_list(CmmParam *param, node_t *args, int scope) {
     }
 }
 
+const char *expr_to_s(node_t *exp);
 CmmType *analyze_exp(node_t *exp, int scope) {
     assert(exp->type == YY_Exp);
 
@@ -538,7 +539,7 @@ CmmType *analyze_exp(node_t *exp, int scope) {
                 case YY_LB:
                     rexp_type = analyze_exp(rexp, scope);
                     if (*rexp_type != CMM_TYPE_INT) {
-                        SEMA_ERROR_MSG(12, rexp->lineno, "The index's type is not 'int'");
+                        SEMA_ERROR_MSG(12, rexp->lineno, "%s is not a integer", expr_to_s(rexp));
                     }
                     if (*lexp_type != CMM_TYPE_ARRAY) {
                         assert(lexp->child->type == YY_ID);
@@ -696,4 +697,90 @@ void analyze_program(node_t *prog) {
             break;
         }
     }
+}
+
+void print_expr(const node_t *nd, FILE *fp) {
+    if (nd == NULL) {
+        return;
+    }
+    if (nd->type == YY_Exp) {
+        print_expr(nd->child, fp);
+        if (nd->sibling == NULL) {
+            return;
+        }
+        const node_t *op = nd->sibling;
+        switch (op->type) {
+            case YY_ASSIGNOP: case YY_RELOP:
+            case YY_AND: case YY_OR:
+            case YY_PLUS: case YY_MINUS:
+            case YY_STAR: case YY_DIV:
+                fprintf(fp, " %s ", op->val.s);
+                print_expr(op->sibling->child, fp);
+                return;
+            case YY_COMMA:
+                fputs(",", fp); 
+                return;
+            case YY_LB:
+                fputs("[", fp);
+                print_expr(op->sibling->child, fp);
+                fputs("]", fp);
+                return;
+            case YY_DOT:
+                fputs(".", fp);
+                fputs(op->sibling->val.s, fp);
+                return;
+            default:
+                assert(0);
+        }
+
+    } else {
+        switch (nd->type) {
+            case YY_LP:
+                fputs("(", fp);
+                print_expr(nd->sibling->child, fp);
+                fputs(")", fp);
+                return;
+            case YY_MINUS: case YY_NOT:
+                fprintf(fp, "%s", nd->val.s);
+                print_expr(nd->sibling->child, fp);
+                return;
+            case YY_INT:
+                fprintf(fp, "%d", nd->val.i);
+                return;
+            case YY_FLOAT:
+                fprintf(fp, "%f", nd->val.f);
+                return;
+            case YY_ID:
+                fputs(nd->val.s, fp);
+                if (nd->sibling != NULL) {
+                    fputs("(", fp);
+                    nd = nd->sibling->sibling;
+                    while (nd->type == YY_Args) {
+                        print_expr(nd->child, fp);
+                        if (nd->child->sibling != NULL) {
+                            nd = nd->child->sibling->sibling;
+                        } else {
+                            break;
+                        }
+                    }
+                    fputs(")", fp);
+                }
+                return;
+            default:
+                assert(0);
+        }
+    }
+
+}
+
+const char *expr_to_s(node_t *exp) {
+    assert(exp->type == YY_Exp);
+    FILE *tmp = tmpfile();
+    print_expr(exp->child, tmp);
+    int len = (int)ftell(tmp);
+    char *s = (char *)malloc((size_t)(len + 1));
+    rewind(tmp);
+    fgets(s, len + 1, tmp);
+    fclose(tmp);
+    return s;
 }

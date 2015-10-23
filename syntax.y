@@ -14,7 +14,7 @@ int is_lex_error = 0;
 int is_syn_error = 0;
 extern is_greedy;
 
-//#define YYDEBUG 1
+#define YYDEBUG 1
 #include "lex.yy.c"
 
 #include <stdio.h>
@@ -30,7 +30,9 @@ static union YYSTYPE *YYVSP = NULL;
     yyval.nd = new_node(name(x));\
     yyval.nd->lineno = yyloc.first_line;\
     yyval.nd->val.s = yytname[name(x)];\
+    printf("yyval %s %d\n", yytname[name(x)], yyloc.first_line);\
     yyval.nd->child = yyvsp[1 - n].nd;\
+    printf("child %s %d\n", yytname[yyval.nd->child->type], yyval.nd->child->lineno);\
     node_t *cur = yyvsp[1 - n].nd;\
     cur->sibling = NULL;\
     int i = 2;\
@@ -160,8 +162,6 @@ ExtDefList      : ExtDef ExtDefList { LINK_NULL(ExtDefList, 2); }
 ExtDef          : Specifier ExtDecList SEMI  { LINK(ExtDef, 3); }
                 | Specifier SEMI             { LINK(ExtDef, 2); }
                 | Specifier FunDec CompSt    { LINK(ExtDef, 3); }
-                | Specifier error            { LOGERR(....); }
-                | Specifier ExtDecList error { LOGERR(...); }
                 ;
 
 ExtDecList      : VarDec                  { LINK(ExtDecList, 1); }
@@ -215,14 +215,7 @@ Stmt            : Exp SEMI                         { LINK(Stmt, 2); }
                 | CompSt                           { LINK(Stmt, 1); }
                 | RETURN Exp SEMI                  { LINK(Stmt, 3); }
                 | IF LP Exp RP Stmt %prec SUB_ELSE { LINK(Stmt, 5); }
-                | IF LP Exp RP Stmt ELSE Stmt      { LINK(Stmt, 6); }
                 | WHILE LP Exp RP Stmt             { LINK(Stmt, 5); }
-                | error SEMI                       { LOGERR(Stmt ... SEMI); }
-                | error ELSE                       { LOGERR(Stmt ... ELSE); }
-                | error IF                         { LOGERR(Stmt ... IF); }
-                | error WHILE                      { LOGERR(Stmt ... WHILE); }
-                | error RETURN                     { LOGERR(Stmt ... RETURN); }
-                | Exp error                        { LOGERR(Stmt Exp error); }
                 ;
 
 /* Local Definitions */
@@ -232,7 +225,6 @@ DefList         : Def DefList   { LINK(DefList, 2); }
                 ;
 
 Def             : Specifier DecList SEMI  { LINK(Def, 3); }
-                | Specifier DecList error { LOGERR(Def spec decl err); }
                 | Specifier error SEMI    { LOGERR(def: spec err semi); }
                 ;
 
@@ -241,12 +233,15 @@ DecList         : Dec { LINK(DecList, 1); }
                 ;
 
 Dec             : VarDec { LINK(Dec, 1); }
-                | VarDec ASSIGNOP Exp { LINK(Dec, 3); }
+                | VarDec ASSIGNOP Exp { printf("hit\n"); LINK(Dec, 3);  }
                 ;
 
 /* Expressions */
 
 Exp             : Exp ASSIGNOP Exp { LINK(Exp, 3); }
+                | Exp error ID {LOGERR(Exp -> Exp error ID);}
+                | Exp error INT {LOGERR(Exp -> Exp error INT);}
+                | Exp error FLOAT {LOGERR(Exp -> Exp error FLOAT);}
                 | Exp AND Exp      { LINK(Exp, 3); }
                 | Exp OR Exp       { LINK(Exp, 3); }
                 | Exp RELOP Exp    { LINK(Exp, 3); }
@@ -257,12 +252,12 @@ Exp             : Exp ASSIGNOP Exp { LINK(Exp, 3); }
                 | Exp LB Exp RB    { LINK(Exp, 4); }
                 | Exp DOT ID       { LINK(Exp, 3); }
                 | LP Exp RP        { LINK(Exp, 3); }
-                | MINUS Exp        { LINK(Exp, 2); }
+                | MINUS Exp        { LINK(Exp, 2); }  /* Conflict with Exp error ID... */
                 | NOT Exp          { LINK(Exp, 2); }
                 | ID LP Args RP    { LINK(Exp, 4); }
                 | ID LP RP         { LINK(Exp, 3); }
                 | ID               { LINK(Exp, 1); }
-                | INT              { LINK(Exp, 1); }
+                | INT              { LINK(Exp, 1); while(1);}
                 | FLOAT            { LINK(Exp, 1); }
                 ;
 
@@ -347,6 +342,6 @@ int yyerror(char *msg) {
     if (token_on_line == 1 && (nd->type != YY_SEMI && nd->type != YY_RC)) {
         lineno = nd->lineno;
     }
-    printf("Error type B at line %d: %s.\n", lineno, msg);
+    printf("Error type B at line %d: %s.\n", yylineno, msg);
     return 0;
 }

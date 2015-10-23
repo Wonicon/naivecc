@@ -35,14 +35,11 @@ int main(int argc, char *argv[])
 
     init_strtab();
     yyrestart(f);
-    //yydebug = 1;
+    yydebug = 1;
     yyparse();
-    if (is_syn_error) {
-        printf("Failed to print ast due to previous errors.\n");
-    }
-    else {
-        //ast();
-        semantic_analysis();
+    if (!is_syn_error) {
+        ast();
+        //semantic_analysis();
     }
     free_ast();
 #ifdef DEBUG

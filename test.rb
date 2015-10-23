@@ -1,7 +1,10 @@
 #!/usr/bin/env ruby
 
-Dir.glob('./test/*.cmm').sort.each do |item|
+dir = ARGV[0]
+path = File.join('.', dir, '*.cmm')
+puts "Working on #{path}"
+Dir.glob(path).sort.each do |item|
     puts "Analyze file #{item}"
-    system("./parser #{item}")
-    puts "===================================="
+    system("./parser -d #{item}")
+    puts "=" * 80
 end
