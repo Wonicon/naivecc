@@ -3,6 +3,10 @@
 
 char *cmm_strdup(const char *src);
 
+typedef int bool;
+#define true (1)
+#define false (0)
+
 //#define DEBUG
 #define concat(x, y) x ## y
 

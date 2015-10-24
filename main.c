@@ -47,3 +47,16 @@ int main(int argc, char *argv[])
 #endif
     return 0;
 }
+/*
+struct A {
+    int m;
+    int x;
+};
+
+int fte() {
+    int a[10][20];
+    struct a b;
+
+    A = A;
+}
+ */

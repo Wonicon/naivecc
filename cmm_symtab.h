@@ -23,16 +23,16 @@
 
 typedef struct _sym_ent_t
 {
-    const char *symbol;   /* The symbol string */
-    CmmType *type;  /* The generic type pointer, we can know the real type by dereferncing it */
-    int line;       /* The line number this symbol first DECLARED */
-    int size;       /* The size this symbol will occupy the memory, maybe we can get it from the type? */
-    int address;    /* The memory address, or register code */
-    int scope;      /* The scope index, each symbol will get exactly one */
+    const char *symbol;  // The symbol string
+    Type *type;          // The generic type pointer, we can know the real type by dereferncing it
+    int line;            // The line number this symbol first DECLARED
+    int size;            // The size this symbol will occupy the memory, maybe we can get it from the type?
+    int address;         // The memory address, or register code */
+    int scope;           // The scope index, each symbol will get exactly one
     struct _sym_ent_t *link;  /* Used for open hashing */
 } sym_ent_t;
 
-int insert(const char *sym, CmmType *type, int line, int scope);
+int insert(const char *sym, Type *type, int line, int scope);
 // NOTE the return value is a shallow copy of the found symbol
 // Release it directly through free, DO NOT release any of its pointer fields.
 sym_ent_t *query(const char *sym, int scope);

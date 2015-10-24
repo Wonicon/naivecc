@@ -6,8 +6,7 @@
 #define SIZE 0x3fff
 static sym_ent_t *symtab[SIZE] = { 0 };
 
-unsigned int hash(const char *name)
-{
+unsigned int hash(const char *name) {
     unsigned int val = 0, i;
     for (; *name; ++name) {
         val = (val << 2) + *name;
@@ -19,8 +18,9 @@ unsigned int hash(const char *name)
     return val;
 }
 
-int insert(const char *sym, CmmType *type, int line, int scope) {
+int insert(const char *sym, Type *type, int line, int scope) {
     assert(sym != NULL);
+    assert(type != NULL);
 
     unsigned int index = hash(sym);
     LOG("Hash index %u", index);
@@ -57,8 +57,7 @@ int insert(const char *sym, CmmType *type, int line, int scope) {
     return 1;
 }
 
-sym_ent_t *query(const char *sym, int scope)
-{
+sym_ent_t *query(const char *sym, int scope) {
     assert(sym);
     unsigned int index = hash(sym);
     sym_ent_t *scanner = symtab[index];
@@ -83,8 +82,7 @@ sym_ent_t *query(const char *sym, int scope)
     return NULL;
 }
 
-void print_symtab()
-{
+void print_symtab() {
     for (int i = 0; i < SIZE; i++) {
         if (symtab[i] == NULL) {
             continue;
@@ -105,14 +103,17 @@ int main()
 int test_sym()
 #endif /* TEST_SYM */
 {
-    CmmFunc *s = new_type_func("helloworld", global_int);
-    CmmArray *a1 = new_type_array(10, global_float);
-    CmmArray *a2 = new_type_array(10, GENERIC(a1));
-    CmmArray *a3 = new_type_array(10, GENERIC(a2));
+    Type *s = new_type(CMM_FUNC, "helloworld", BASIC_INT, NULL);
+    Type *a1 = new_type(CMM_ARRAY, NULL, BASIC_FLOAT, NULL);
+    a1->size = 10;
+    Type *a2 = new_type(CMM_ARRAY, NULL, a1, NULL);
+    a2->size = 20;
+    Type *a3 = new_type(CMM_ARRAY, NULL, a2, NULL);
+    a3->size = 30;
 
-    insert(s->name, GENERIC(s), 10, -1);
-    insert(s->name, GENERIC(s), 10, -1);
-    insert("a_new_array", GENERIC(a3), 10, 0);
+    insert(s->name, s, 10, -1);
+    insert(s->name, s, 10, -1);
+    insert("a_new_array", a3, 10, 0);
     print_symtab();
 
     sym_ent_t *ret = query("a_new_array", 0);

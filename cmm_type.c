@@ -3,179 +3,151 @@
 #include <string.h> /* strlen */
 #include <assert.h> /* assert */
 
-const char *type_s[] =
-{
+const char *class_s[] = {
     "int",
     "float",
     "array",
     "struct",
-    "function"
+    "function",
+    "field",
+    "param",
+    "type"
 };
 
-/* Constructors */
+Type _BASIC_INT = {
+        CMM_INT,
+        "int",
+        { NULL },
+        { NULL },
+        { 0 },
+        0
+};
 
-CmmType basic_type[2] = { CMM_TYPE_INT, CMM_TYPE_FLOAT };
+Type _BASIC_FLOAT = {
+        CMM_FLOAT,
+        "float",
+        { NULL },
+        { NULL },
+        { 0 },
+        0
+};
 
-CmmType *global_int = &basic_type[0];
-CmmType *global_float = &basic_type[1];
+Type *BASIC_INT = &_BASIC_INT;
+Type *BASIC_FLOAT = &_BASIC_FLOAT;
 
-CmmArray *new_type_array(int size, CmmType *base)
-{
-    CmmArray *p = (CmmArray *)malloc(sizeof(CmmArray));
-    p->type = CMM_TYPE_ARRAY;
-    p->size = size;
-    p->base = base;
-    return p;
+// Constructor
+Type *new_type(CmmType class, const char *name, Type *type, Type *link) {
+    Type *this = NEW(Type);
+    this->class = class;
+    this->name = name;
+    this->base = type;  // Equivalent to this->meta, this->ret
+    this->link = link;
+    this->ref = 0;
+    this->lineno = -1;
+    return this;
 }
 
-CmmStruct *new_type_struct(const char *name)
-{
-    CmmStruct *p = (CmmStruct *) malloc(sizeof(CmmStruct));
-    p->type = CMM_TYPE_STRUCT;
-    p->tag = name;
-    p->field_list = NULL;
-    return p;
-}
-
-CmmFunc *new_type_func(const char *name, CmmType *ret)
-{
-    CmmFunc *p = (CmmFunc *)malloc(sizeof(CmmFunc));
-    p->type = CMM_TYPE_FUNC;
-    p->name = name;
-    p->ret = ret;
-    p->param_list = NULL;
-    return p;
-}
-
-CmmField *new_type_field(CmmType *type, const char *name, int lineno, CmmField *next) {
-    CmmField *p = NEW(CmmField);
-    p->type = CMM_TYPE_FIELD;
-    p->base = type;
-    p->next = next;
-    p->name = name;
-    p->def_line_no = lineno;
-    return p;
-}
-
-CmmParam *new_type_param(CmmType *type, CmmParam *next)
-{
-    CmmParam *p = NEW(CmmParam);
-    p->type = CMM_TYPE_PARAM;
-    p->base = type;
-    p->next = next;
-    return p;
-}
-
-const char *typename(CmmType *x) {
-    return type_s[*x];
-}
-
-/* constructors end */
-
-int typecmp(CmmType *x, CmmType *y) {
+bool typecmp(const Type *x, const Type *y) {
     // TODO allow void ?
     if (x == y) {  // Allow void
-        return 1;
+        return true;
     } else if (x == NULL || y == NULL) {  // void vs others
-        return 2;  // This is error, but NULL is used for undefined variables, return true allow not reporting error recursively.
+        return true;  // This is error, but NULL is used for undefined variables, return true allow not reporting error recursively.
     }
-    LOG("Now compare %s and %s", typename(x), typename(y));
+
+    LOG("Now compare %s and %s", x->name, y->name);
     /* Totally different! */
-    if (*x != *y) {
-        LOG("Totally different!");
-        return 0;
+    if (x->class != y->class) {
+        LOG("%s and %s are totally different!", class_s[x->class], class_s[y->class]);
+        return false;
     }
 
-    /* The function only use name to differ */
-    if (*x == CMM_TYPE_FUNC) {
+    // The function only use name to differ
+    if (x->class == CMM_FUNC) {
         LOG("Then we fall into func comparision");
-        CmmFunc *func_x, *func_y;
-        func_x = Fun(x);
-        func_y = Fun(y);
-        if (strcmp(func_x->name, func_y->name) != 0) {
-            return 0;
+        if (strcmp(x->name, y->name) != 0) {
+            return false;
         } else {
-            CmmParam *param_x = func_x->param_list;
-            CmmParam *param_y = func_y->param_list;
+            const Type *param_x = x->param;
+            const Type *param_y = y->param;
             while (param_x != NULL && param_y != NULL && typecmp(param_x->base, param_y->base)) {
-                param_x = param_x->next;
-                param_y = param_y->next;
+                param_x = param_x->link;
+                param_y = param_y->link;
             }
 
-            /* Compare to the end means all the same */
+            // Compare to the end means all the same
             if (param_x != NULL || param_y != NULL) {
-                return 0;
+                return false;
+            } else {
+                // Compare return type
+                // TODO: we don't allow void type now
+                assert(x->ret != NULL && y->ret != NULL);
+                return typecmp(x->ret, y->ret);
             }
-
-            /* Compare return type */
-            return typecmp(Fun(x)->ret, Fun(y)->ret);
         }
     }
 
-    if (*x == CMM_TYPE_ARRAY) {
+    if (x->class == CMM_ARRAY) {
         LOG("Then we fall into array comparision");
-        /* The array differs from its dimension and basic type */
+        // The array differs from its dimension and basic type
         int loopno = 1;
-        /* End loop when reach the basic type */
-        while (*x == CMM_TYPE_ARRAY && *y == CMM_TYPE_ARRAY) {
+        // End loop when reach the basic type
+        while (x->class == CMM_ARRAY && y->class == CMM_ARRAY) {
             LOG("loop %d", loopno);
-            if (*x != *y) {
-                return 0;
-            }
-            x = Array(x)->base;
-            y = Array(y)->base;
+            x = x->base;
+            y = y->base;
             loopno++;
         }
 
-        if (*x == CMM_TYPE_ARRAY || *y == CMM_TYPE_ARRAY) {
-            /* The dimension differs */
-            return 0;
+        if (x->class == CMM_ARRAY || y->class == CMM_ARRAY) {
+            // The dimension differs
+            return false;
         }
         else {
-            /* Compare the base type */
+            // Compare the base type
             return typecmp(x, y);
         }
     }
 
-    if (*x == CMM_TYPE_STRUCT) {
+    if (x->class == CMM_STRUCT) {
         LOG("Then we fall into struct comparision");
 #ifdef STRUCTURE
         // Comparison based on structure similarity
         // But don't compare their name
-        CmmField *field_x = Struct(x)->field_list;
-        CmmField *field_y = Struct(y)->field_list;
-        /* Compare the field one by one */
+        const Type *field_x = x->field;
+        const Type *field_y = y->field;
+        // Compare the field one by one
         while (field_x != NULL && field_y != NULL && typecmp(field_x->base, field_y->base)) {
-            field_x = field_x->next;
-            field_y = field_y->next;
+            field_x = field_x->link;
+            field_y = field_y->link;
         }
 
         if (field_x == NULL && field_y == NULL) {
-            return 1;  /* The fields' numbers are the same, and the type is the same respectively */
+            return true;  /* The fields' numbers are the same, and the type is the same respectively */
         } else {
-            return 0;
+            return false;
         }
-#else /* just the name */
+#else  // just the name
         return strcmp(STRUCT(x)->tag, STRUCT(y)->tag) == 0;
-#endif /* ifdef STRUCTURE */
+#endif // ifdef STRUCTURE
     }
 
-    assert(*x == CMM_TYPE_INT || *x == CMM_TYPE_FLOAT);
+    assert(x->class == CMM_INT || x->class == CMM_FLOAT);
 
     return 1;
-} /* typecmp */
+}
 
 // Find out whether a field belongs to a given structure
 // return the type of that field, NULL if not found
-CmmType *query_field(CmmType *target_struct, const char *field_name) {
-    assert(*target_struct == CMM_TYPE_STRUCT);
+Type *query_field(Type *target, const char *field_name) {
+    assert(target->class == CMM_STRUCT);
     assert(field_name != NULL);
 
     // Traverse the field list
-    for (CmmField *target_field = Struct(target_struct)->field_list;
-         target_field != NULL; target_field = target_field->next) {
-        if (!strcmp(target_field->name, field_name)) {
-            return target_field->base;
+    for (const Type *itr = target->field;
+         itr != NULL; itr = itr->link) {
+        if (!strcmp(itr->name, field_name)) {
+            return itr->base;
         }
     }
 
@@ -183,57 +155,52 @@ CmmType *query_field(CmmType *target_struct, const char *field_name) {
     return NULL;
 }
 
-void _print_type(CmmType *generic, char *end)
-{
-    CmmType *base;
-    CmmParam *param = NULL;
-    CmmField *field = NULL;
-    switch (*generic) {
-        case CMM_TYPE_INT:
-            printf("int");
+void _print_type(const Type *type, char *end) {
+    const Type *base, *link;
+    switch (type->class) {
+        case CMM_INT:
+        case CMM_FLOAT:
+            printf("%s", class_s[type->class]);
             break;
-        case CMM_TYPE_FLOAT:
-            printf("float");
-            break;
-        case CMM_TYPE_ARRAY:
-            /* Find the base */
-            base = Array(generic)->base;
-            while (*base == CMM_TYPE_ARRAY) {
-                base = Array(base)->base;
+        case CMM_ARRAY:
+            // Find the base
+            base = type->base;
+            while (base->class == CMM_ARRAY) {
+                base = base->base;
             }
-            /* Print the base recursively */
-            _print_type(base, " ");
-            /* Print dimension from left to right */
-            while (*generic == CMM_TYPE_ARRAY) {
-                printf("[%d]", Array(generic)->size);
-                generic = Array(generic)->base;
+            // Print the base recursively
+            _print_type(base, "");
+            // Print dimension from left to right
+            while (type->class == CMM_ARRAY) {
+                printf("[%d]", type->size);
+                type = type->base;
             }
             break;
-        case CMM_TYPE_STRUCT:
-            printf("struct %s { ", Struct(generic)->tag);
-            /* Print field list */
-            field = Struct(generic)->field_list;
-            while (field != NULL) {
-                _print_type(field->base, " ");
-                printf("%s; ", field->name);
-                field = field->next;
+        case CMM_STRUCT:
+            printf("%s %s{", class_s[type->class], type->name);
+            // Print field list
+            link = type->field;
+            while (link != NULL) {
+                _print_type(link->base, " ");
+                printf("%s;", link->name);
+                link = link->link;
             }
             printf("}");
             break;
-        case CMM_TYPE_FUNC:
-            /* Print return type */
-            _print_type(Fun(generic)->ret, " ");
-            /* Print function name */
-            printf("%s (", Fun(generic)->name);
-            /* Print param list */
-            param = Fun(generic)->param_list;
-            while (param != NULL && param->next != NULL) {
-                _print_type(param->base, ", ");
-                param = param->next;
+        case CMM_FUNC:
+            // Print return type
+            _print_type(type->ret, " ");
+            // Print function name
+            printf("%s(", type->name);
+            // Print param list
+            link = type->param;
+            while (link != NULL && link->link != NULL) {
+                _print_type(link->base, ", ");
+                link = link->link;
             }
-            /* Tail param handling */
-            if (param != NULL) {
-                _print_type(param->base, "");
+            // Tail param handling
+            if (link != NULL) {
+                _print_type(link->base, "");
             }
             printf(")");
             break;
@@ -244,41 +211,41 @@ void _print_type(CmmType *generic, char *end)
     printf("%s", end);
 }
 
-void print_type(CmmType *x) {
-    _print_type(x, "\n");
+void print_type(const Type *type) {
+    _print_type(type, "\n");
 }
 
-/* Test */
+// Test
 #ifdef TEST_TYPE
 int main()
-#else  /* ifndef TEST_TYPE */
+#else  // ifndef TEST_TYPE
 int test_cmm_type()
-#endif /* endif  TEST_TYPE */
+#endif // endif  TEST_TYPE
 {
-    CmmType top = CMM_TYPE_INT;
-    CmmType *current = &top;
-    CmmType *types[100];
-    CmmStruct *struc;
-    CmmFunc *foo;
+    Type *top = BASIC_INT;
+    Type *current = top;
+    Type *types[100];
+    Type *struc;
+    Type *foo;
     for (int i = 0; i < 100; i++) {
         int rd = rand();
         int idx = (unsigned)rd % 3;
 
         switch (idx) {
             case 0:
-                current = (CmmType *)new_type_array(rd, current);
+                current = new_type(CMM_ARRAY, NULL, current, NULL);
                 break;
             case 1:
-                struc = new_type_struct("hello");
-                struc->field_list = new_type_field(&top, "a", 0, NULL);
-                struc->field_list = new_type_field(&top, "b", 1, Struct(current)->field_list);
-                current = GENERIC(struc);
+                struc = new_type(CMM_STRUCT, "hello", NULL, NULL);
+                struc->field = new_type(CMM_FIELD, "a", top, NULL);
+                struc->field = new_type(CMM_FIELD, "b", top, struc->field);
+                current = struc;
                 break;
             case 2:
-                foo = new_type_func("foo", current);
-                foo->param_list = new_type_param(&top, NULL);
-                foo->param_list = new_type_param(&top, Fun(current)->param_list);
-                current = GENERIC(foo);
+                foo = new_type(CMM_FUNC, "foo", current, NULL);
+                foo->param = new_type(CMM_PARAM, "boo", BASIC_INT, NULL);
+                foo->param = new_type(CMM_PARAM, "coo", BASIC_FLOAT, foo->param);
+                current = foo;
                 break;
             default:
                 assert(0);

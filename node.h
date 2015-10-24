@@ -19,4 +19,5 @@ node_t *new_node(int type);
 void free_node(node_t *nd);
 void puts_tree(node_t *nd);
 void analyze_program(node_t *program);
+
 #endif // NODE_H
