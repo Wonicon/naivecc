@@ -40,3 +40,20 @@ a.a?
 ```
 
 will this cause name collision?
+
+### 一些存疑的语义错误
+
+```c
+struct A { int x; };
+struct B { int y; };
+int foo() {
+    int a[1][2];
+    struct a b;
+
+    A = B;
+}
+```
+
+由于我们的任务是允许结构等价, 所以`struct A`和`struct B`的变量进行运算是允许的.
+但是问题是`A = B`该如何界定, 是认为两边都是没有定义的变量呢, 还是说不是合法的操作数呢, 这种情况下要不要判断左值呢?
+还有就是`struct a b`, 这种情况是认为没有定义这个类型呢, 还是说类型不合法?
