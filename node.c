@@ -82,12 +82,13 @@ void puts_tree(node_t *nd) {
 
 typedef struct {
     Type *type;
+    int lineno;
     const char *name;
 } var_t;
 
 #define STRUCT_SCOPE (-10086)
 
-static var_t default_attr = {NULL, NULL};
+static var_t default_attr = {NULL, 0, NULL};
 
 #define SEMA_ERROR_MSG(type, lineno, fmt, ...) \
 fprintf(stderr, "Error type %d at Line %d: " fmt "\n", type, lineno, ## __VA_ARGS__)
@@ -104,8 +105,9 @@ var_t analyze_vardec(node_t *vardec, Type *inh_type) {
     assert(vardec->type == YY_VarDec);
 
     if (vardec->child->type == YY_ID) {
+        // Identifier
         node_t *id = vardec->child;
-        var_t return_attr = { inh_type, id->val.s };
+        var_t return_attr = { inh_type, id->lineno, id->val.s };
         return return_attr;
     } else if (vardec->child->type == YY_VarDec) {
         // Array
@@ -177,13 +179,8 @@ Type *analyze_declist(node_t *declist, Type *type, int scope) {
 
     // If the declist is not in struct, then we just return NULL.
     if (scope == STRUCT_SCOPE) {
-        // Get id line number
-        node_t *find_id = dec->child;
-        while (find_id->type != YY_ID) {
-            find_id = find_id->child;
-        }
         Type *field = new_type(CMM_FIELD, var.name, var.type, next_field);
-        field->lineno = find_id->lineno;
+        field->lineno = var.lineno;
         return field;
     } else {
         return NULL;
