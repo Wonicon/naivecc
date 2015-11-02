@@ -134,7 +134,8 @@ var_t analyze_dec(node_t *dec, Type *type, int scope) {
     var_t var = analyze_vardec(vardec, type);
 
     // TODO is field need insert symbol?
-    if (scope != STRUCT_SCOPE && (insert(var.name, var.type, dec->child->child->lineno, scope) < 0)) {
+    // if (scope != STRUCT_SCOPE && (insert(var.name, var.type, dec->child->child->lineno, scope) < 0)) {
+    if (insert(var.name, var.type, dec->child->child->lineno, scope) < 0) {
         SEMA_ERROR_MSG(3, dec->child->child->lineno, "Redefined variable \"%s\".", var.name);
         // TODO handle memory leak
     }
