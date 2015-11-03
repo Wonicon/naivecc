@@ -666,7 +666,7 @@ Type *analyze_stmtlist(node_t *stmtlist, Type *inh_func_type, int scope) {
     Type *sub_return_type;
     if (stmt->sibling != NULL) {
         sub_return_type = analyze_stmtlist(stmt->sibling, inh_func_type, scope);
-        return_type = (return_type != NO_RETURN) ? return_type : sub_return_type;
+        return_type = (return_type != NULL) ? return_type : sub_return_type;
     }
     return return_type;
 }
@@ -714,7 +714,7 @@ void analyze_extdef(node_t *extdef) {
             analyze_fundec(spec->sibling, type);
             return_type = analyze_compst(spec->sibling->sibling, type, 0);
             if (return_type == NULL) {
-                puts("Unreturned branch in function!");
+                LOG("Unreturned branch in function!");
             }
             break;
         case YY_SEMI:
