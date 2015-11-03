@@ -605,42 +605,50 @@ Type *analyze_exp(node_t *exp, int scope) {
 
 Type *analyze_stmt(node_t *stmt, Type *inh_func_type, int scope) {
     assert(stmt->type == YY_Stmt);
+
     node_t *first = stmt->child;
-    Type *stmt_type = NULL;
-    node_t *exp = NULL, *sub_stmt = NULL;
+    node_t *exp;
+    node_t *sub_stmt;
+    Type *cond_type;  // Used to check condition type
+    Type *return_type = NULL;
+    Type *else_return_type;
     switch (first->type) {
         case YY_Exp:
             analyze_exp(first, scope);
             break;
         case YY_CompSt:
-            analyze_compst(first, inh_func_type, scope);
+            return_type = analyze_compst(first, inh_func_type, scope);
             break;
         case YY_IF:
             exp = first->sibling->sibling;
-            stmt_type = analyze_exp(exp, scope);
-            if (!typecmp(stmt_type, BASIC_INT)) {
+            cond_type = analyze_exp(exp, scope);
+            if (!typecmp(cond_type, BASIC_INT)) {
                 SEMA_ERROR_MSG(7, exp->lineno, "The condition expression must return int");
             }
             sub_stmt = exp->sibling->sibling;
-            analyze_stmt(sub_stmt, inh_func_type, scope);
+            return_type = analyze_stmt(sub_stmt, inh_func_type, scope);
             if (sub_stmt->sibling != NULL) {
                 // ELSE
-                analyze_stmt(sub_stmt->sibling->sibling, inh_func_type, scope);
+                else_return_type = analyze_stmt(sub_stmt->sibling->sibling, inh_func_type, scope);
+                return_type = (return_type != NULL) ? else_return_type : return_type;
+            } else {
+                return_type = NULL;
             }
             break;
         case YY_WHILE:
             exp = first->sibling->sibling;
-            stmt_type = analyze_exp(exp, scope);
-            if (!typecmp(stmt_type, BASIC_INT)) {
+            cond_type = analyze_exp(exp, scope);
+            if (!typecmp(cond_type, BASIC_INT)) {
                 SEMA_ERROR_MSG(7, exp->lineno, "The condition expression must return int");
             }
             sub_stmt = exp->sibling->sibling;
             analyze_stmt(sub_stmt, inh_func_type, scope);
+            // We suppose the loop can jump out, so whether the compst returned decided by the following statement.
             break;
         case YY_RETURN:
             exp = first->sibling;
-            stmt_type = analyze_exp(exp, scope);
-            if (!typecmp(stmt_type, inh_func_type)) {
+            return_type = analyze_exp(exp, scope);
+            if (!typecmp(return_type, inh_func_type)) {
                 SEMA_ERROR_MSG(8, exp->lineno, "Type mismatched for return.");
             }
             break;
@@ -649,17 +657,18 @@ Type *analyze_stmt(node_t *stmt, Type *inh_func_type, int scope) {
             assert(0);
     }
 
-    return stmt_type;
+    return return_type;
 }
 
 Type *analyze_stmtlist(node_t *stmtlist, Type *inh_func_type, int scope) {
     node_t *stmt = stmtlist->child;
     Type *return_type = analyze_stmt(stmt, inh_func_type, scope);
+    Type *sub_return_type;
     if (stmt->sibling != NULL) {
-        return analyze_stmtlist(stmt->sibling, inh_func_type, scope);
-    } else {
-        return return_type;
+        sub_return_type = analyze_stmtlist(stmt->sibling, inh_func_type, scope);
+        return_type = (return_type != NO_RETURN) ? return_type : sub_return_type;
     }
+    return return_type;
 }
 
 //
@@ -672,7 +681,6 @@ Type *analyze_compst(node_t *compst, Type *inh_func_type, int scope) {
     node_t *list = compst->child->sibling;
 
     Type *return_type = NULL;
-
     while (list != NULL) {
         if (list->type == YY_DefList) {
             analyze_deflist(list, scope);
@@ -697,13 +705,17 @@ void analyze_extdef(node_t *extdef) {
 
     node_t *spec = extdef->child;
     Type *type = analyze_specifier(spec);
+    Type *return_type;
     switch (spec->sibling->type) {
         case YY_ExtDecList:
             analyze_extdeclist(spec->sibling, type);
             break;
         case YY_FunDec:
             analyze_fundec(spec->sibling, type);
-            analyze_compst(spec->sibling->sibling, type, 0);
+            return_type = analyze_compst(spec->sibling->sibling, type, 0);
+            if (return_type == NULL) {
+                puts("Unreturned branch in function!");
+            }
             break;
         case YY_SEMI:
             LOG("Well, I think this is used for struct");
