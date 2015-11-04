@@ -6,6 +6,9 @@
 #include <memory.h>
 
 
+extern int is_check_return;
+
+
 //
 // node constructor, wrapping some initialization
 //
@@ -96,8 +99,8 @@ fprintf(stderr, "Error type %d at Line %d: " fmt "\n", type, lineno, ## __VA_ARG
 //
 // Some pre-declaration
 //
-Type * analyze_specifier(const node_t *);                     // required by analyze_[def|paramdec|extdef]
-Type *analyze_exp(node_t *exp, int scope);             // required by check_param_lsit, analyze_vardec
+Type * analyze_specifier(const node_t *);     // required by analyze_[def|paramdec|extdef]
+Type *analyze_exp(node_t *exp, int scope);    // required by check_param_lsit, analyze_vardec
 Type *analyze_compst(node_t *, Type *, int);  // required by analyze_stmt
 
 
@@ -421,27 +424,28 @@ void analyze_extdeclist(node_t *extdeclist, Type *inh_type) {
     }
 }
 
-// TODO if-elseif-else return routes analysis
 
 //
 // exp only return its type.
 // We use stmt analyzer to check the return type.
 //
-static inline int is_lval(node_t *exp) {
+static inline int is_lval(const node_t *exp)
+{
     assert(exp != NULL && exp->type == YY_Exp);
-    if (exp->child->type == YY_ID) {
+
+    if (exp->child->type == YY_ID)
+    {
         // Avoid function name and type name.
         // An array directly found in the symbol table is a constant variable
         // which cannot be assigned.
         sym_ent_t *ent = query(exp->child->val.s, 0);
-        return ent != NULL && ent->type->class != CMM_FUNC &&
-                ent->type->class != CMM_TYPE && ent->type->class != CMM_ARRAY;
-    } else if (exp->child->sibling != NULL && exp->child->sibling->type == YY_LB) {
-        return 1;
-    } else if (exp->child->sibling != NULL && exp->child->sibling->type == YY_DOT) {
-        return 1;
-    } else {
-        return 0;
+        // TODO Ugly conditions
+        return ent != NULL && ent->type->class != CMM_FUNC && ent->type->class != CMM_TYPE && ent->type->class != CMM_ARRAY;
+    }
+    else 
+    {
+        node_t *follow = exp->child->sibling;
+        return (follow != NULL && (follow->type == YY_LB || follow->type == YY_DOT));
     }
 }
 
@@ -481,6 +485,7 @@ static int check_param_list(const Type *param, node_t *args, int scope) {
 }
 
 const char *expr_to_s(node_t *exp);
+// TODO Split this bulk function!
 Type *analyze_exp(node_t *exp, int scope) {
     assert(exp->type == YY_Exp);
 
@@ -603,6 +608,13 @@ Type *analyze_exp(node_t *exp, int scope) {
     }
 }
 
+
+//
+// Statement analyzer will check condition type and return type
+// which cannot be judged in expression analyzer. In other cases
+// it is just a router, and receives the type of the composite 
+// statement, which may contain a return statement.
+//
 Type *analyze_stmt(node_t *stmt, Type *inh_func_type, int scope) {
     assert(stmt->type == YY_Stmt);
 
@@ -660,6 +672,10 @@ Type *analyze_stmt(node_t *stmt, Type *inh_func_type, int scope) {
     return return_type;
 }
 
+
+//
+// Traverse the stmtlist
+//
 Type *analyze_stmtlist(node_t *stmtlist, Type *inh_func_type, int scope) {
     node_t *stmt = stmtlist->child;
     Type *return_type = analyze_stmt(stmt, inh_func_type, scope);
@@ -670,6 +686,7 @@ Type *analyze_stmtlist(node_t *stmtlist, Type *inh_func_type, int scope) {
     }
     return return_type;
 }
+
 
 //
 // Second level analyzer router : CompSt
@@ -693,6 +710,7 @@ Type *analyze_compst(node_t *compst, Type *inh_func_type, int scope) {
     return return_type;
 }
 
+
 //
 // Top level analyzer of extdef acting as a router
 // Production:
@@ -713,8 +731,8 @@ void analyze_extdef(node_t *extdef) {
         case YY_FunDec:
             analyze_fundec(spec->sibling, type);
             return_type = analyze_compst(spec->sibling->sibling, type, 0);
-            if (return_type == NULL) {
-                LOG("Unreturned branch in function!");
+            if (is_check_return && return_type == NULL) {
+                fprintf(stderr, "Unreturned branch in function!\n");
             }
             break;
         case YY_SEMI:
@@ -724,6 +742,7 @@ void analyze_extdef(node_t *extdef) {
             LOG("WTF");
     }
 }
+
 
 void analyze_program(node_t *prog) {
     node_t *extdef = prog->child->child;
@@ -737,6 +756,8 @@ void analyze_program(node_t *prog) {
     }
 }
 
+
+// TODO Split this ugly function!
 void print_expr(const node_t *nd, FILE *fp) {
     if (nd == NULL) {
         return;
@@ -810,12 +831,14 @@ void print_expr(const node_t *nd, FILE *fp) {
     }
 }
 
+
 const char *expr_to_s(node_t *exp) {
     static char *s = NULL;
+
     assert(exp->type == YY_Exp);
     FILE *tmp = tmpfile();
     print_expr(exp->child, tmp);
-    int len = (int)ftell(tmp);
+    int len = (int)ftell(tmp);  // long long -> int
     if (s != NULL) {
         free(s);
     }
