@@ -556,7 +556,7 @@ Type *analyze_exp(node_t *exp, int scope) {
                     }
                 case YY_LB:
                     rexp_type = analyze_exp(rexp, scope);
-                    if (rexp_type->class != CMM_INT) {
+                    if (rexp_type != NULL && rexp_type->class != CMM_INT) {
                         SEMA_ERROR_MSG(12, rexp->lineno, "%s is not a integer", expr_to_s(rexp));
                     }
 
