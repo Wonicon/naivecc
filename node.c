@@ -137,12 +137,13 @@ var_t analyze_dec(node_t *dec, Type *type, int scope) {
     var_t var = analyze_vardec(vardec, type);
 
     // TODO is field need insert symbol?
-    // if (scope != STRUCT_SCOPE && (insert(var.name, var.type, dec->child->child->lineno, scope) < 0)) {
-    if (insert(var.name, var.type, dec->child->child->lineno, scope) < 0) {
-        if (scope != STRUCT_SCOPE) {
-            SEMA_ERROR_MSG(3, dec->child->child->lineno, "Redefined variable \"%s\".", var.name);
-        }
+    if (scope != STRUCT_SCOPE) {
+        if (insert(var.name, var.type, dec->child->child->lineno, scope) < 0) {
+            if (scope != STRUCT_SCOPE) {
+                SEMA_ERROR_MSG(3, dec->child->child->lineno, "Redefined variable \"%s\".", var.name);
+            }
         // TODO handle memory leak
+        }
     }
 
     // Assignment / Initialization
@@ -292,6 +293,10 @@ Type *analyze_struct_spec(const node_t *struct_spec) {
         if (outer->name[0] == '\0') {
             // This is an anonymous field, which means that it has been detected as a duplicated field.
             continue;
+        }
+
+        if (insert(outer->name, outer->base, outer->lineno, STRUCT_SCOPE) < 0) {
+            SEMA_ERROR_MSG(3, outer->lineno, "Redefined field \"%s\".", outer->name);
         }
 
         Type *inner = outer->link;

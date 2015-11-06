@@ -5,7 +5,7 @@
 CC = gcc
 FLEX = flex
 BISON = bison
-CFLAGS = -std=gnu99 -Wall -Werror -Wno-unused-function
+CFLAGS = -std=gnu99 -Wall -Werror -ggdb
 # CFLAGS = -std=c99
 
 # 编译目标：src目录下的所有.c文件
@@ -19,10 +19,10 @@ LFO = $(LFC:.c=.o)
 YFO = $(YFC:.c=.o)
 
 parser: syntax $(filter-out $(LFO),$(OBJS))
-	$(CC) $(CFLAGS) -o parser $(filter-out $(LFO),$(OBJS)) -lfl -ly
+	$(CC) -ggdb -o parser $(filter-out $(LFO),$(OBJS)) -lfl -ly
 
 syntax: lexical syntax-c
-	$(CC) $(CFLAGS) -c $(YFC) -o $(YFO)
+	$(CC) -ggdb -c $(YFC) -o $(YFO)
 
 lexical: $(LFILE)
 	$(FLEX) -o $(LFC) $(LFILE)
