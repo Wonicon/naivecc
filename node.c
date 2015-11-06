@@ -139,7 +139,9 @@ var_t analyze_dec(node_t *dec, Type *type, int scope) {
     // TODO is field need insert symbol?
     // if (scope != STRUCT_SCOPE && (insert(var.name, var.type, dec->child->child->lineno, scope) < 0)) {
     if (insert(var.name, var.type, dec->child->child->lineno, scope) < 0) {
-        SEMA_ERROR_MSG(3, dec->child->child->lineno, "Redefined variable \"%s\".", var.name);
+        if (scope != STRUCT_SCOPE) {
+            SEMA_ERROR_MSG(3, dec->child->child->lineno, "Redefined variable \"%s\".", var.name);
+        }
         // TODO handle memory leak
     }
 
@@ -382,7 +384,8 @@ Type *analyze_varlist(node_t *varlist) {
 // Analyze the function and register it
 //   FunDec -> ID LP VarList RP
 //   FunDec -> ID LP RP
-void analyze_fundec(node_t *fundec, Type *inh_type) {
+const char *
+analyze_fundec(node_t *fundec, Type *inh_type) {
     assert(fundec->type == YY_FunDec);
     node_t *id = fundec->child;
     node_t *varlist = id->sibling->sibling;
@@ -405,6 +408,8 @@ void analyze_fundec(node_t *fundec, Type *inh_type) {
         SEMA_ERROR_MSG(4, fundec->lineno, "Redefined function \"%s\"", func->name);
         // TODO handle memory leak!
     }
+
+    return name;
 }
 
 
@@ -724,15 +729,16 @@ void analyze_extdef(node_t *extdef) {
     node_t *spec = extdef->child;
     Type *type = analyze_specifier(spec);
     Type *return_type;
+    const char *func_name;
     switch (spec->sibling->type) {
         case YY_ExtDecList:
             analyze_extdeclist(spec->sibling, type);
             break;
         case YY_FunDec:
-            analyze_fundec(spec->sibling, type);
+            func_name = analyze_fundec(spec->sibling, type);
             return_type = analyze_compst(spec->sibling->sibling, type, 0);
             if (is_check_return && return_type == NULL) {
-                fprintf(stderr, "Unreturned branch in function!\n");
+                fprintf(stderr, "Unreturned branch in function \"%s\"!\n", func_name);
             }
             break;
         case YY_SEMI:

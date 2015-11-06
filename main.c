@@ -36,7 +36,7 @@ int main(int argc, char *argv[])
             }
             else if (!strcmp(argv[i], "--check-return"))
             {
-                is_check_return = 0;
+                is_check_return = 1;
             }
         }
     }

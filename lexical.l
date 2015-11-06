@@ -26,6 +26,13 @@ yylloc.first_column = yycolumn;\
 yylloc.last_column = yycolumn + yyleng - 1;\
 yycolumn += yyleng;
 
+
+//
+// Pre-declaration
+//
+int check_oct(char *yytext, int yyleng, int yylineno);
+int check_hex(char *yytext, int yyleng, int yylineno);
+
 %}
 
 

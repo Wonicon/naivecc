@@ -12,7 +12,7 @@
 
 int is_lex_error = 0;
 int is_syn_error = 0;
-extern is_greedy;
+extern int is_greedy;
 
 #define YYDEBUG 1
 #include "lex.yy.c"
@@ -71,7 +71,12 @@ static union YYSTYPE *YYVSP = NULL;
 #define LOGERR(x) is_lex_error = 0; if (is_greedy) yyerrok
 #endif
 
+//
+// Pre-declaration
+//
+int yyerror(const char *msg);
 void midorder(node_t *, int);
+
 %}
 
 /* declared types */
@@ -308,38 +313,16 @@ void free_ast() {
 }
 
 
+//
 // oeverride of yyerror
 //
-int yyerror(char *msg) {
+int yyerror(const char *msg) {
     is_syn_error = 1;
     if (is_lex_error) {
         is_lex_error = 0;
         return 0;
     }
 
-    /* The gloabl ast root -> prog is changed every time
-     * when successfully reduce a production.
-     * When an error occurs, it is highly possible that the
-     * nterm has an upper level wrapper nterm as well as a
-     * sub nterm which owns the ast root. So we can use this
-     * information to locate our errors better.
-     * For example, DecList is an upper level nterm which
-     * has some leaf nterms. But the detailed error will be
-     * first triggered in the leaf level, so the lineno of the
-     * place where error really occurs is highly possible to
-     * be consistent with the ast root's lineno information.
-     */
-    int lineno = yylineno;
-    node_t *nd = prog;
-    if (nd != NULL && nd->child != NULL) {
-        nd = nd->child;
-    }
-    while (nd != NULL && nd->sibling != NULL) {
-        nd = nd->sibling;
-    }
-    if (token_on_line == 1 && (nd->type != YY_SEMI && nd->type != YY_RC)) {
-        lineno = nd->lineno;
-    }
     printf("Error type B at line %d: %s.\n", yylineno, msg);
     return 0;
 }
