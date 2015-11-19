@@ -10,6 +10,10 @@
 #include <assert.h>
 
 
+node_t *simplify_exp(const node_t *);
+node_t *simplify_stmt(const node_t *);
+node_t *simplify_compst(const node_t *);
+node_t *simplify_fundec(const node_t *);
 int is_lex_error = 0;
 int is_syn_error = 0;
 extern int is_greedy;
@@ -193,7 +197,7 @@ VarDec          : ID               { LINK(VarDec, 1); }
                 | VarDec LB INT RB { LINK(VarDec, 4); }
                 ;
 
-FunDec          : ID LP VarList RP { LINK(FunDec, 4); }
+FunDec          : ID LP VarList RP { LINK(FunDec, 4); simplify_fundec($$); }
                 | ID LP RP         { LINK(FunDec, 3); }
                 ;
 
@@ -206,14 +210,14 @@ VarList         : ParamDec COMMA VarList { LINK(VarList, 3); }
 
 /* Statements */
 
-CompSt          : LC DefList StmtList RC { LINK_NULL(CompSt, 4); }
+CompSt          : LC DefList StmtList RC { LINK_NULL(CompSt, 4); simplify_compst($$); }
                 ;
 
-StmtList        : Stmt StmtList { LINK_NULL(StmtList, 2); }
+StmtList        : Stmt StmtList { simplify_stmt($1); LINK_NULL(StmtList, 2); }
                 |               { $$ = NULL; }
                 ;
 
-Stmt            : Exp SEMI                         { LINK(Stmt, 2); }
+Stmt            : Exp SEMI                         { simplify_exp($1); LINK(Stmt, 2); }
                 | CompSt                           { LINK(Stmt, 1); }
                 | RETURN Exp SEMI                  { LINK(Stmt, 3); }
                 | IF LP Exp RP Stmt %prec SUB_ELSE { LINK(Stmt, 5); }
@@ -305,6 +309,14 @@ void semantic_analysis() {
     analyze_program(prog);
 }
 
+//
+// 简化语法分析树
+//
+node_t *simplify_tree(const node_t *);
+static node_t *ast_tree;
+void simplify() {
+    ast_tree = simplify_tree(prog);
+}
 //
 // Release the parsing tree
 //

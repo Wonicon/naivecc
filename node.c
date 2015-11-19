@@ -12,13 +12,12 @@ extern int is_check_return;
 //
 // node constructor, wrapping some initialization
 //
-node_t *new_node(int type) {
+node_t *new_node(enum YYTNAME_INDEX type) {
     node_t *p = (node_t *)malloc(sizeof(node_t));
     memset(p, 0, sizeof(*p));
     p->type = type;
     return p;
 }
-
 
 //
 // release the space the node occupies
