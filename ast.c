@@ -100,12 +100,17 @@ Node simplify_func_call(const Node exp) {
     p->child = trans_node(exp->child, TERM_ID);
     Node args = exp->child->sibling->sibling;
     Node tail = p->child;
-    while (args != NULL) {
+    // TODO Ugly
+    while (1) {
         assert(args->type == YY_Args);
         tail->sibling = trans_node(args, ARG_is_EXP);
         tail = tail->sibling;
         tail->child = simplify_exp(args->child);
-        args = args->child->sibling->sibling;
+        if (args->child->sibling != NULL) {
+            args = args->child->sibling->sibling;
+        } else {
+            break;
+        }
     }
     return p;
 }
@@ -228,7 +233,7 @@ Node simplify_compst(const Node compst) {
     Node element = compst->child;
     while (element != NULL) {
         if (element->type == YY_DefList) {
-            // Uncomment this after the implementation of simplify_def
+            // Uncomment this after the implementation of simpliy_def
             //*iterator = simplify_list(element, simplify_def);
         } else if (element->type == YY_StmtList) {
             *iterator = simplify_list(element, simplify_stmt);

@@ -10,10 +10,6 @@
 #include <assert.h>
 
 
-node_t *simplify_exp(const node_t *);
-node_t *simplify_stmt(const node_t *);
-node_t *simplify_compst(const node_t *);
-node_t *simplify_fundec(const node_t *);
 int is_lex_error = 0;
 int is_syn_error = 0;
 extern int is_greedy;
@@ -197,7 +193,7 @@ VarDec          : ID               { LINK(VarDec, 1); }
                 | VarDec LB INT RB { LINK(VarDec, 4); }
                 ;
 
-FunDec          : ID LP VarList RP { LINK(FunDec, 4); simplify_fundec($$); }
+FunDec          : ID LP VarList RP { LINK(FunDec, 4); }
                 | ID LP RP         { LINK(FunDec, 3); }
                 ;
 
@@ -210,14 +206,14 @@ VarList         : ParamDec COMMA VarList { LINK(VarList, 3); }
 
 /* Statements */
 
-CompSt          : LC DefList StmtList RC { LINK_NULL(CompSt, 4); simplify_compst($$); }
+CompSt          : LC DefList StmtList RC { LINK_NULL(CompSt, 4); }
                 ;
 
-StmtList        : Stmt StmtList { simplify_stmt($1); LINK_NULL(StmtList, 2); }
+StmtList        : Stmt StmtList { LINK_NULL(StmtList, 2); }
                 |               { $$ = NULL; }
                 ;
 
-Stmt            : Exp SEMI                         { simplify_exp($1); LINK(Stmt, 2); }
+Stmt            : Exp SEMI                         { LINK(Stmt, 2); }
                 | CompSt                           { LINK(Stmt, 1); }
                 | RETURN Exp SEMI                  { LINK(Stmt, 3); }
                 | IF LP Exp RP Stmt %prec SUB_ELSE { LINK(Stmt, 5); }

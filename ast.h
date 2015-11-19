@@ -59,4 +59,19 @@ enum ProductionTag {
     TERM_ID
 };
 
+enum BinaryOpType {
+    BI_ADD,
+    BI_SUB,
+    BI_MUL,
+    BI_DIV,
+    BI_AND,
+    BI_OR,
+    BI_EQ,
+    BI_LT,
+    BI_LE,
+    BI_GT,
+    BI_GE,
+    BI_NE
+};
+
 #endif //__AST_H__

@@ -58,8 +58,10 @@ int main(int argc, char *argv[])
     {
         //ast();
         semantic_analysis();
+        simplify();
     }
 
+    
     free_ast();
 #ifdef DEBUG
     print_symtab();
