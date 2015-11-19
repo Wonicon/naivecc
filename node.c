@@ -120,6 +120,7 @@ var_t analyze_vardec(node_t *vardec, Type *inh_type) {
         node_t *sub_vardec = vardec->child;
         Type *temp_array = new_type(CMM_ARRAY, NULL, inh_type, NULL);
         temp_array->size = sub_vardec->sibling->sibling->val.i;
+        temp_array->type_size = temp_array->size * inh_type->type_size;
         return analyze_vardec(sub_vardec, temp_array);
     } else {
         assert(0);

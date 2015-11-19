@@ -32,6 +32,7 @@ typedef struct _Type {
         int ref;               // How many instance are using this type, used by struct
         int size;              // Every variable have its own array type
     };
+    int type_size;
     int lineno;                // The line number of definition
 } Type;
 
