@@ -205,6 +205,7 @@ Type *analyze_def(node_t *def, int scope) {
 
     // Handle Specifier
     Type *type = analyze_specifier(spec);
+    assert(type->type_size != 0);
 
     // Handle DecList and get a field list if we are in struct scope
     return analyze_declist(declist, type, scope);
@@ -288,7 +289,8 @@ Type *analyze_struct_spec(const node_t *struct_spec) {
     // Get field list
     this->field = analyze_deflist(body, STRUCT_SCOPE);
 
-    // Check field name collision
+    int struct_size = 0;
+    // Check field name collision and add up the size and offset
     for (Type *outer = this->field; outer != NULL; outer = outer->link) {
         if (outer->name[0] == '\0') {
             // This is an anonymous field, which means that it has been detected as a duplicated field.
@@ -298,6 +300,10 @@ Type *analyze_struct_spec(const node_t *struct_spec) {
         if (insert(outer->name, outer->base, outer->lineno, STRUCT_SCOPE) < 0) {
             SEMA_ERROR_MSG(3, outer->lineno, "Redefined field \"%s\".", outer->name);
         }
+
+        // 记录偏移量并累加大小
+        outer->offset = struct_size;
+        struct_size += outer->meta->type_size;
 
         Type *inner = outer->link;
         while (inner != NULL) {
@@ -310,10 +316,10 @@ Type *analyze_struct_spec(const node_t *struct_spec) {
             inner = inner->link;
         }
     }
+    this->type_size = struct_size;
 
     // Use the struct name to register in the symbol table.
     // Ignore the struct with empty tag.
-
 
     int insert_rst = 1;
     if (strcmp(this->name, "") != 0) {

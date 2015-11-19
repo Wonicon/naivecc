@@ -35,7 +35,7 @@ void print_production_tag(const Node nd) {
 
 Node simplify_func_call(const Node exp);
 Node simplify_binary(const Node exp);
-
+Node simplify_vardec(const Node vardec);
 //
 // 简化表达式
 //
@@ -205,7 +205,46 @@ Node simplify_stmt(const Node stmt) {
     }
 }
 
-Node simplify_def(const Node def) { return NULL; }  // TODO
+//
+// 简化 dec, 主要是递归简化, 以及有初始化的时候去掉 ASSIGNOP
+//
+Node simplify_dec(const Node dec) {
+    assert(dec && dec->type == YY_Dec);
+    // 获取产生式各结点
+    Node vardec = dec->child;
+    Node initializer = vardec->sibling ? vardec->sibling->sibling : NULL;
+    Node new_vardec = simplify_vardec(vardec);
+
+    Node new_dec;
+    if (initializer) {
+        new_dec = trans_node(dec, DEC_is_VARDEC_INITIALIZATION);
+        new_dec->child = new_vardec;
+        new_dec->child->sibling = simplify_exp(initializer);
+    } else {
+        new_dec = trans_node(dec, DEC_is_VARDEC);
+        new_dec->child = new_vardec;
+    }
+
+    return new_dec;
+}
+
+Node simplify_def(const Node def) {
+    assert(def && def->type == YY_Def);
+    // 获取产生式各结点
+    Node specifier = def->child;
+    Node declist = specifier->sibling;
+    Node dec = declist->child;
+
+    Node new_def = trans_node(def, DEF_is_SPEC_DEC);
+    new_def->child = specifier;  // TODO 暂时没有简化 Specifier 的需求
+    Node iterator = new_def->child;
+    while (dec->sibling) {
+        iterator->sibling = simplify_dec(dec);
+        iterator = iterator->sibling;
+    }
+    iterator->sibling = simplify_dec(dec);
+    return new_def;
+}
 
 //
 // List 类通用简化函数, 用于将递归定义的表结构转化为链表形式
@@ -233,8 +272,7 @@ Node simplify_compst(const Node compst) {
     Node element = compst->child;
     while (element != NULL) {
         if (element->type == YY_DefList) {
-            // Uncomment this after the implementation of simpliy_def
-            //*iterator = simplify_list(element, simplify_def);
+            *iterator = simplify_list(element, simplify_def);
         } else if (element->type == YY_StmtList) {
             *iterator = simplify_list(element, simplify_stmt);
         }
