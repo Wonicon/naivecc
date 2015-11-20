@@ -11,9 +11,11 @@
 
 #include "cmm_type.h"
 
+#define MAX_LINE 2048
+
 #define FAIL_TO_GEN -1
 #define NO_NEED_TO_GEN -2
-#define MULTI_INSTR -3
+#define MULTI_INSTR MAX_LINE
 
 typedef struct Operand_ *Operand;
 

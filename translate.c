@@ -54,6 +54,8 @@ void intime_deref(Node exp);
 
 int translate_exp_is_exp_idx(Node exp);
 
+int translate_cond_and(Node exp);
+
 //
 // 用switch-case实现对不同类型(tag)node的分派
 // 也可以用函数指针表来实现, 不过函数指针表对枚举值的依赖太强
@@ -97,9 +99,67 @@ int translate_dispatcher(Node node) {
             return translate_exp_is_assign(node);
         case EXP_is_EXP_IDX:
             return translate_exp_is_exp_idx(node);
+        case EXP_is_AND:
+        case EXP_is_OR:
+        case EXP_is_NOT:
+        case EXP_is_RELOP: {
+            node->label_true = new_operand(OPE_LABEL);
+            node->label_false = new_operand(OPE_LABEL);
+
+            if (node->dst != NULL) {
+                Operand value_false = new_operand(OPE_INTEGER);
+                value_false->var.integer = 0;
+                new_instr(IR_ASSIGN, value_false, NULL, node->dst);
+            }
+
+            switch (node->tag) {
+                case EXP_is_AND: return translate_cond_and(node);
+                default: ;
+            }
+
+            new_instr(IR_LABEL, node->label_true, NULL, NULL);
+
+            if (node->dst != NULL) {
+                Operand value_true = new_operand(OPE_INTEGER);
+                value_true->var.integer = 1;
+                new_instr(IR_ASSIGN, value_true, NULL, node->dst);
+            }
+
+            new_instr(IR_LABEL, node->label_false, NULL, NULL);
+
+            return MULTI_INSTR;
+        }
         default:
             return FAIL_TO_GEN;
     }
+}
+
+int translate_cond(Node exp) {
+    switch (exp->tag) {
+        case EXP_is_AND: return translate_cond_and(exp);
+        default: return FAIL_TO_GEN;
+    }
+}
+
+//
+// 翻译 与 表达式
+//
+int translate_cond_and(Node exp) {
+    Node left = exp->child;
+    Node right = left->sibling;
+    left->label_true = new_operand(OPE_LABEL);
+    left->label_false = exp->label_false;
+    right->label_true = exp->label_true;
+    right->label_false = exp->label_false;
+
+    // 这里产生了 left 相关的代码
+    translate_dispatcher(left);
+
+    // 为真 非短路
+    new_instr(IR_LABEL, left->label_true, NULL, NULL);
+
+    // 继续执行 right 的代码
+    return translate_dispatcher(right);
 }
 
 //

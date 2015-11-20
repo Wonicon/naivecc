@@ -19,8 +19,8 @@ typedef struct _node_t {
     } val;
     struct _node_t *child, *sibling;
     Operand dst;  // 一个表达式可能需要上层提供的目标地址, 值类型可能会将这个字段的值替换 [Feature]
-    Operand lable_true;
-    Operand lable_false;
+    Operand label_true;
+    Operand label_false;
 } node_t;
 
 typedef node_t *Node;

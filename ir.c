@@ -6,7 +6,6 @@
 #include <stdlib.h>
 #include <assert.h>
 
-#define MAX_LINE 2048
 #define NAME_LEN 128
 // 指令缓冲区
 static struct IR instr_buffer[MAX_LINE];
