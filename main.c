@@ -10,6 +10,7 @@ void ast();
 void semantic_analysis();
 void free_ast();
 void simplify();
+void test_translate();
 
 extern int yydebug;
 
@@ -59,6 +60,7 @@ int main(int argc, char *argv[])
         //ast();
         semantic_analysis();
         simplify();
+        test_translate();
     }
 
     
