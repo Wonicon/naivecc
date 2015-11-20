@@ -246,6 +246,8 @@ int translate_if_else(Node exp) {
 
     new_instr(IR_JMP, next, NULL, NULL);
 
+    new_instr(IR_LABEL, cond->label_false, NULL, NULL);
+
     translate_dispatcher(false_stmt);
 
     new_instr(IR_LABEL, next, NULL, NULL);
@@ -288,6 +290,7 @@ int translate_cond_exp(Node exp) {
     exp->dst = new_operand(OPE_TEMP);
     translate_dispatcher(exp);
     Operand const_zero = new_operand(OPE_INTEGER);
+    const_zero->var.integer = 0;
     new_instr(IR_BNE, exp->dst, const_zero, exp->label_true);
     new_instr(IR_JMP, exp->label_false, NULL, NULL);
     return MULTI_INSTR;
