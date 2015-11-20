@@ -124,6 +124,9 @@ void print_single_instr(struct IR instr, FILE *file) {
     // 约定 BEQ 和 BNE 包围所有 Branch 指令
     if (IR_BEQ <= instr.type && instr.type <= IR_BNE) {
         fprintf(file, ir_format[instr.type], rs_s, rt_s, rd_s);  // 交换顺序
+    } else if (instr.type == IR_DEC) {  // 规划干不过特例
+        fprintf(file, ir_format[instr.type], rd_s, rs_s, rt_s + 1);
+
     } else {
         fprintf(file, ir_format[instr.type], rd_s, rs_s, rt_s);
     }
