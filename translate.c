@@ -301,6 +301,13 @@ int translate_extdef_func(Node extdef) {
 int translate_func_head(Node func) {
     Node funcname = func->child;
     Node param = funcname->sibling;
+
+    // 声明函数头
+    Operand rs = new_operand(OPE_FUNC);
+    rs->var.funcname = funcname->val.s;
+    new_instr(IR_FUNC, rs, NULL, NULL);
+
+    // 声明变量
     while (param != NULL) {
         Node spec = param->child;
         // 无脑找变量名

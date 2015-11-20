@@ -86,8 +86,8 @@ void print_operand(Operand ope, char *str) {
 }
 
 static const char *ir_format[] = {
-    "LABEL %s :",           // LABEL
-    "FUNCTION %s :",        // FUNCTION
+    "%sLABEL %s :",         // LABEL
+    "%sFUNCTION %s :",      // FUNCTION
     "%s := %s",             // ASSIGN
     "%s := %s + %s",        // ADD
     "%s := %s - %s",        // SUB
@@ -96,14 +96,14 @@ static const char *ir_format[] = {
     "%s := &%s",            // ADDR
     "%s := *%s",            // DEREF_R
     "*%s := %s",            // DEREF_L
-    "GOTO %s",              // JMP
+    "%sGOTO %s",            // JMP
     "IF %s == %s GOTO %s",  // BEQ
     "IF %s < %s GOTO %s",   // BLT
     "IF %s <= %s GOTO %s",  // BLE
     "IF %s > %s GOTO %s",   // BGT
     "IF %s >= %s GOTO %s",  // BGE
     "IF %s != %s GOTO %s",  // BNE
-    "RETURN %s",            // RETURN
+    "%sRETURN %s",          // RETURN
     "%sDEC %s %s",          // DEC, 第一个 %s 过滤 rd_s
     "%sARG %s",             // Pass argument, 第一个 %s 过滤 rd_s
     "%s := CALL %s",        // CALL
