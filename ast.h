@@ -44,6 +44,7 @@ enum ProductionTag {
     EXP_is_ASSIGN,
     EXP_is_AND,
     EXP_is_OR,
+    EXP_is_NOT,
     EXP_is_RELOP,
     EXP_is_BINARY,
     EXP_is_UNARY,

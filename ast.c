@@ -62,7 +62,7 @@ Node simplify_exp(const Node exp) {
         }
         case YY_NOT:
         {
-            Node p = trans_node(exp, EXP_is_UNARY);
+            Node p = trans_node(exp, EXP_is_NOT);
             p->val.operator = "!";
             p->child = simplify_exp(exp->child->sibling);
             return p;

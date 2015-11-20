@@ -13,6 +13,8 @@
 
 enum TranslateState translate_state = FINE;
 
+// TODO 每个 Compst 在跳转指令生成前可以计算所有常量
+
 static void free_ope(Operand *ptr) {
     if (*ptr != NULL) {
         free(*ptr);
@@ -44,6 +46,8 @@ int translate_stmt_is_compst(Node stmt);
 
 int translate_binary_operation(Node exp);
 
+int translate_unary_operation(Node exp);
+
 //
 // 用switch-case实现对不同类型(tag)node的分派
 // 也可以用函数指针表来实现, 不过函数指针表对枚举值的依赖太强
@@ -74,6 +78,8 @@ int translate_dispatcher(Node node) {
             return translate_stmt_is_exp(node);
         case EXP_is_BINARY:
             return translate_binary_operation(node);
+        case EXP_is_UNARY:
+            return translate_unary_operation(node);
         case EXP_is_INT:
         case EXP_is_FLOAT:
             return translate_exp_is_const(node);
@@ -84,6 +90,10 @@ int translate_dispatcher(Node node) {
         default:
             return FAIL_TO_GEN;
     }
+}
+
+int translate_unary_operation(Node exp) {
+    return 0;
 }
 
 #define CALC(op, rs, rt, rd, type) do {\
@@ -111,7 +121,7 @@ int translate_binary_operation(Node exp) {
     rexp->dst = new_operand(OPE_TEMP);
     translate_dispatcher(rexp);
 
-    // TODO 检查变量在当前数据流中是否为常量
+    // TODO 检查变量是否为常量
 
     // 常量计算
     Operand lope = lexp->dst;
