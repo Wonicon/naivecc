@@ -9,6 +9,8 @@
 #ifndef __IR_H__
 #define __IR_H__
 
+#include "cmm_type.h"
+
 #define FAIL_TO_GEN -1
 #define NO_NEED_TO_GEN -2
 #define MULTI_INSTR -3
@@ -36,6 +38,8 @@ struct Operand_ {
         int label;
         const char *funcname;
     } var;
+    Type *array_base;
+    Operand offset;
     int is_const;
     int const_i;
     float const_f;

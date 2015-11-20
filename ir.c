@@ -79,7 +79,7 @@ void print_operand(Operand ope, char *str) {
         case OPE_DEREF:   sprintf(str, "*a%d", ope->var.index);    break;
         case OPE_FLOAT:   sprintf(str, "#%f",  ope->var.real);     break;
         case OPE_LABEL:   sprintf(str, "L%d",  ope->var.label);    break;
-        case OPE_V_ADDR:  sprintf(str, "&v%d", ope->var.index);    break;
+        case OPE_V_ADDR:  sprintf(str, "&v%d", ope->var.label);    break;
         case OPE_INTEGER: sprintf(str, "#%d",  ope->var.integer);  break;
         default:          sprintf(str, "%s",   "");
     }

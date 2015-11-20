@@ -14,7 +14,7 @@
 enum TranslateState translate_state = FINE;
 
 // TODO 每个 Compst 在跳转指令生成前可以计算所有常量
-
+// TODO 左值解引用只能用在赋值操作中, 不能像 & 和右解引用那样随意嵌入
 static void free_ope(Operand *ptr) {
     if (*ptr != NULL) {
         free(*ptr);
@@ -49,6 +49,10 @@ int translate_binary_operation(Node exp);
 int translate_unary_operation(Node exp);
 
 int translate_exp_is_exp(Node exp);
+
+void intime_deref(Node exp);
+
+int translate_exp_is_exp_idx(Node exp);
 
 //
 // 用switch-case实现对不同类型(tag)node的分派
@@ -91,9 +95,81 @@ int translate_dispatcher(Node node) {
             return translate_exp_is_id(node);
         case EXP_is_ASSIGN:
             return translate_exp_is_assign(node);
+        case EXP_is_EXP_IDX:
+            return translate_exp_is_exp_idx(node);
         default:
             return FAIL_TO_GEN;
     }
+}
+
+//
+// 翻译下标表达式
+//
+int translate_exp_is_exp_idx(Node exp) {
+    Node base = exp->child;
+    Node idx = base->sibling;
+
+    base->dst = new_operand(OPE_V_ADDR);
+    idx->dst = new_operand(OPE_TEMP);
+
+    translate_dispatcher(base);
+    translate_dispatcher(idx);
+
+    // 现在我们已经准备好了一个基地址和偏移量, 以及"当前"数组的类型
+    // 为了进一步计算偏移量, 我们需要访问数组的基类型, 获得基类型的大小, 用当前下标去计算
+    // 新的偏移量, 如果综合来的偏移量和下标有一个为非常量, 则要生成指令并转移操作数
+
+    Operand offset = idx->dst;
+    int size = base->dst->array_base->base->type_size;
+    if (offset->type == OPE_INTEGER) {
+        offset->var.integer = offset->var.integer * size;
+    } else {
+        Operand p = new_operand(OPE_TEMP);
+        Operand array_size = new_operand(OPE_INTEGER);
+        array_size->var.integer = size;
+        new_instr(IR_MUL, offset, array_size, p);
+        offset = p;  // 转移本层偏移量
+    }
+
+    if (base->dst->offset->type == OPE_INTEGER && offset->type == OPE_INTEGER) {
+        offset->var.integer = offset->var.integer + base->dst->offset->var.integer;
+    } else {
+        Operand p = new_operand(OPE_TEMP);
+        new_instr(IR_ADD, offset, base->dst->offset, p);
+        offset = p;  // 再转移本层偏移量
+    }
+
+    // 现在我们就有了完整的偏移量
+    if (exp->dst->type == OPE_V_ADDR) {
+        // 说明在下标翻译过程中
+        exp->dst->var.index = base->dst->var.index;          // 保证基地址一致
+        exp->dst->array_base = base->dst->array_base->base;  // 数组降低一维
+        exp->dst->offset = offset;                           // 转移经过一系列计算的偏移量
+        return MULTI_INSTR;
+    }
+
+    // 进入这里说明是最后一个阶段, 按道理要进行解引用
+    // 但是由于任何指令都可以内嵌解引用, 所以为了效率
+    // 这里直接算一个地址就往回送 (如果老老实实解引用
+    // 则还要多一条指令)
+    // 由于第一个元素直接用变量名访问在虚拟机里也是允许的,
+    // 所以总偏移为0时改成var送回去, 毕竟编号是一致的,
+    // 否则, 要用一个临时变量存储地址, 生成加法指令, 然后改成约定的待转换类型(ADD)传回去.
+    if (exp->dst->type == OPE_TEMP) {
+        free(exp->dst);
+    }
+
+    if (offset->type == OPE_INTEGER && offset->var.integer == 0) {
+        // 伪造变量操作数
+        exp->dst = new_operand(OPE_NOT_USED);
+        exp->dst->type = OPE_VAR;
+        exp->dst->var.index = base->dst->var.index;
+    } else {
+        // 要生成加法指令
+        exp->dst = new_operand(OPE_ADDR);
+        new_instr(IR_ADD, base->dst, offset, exp->dst);
+    }
+    return 0;
 }
 
 //
@@ -166,13 +242,18 @@ int translate_binary_operation(Node exp) {
     translate_dispatcher(lexp);
     rexp->dst = new_operand(OPE_TEMP);
     translate_dispatcher(rexp);
+    intime_deref(lexp);
+    intime_deref(rexp);
 
     // TODO 检查变量是否为常量
 
     // 常量计算
+
     Operand lope = lexp->dst;
     Operand rope = rexp->dst;
     assert(lope && rope);
+
+
     if (lope->type == rope->type) {
         Operand const_ope = new_operand(OPE_NOT_USED);
         switch (lope->type) {
@@ -306,9 +387,6 @@ int translate_def_is_spec_dec(Node def) {
 // 对于赋值语句, 如果左边的表达式不是值类型(数组和结构体0偏移的域也可以直接用值类型)
 // 那么就是数组或者结构体计算出来的偏移地址, 这时候是需要进行解引用操作
 //
-
-void intime_deref(Node exp);
-
 int translate_exp_is_assign(Node assign_exp) {
     assert(assign_exp && assign_exp->tag == EXP_is_ASSIGN);
 
@@ -323,10 +401,8 @@ int translate_exp_is_assign(Node assign_exp) {
     // 常规的表达式(注意与指令生成的做区分)不应该遇到地址操作数,
     // 如果遇到了, 可以即刻解引用. 由于地址的这种特性, 它也适合
     // 直接取代直接提供的目标操作数, 直接返回.
-    // 所以左值这里没必要分配一个新的目标操作数, 反正会取而代之的.
-    // 注意区分赋值表达式和赋值指令(不过赋值指令也只有这里有用了)!
+    lexp->dst = new_operand(OPE_TEMP);
     translate_dispatcher(lexp);
-
     rexp->dst = new_operand(OPE_TEMP);
     translate_dispatcher(rexp);
 
@@ -387,6 +463,15 @@ int translate_exp_is_id(Node exp) {
         translate_state = UNSUPPORT;
     }
 #endif
+
+    // 上层希望存储到一个地址变量, 说明现在在寻址模式
+    if (exp->dst && exp->dst->type == OPE_V_ADDR) {
+        exp->dst->var.index = sym->address->var.index;  // 虽然类型不同, 但是编号保持一致
+        exp->dst->offset = new_operand(OPE_INTEGER);    // 偏移量将来可能变成临时变量
+        exp->dst->offset->var.integer = 0;              // 当前偏移量为常数 0
+        exp->dst->array_base = sym->type;               // 数组类型, 在上层使用 base 获得信息
+        return NO_NEED_TO_GEN;
+    }
 
     // 替换不必要的目标地址
     // 如果赋值语句结点重复进入, 则被 free 掉的不是无用的 temp,
