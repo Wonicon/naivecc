@@ -8,6 +8,7 @@
 #include "node.h"
 #include <assert.h>
 #include <stdlib.h>
+#include <string.h>
 
 #define TASK_2
 
@@ -21,6 +22,21 @@ static void free_ope(Operand *ptr) {
     }
     *ptr = NULL;
 }
+
+struct {
+    enum IR_Type relop;
+    const char *str;
+    enum IR_Type anti;
+} relop_dict[] = {
+    { IR_BEQ, "==", IR_BNE },
+    { IR_BLT, "<" , IR_BGE },
+    { IR_BLE, "<=", IR_BGT },
+    { IR_BGT, ">" , IR_BLE },
+    { IR_BGE, ">=", IR_BLT },
+    { IR_BNE, "!=", IR_BEQ }
+};
+
+#define LENGTH(x) (sizeof(x) / sizeof(*x))
 
 int translate_exp_is_const(Node nd);
 
@@ -54,7 +70,17 @@ void intime_deref(Node exp);
 
 int translate_exp_is_exp_idx(Node exp);
 
+int translate_cond(Node exp);
+
 int translate_cond_and(Node exp);
+
+int translate_cond_or(Node exp);
+
+int translate_cond_relop(Node exp);
+
+int translate_ccond_not(Node exp);
+
+int translate_cond_exp(Node exp);
 
 //
 // 用switch-case实现对不同类型(tag)node的分派
@@ -112,10 +138,7 @@ int translate_dispatcher(Node node) {
                 new_instr(IR_ASSIGN, value_false, NULL, node->dst);
             }
 
-            switch (node->tag) {
-                case EXP_is_AND: return translate_cond_and(node);
-                default: ;
-            }
+            translate_cond(node);
 
             new_instr(IR_LABEL, node->label_true, NULL, NULL);
 
@@ -137,8 +160,60 @@ int translate_dispatcher(Node node) {
 int translate_cond(Node exp) {
     switch (exp->tag) {
         case EXP_is_AND: return translate_cond_and(exp);
-        default: return FAIL_TO_GEN;
+        case EXP_is_OR: return translate_cond_or(exp);
+        case EXP_is_RELOP: return translate_cond_relop(exp);
+        case EXP_is_NOT: return translate_ccond_not(exp);
+        default: return translate_cond_exp(exp);
     }
+}
+
+int translate_cond_exp(Node exp) {
+    exp->dst = new_operand(OPE_TEMP);
+    translate_dispatcher(exp);
+    Operand const_zero = new_operand(OPE_INTEGER);
+    new_instr(IR_BNE, exp->dst, const_zero, exp->label_true);
+    new_instr(IR_JMP, exp->label_false, NULL, NULL);
+    return MULTI_INSTR;
+}
+
+//
+// 在条件判断框架下翻译 NOT
+//
+int translate_ccond_not(Node exp) {
+    Node sub_exp = exp->child;
+    sub_exp->label_true = exp->label_false;
+    sub_exp->label_false = exp->label_true;
+    return translate_cond(sub_exp);
+}
+
+//
+// 在条件判断框架下翻译 RELOP
+// TODO 优化重点!
+//
+int translate_cond_relop(Node exp) {
+    Node left = exp->child;
+    Node right = left->sibling;
+
+    left->dst = new_operand(OPE_TEMP);
+    right->dst = new_operand(OPE_TEMP);
+
+    // 获取结果值
+    translate_dispatcher(left);
+    translate_dispatcher(right);
+
+    const char *op = exp->val.operator;
+    enum IR_Type relop = IR_BEQ;
+    for (int i = 0; i < LENGTH(relop_dict); ++i) {
+        if (!strcmp(relop_dict[i].str, op)) {
+            relop = relop_dict[i].relop;
+        }
+    }
+
+    new_instr(relop, left->dst, right->dst, exp->label_true);
+
+    new_instr(IR_JMP, exp->label_false, NULL, NULL);
+
+    return MULTI_INSTR;
 }
 
 //
@@ -157,6 +232,27 @@ int translate_cond_and(Node exp) {
 
     // 为真 非短路
     new_instr(IR_LABEL, left->label_true, NULL, NULL);
+
+    // 继续执行 right 的代码
+    return translate_dispatcher(right);
+}
+
+//
+// 翻译 或 表达式
+//
+int translate_cond_or(Node exp) {
+    Node left = exp->child;
+    Node right = left->sibling;
+    left->label_true = exp->label_true;
+    left->label_false = new_operand(OPE_LABEL);
+    right->label_true = exp->label_true;
+    right->label_false = exp->label_false;
+
+    // 这里产生了 left 相关的代码
+    translate_dispatcher(left);
+
+    // 为假 非短路
+    new_instr(IR_LABEL, left->label_false, NULL, NULL);
 
     // 继续执行 right 的代码
     return translate_dispatcher(right);
