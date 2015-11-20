@@ -92,8 +92,34 @@ int translate_dispatcher(Node node) {
     }
 }
 
+//
+// 翻译一元运算: 只有取负
+//
 int translate_unary_operation(Node exp) {
-    return 0;
+    Node rexp = exp->child;
+    rexp->dst = new_operand(OPE_TEMP);
+
+    // 常量计算
+    if (translate_dispatcher(rexp) < 0) {
+        Operand const_ope = new_operand(OPE_NOT_USED);
+        if (rexp->dst->type == OPE_INTEGER) {
+            const_ope->type = OPE_INTEGER;
+            const_ope->var.integer = -rexp->dst->var.integer;
+            return NO_NEED_TO_GEN;
+        } else if (rexp->dst->type == OPE_FLOAT) {
+            const_ope->type = OPE_FLOAT;
+            const_ope->var.real = -rexp->dst->var.real;
+            return NO_NEED_TO_GEN;
+        } else {
+            // 变量情况
+            free(const_ope);
+        }
+    }
+
+    // 无脑上 0
+    Operand p = new_operand(OPE_INTEGER);
+    p->var.integer = 0;
+    return new_instr(IR_SUB, p, rexp->dst, exp->dst);
 }
 
 #define CALC(op, rs, rt, rd, type) do {\
