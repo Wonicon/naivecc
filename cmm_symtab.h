@@ -20,6 +20,7 @@
 //
 
 #include "cmm_type.h"
+#include "ir.h"
 
 typedef struct _sym_ent_t
 {
@@ -27,7 +28,7 @@ typedef struct _sym_ent_t
     Type *type;          // The generic type pointer, we can know the real type by dereferncing it
     int line;            // The line number this symbol first DECLARED
     int size;            // The size this symbol will occupy the memory, maybe we can get it from the type?
-    int address;         // The memory address, or register code */
+    Operand address;     // The memory address, or register code */
     int scope;           // The scope index, each symbol will get exactly one
     struct _sym_ent_t *link;  /* Used for open hashing */
 } sym_ent_t;

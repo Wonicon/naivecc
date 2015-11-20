@@ -12,8 +12,15 @@ typedef int bool;
 
 #ifdef DEBUG
 #define LOG(s, ...) fprintf(stderr, "\033[31;1m" "[%s] " s "\033[0m\n", __func__, ## __VA_ARGS__)
+#define TEST(expr, s, ...) do {\
+    if (!(expr)) {\
+        LOG("Error" s, __VA_ARGS__);\
+        assert((expr));
+    }\
+} while (0);
 #else
 #define LOG(s, ...)
+#define TEST(expr, s, ...)
 #endif
 
 /* Our assigned task */
