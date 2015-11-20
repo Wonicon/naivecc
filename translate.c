@@ -31,6 +31,8 @@ void intime_deref(Node exp) ;
 
 int translate_def_is_spec_dec(Node def);
 
+int translate_dec_is_vardec(Node dec);
+
 //
 // 用switch-case实现对不同类型(tag)node的分派
 // 也可以用函数指针表来实现, 不过函数指针表对枚举值的依赖太强
@@ -40,6 +42,8 @@ int translate_def_is_spec_dec(Node def);
 //
 int translate_dispatcher(Node node) {
     switch (node->tag) {
+        case DEC_is_VARDEC:
+            return translate_dec_is_vardec(node);
         case DEF_is_SPEC_DEC:
             return translate_def_is_spec_dec(node);
         case EXP_is_INT:
@@ -54,9 +58,38 @@ int translate_dispatcher(Node node) {
     }
 }
 
+//
+// 翻译定义: 找 ID
+// dec 可以简单实现, 只要找数组定义就行了
+//
+int translate_dec_is_vardec(Node dec) {
+    Node vardec = dec->child;
+    Node iterator = vardec->child;
+    if (iterator->type == YY_ID) {  // 普通变量声明, 分配空间就好了.
+        sym_ent_t *sym = query(iterator->val.s, 0);
+        assert(sym->type->type_size == 4);
+        sym->address = new_operand(OPE_VAR);
+        return NO_NEED_TO_GEN;
+    }
+
+    while (iterator->type != YY_ID) {
+        iterator = iterator->child;
+    }
+
+    sym_ent_t *sym = query(iterator->val.s, 0);
+    sym->address = new_operand(OPE_VAR);
+    Operand size = new_operand(OPE_INTEGER);
+    size->var.integer = sym->type->type_size;
+    return new_instr(IR_DEC, sym->address, size, NULL);
+}
+
+//
+// 翻译定义: 主要是用来遍历 declist 的
+//
 int translate_def_is_spec_dec(Node def) {
     Node spec = def->child;
     Node dec = spec->sibling;
+    // 返回值并没有什么用......
     int final_ret = NO_NEED_TO_GEN;
     while (dec != NULL) {
         int this_ret = translate_dispatcher(dec);
@@ -194,6 +227,7 @@ Operand test_ope;
 int indent = 0;
 void traverse_(Node node) {
     if (node == NULL) return;
+    print_instr(stdout);
     node->dst = test_ope;
     printf("%*s", indent, "");
     puts(get_token_name(node->type));
@@ -209,7 +243,5 @@ void traverse_(Node node) {
 
 extern node_t *ast_tree;
 void test_translate() {
-    test_ope = new_operand(OPE_VAR);
     traverse_(ast_tree);
-    print_instr(stdout);
 }
