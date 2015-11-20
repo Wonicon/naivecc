@@ -11,7 +11,7 @@
 
 typedef struct Operand_ *Operand;
 
-enum OpeType {
+enum Ope_Type {
     OPE_NOT_USED,
     OPE_VARIABLE,
     OPE_INTEGER,
@@ -20,7 +20,7 @@ enum OpeType {
     OPE_FUNC
 };
 struct Operand_ {
-    enum OpeType type;
+    enum Ope_Type type;
     union {
         int index;
         int integer;
@@ -82,6 +82,7 @@ struct IR {
 //
 // 中间代码模块对外接都口
 //
+Operand new_operand(enum Ope_Type type);
 int new_instr(enum IR_Type type, Operand rs, Operand rt, Operand rd);
 void print_instr(FILE *stream);
 int new_variable();

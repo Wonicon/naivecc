@@ -3,6 +3,7 @@
 //
 
 #include "ir.h"
+#include <stdlib.h>
 #include <assert.h>
 
 #define MAX_LINE 2048
@@ -18,6 +19,24 @@ static char rs_s[NAME_LEN];
 static char rt_s[NAME_LEN];
 static char rd_s[NAME_LEN];
 
+//
+// 操作数构造函数
+//
+Operand new_operand(enum Ope_Type type) {
+    Operand p = (Operand)malloc(sizeof(struct Operand_));
+    p->type = type;
+    switch (type) {
+        case OPE_VARIABLE:
+            p->var.index = new_variable();
+            break;
+        case OPE_LABEL:
+            p->var.label = new_lable();
+            break;
+        default:
+            break;
+    }
+    return p;
+}
 //
 // 中间代码构造函数
 // 返回 IR 在缓冲区中的下标
@@ -119,7 +138,7 @@ int new_variable() {
 //
 // 提供新的标签(数字编号)
 //
-int new_label() {
+int new_lable() {
     static int label_index= 0;
     return label_index++;
 }
