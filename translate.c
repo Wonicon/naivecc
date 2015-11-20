@@ -37,7 +37,11 @@ int translate_stmt_is_exp(Node stmt);
 
 int translate_compst(Node compst);
 
-int translate_func_is_id_var(Node func);
+int translate_func_head(Node func);
+
+int translate_extdef_func(Node extdef);
+
+int translate_ast(Node ast);
 
 //
 // 用switch-case实现对不同类型(tag)node的分派
@@ -51,8 +55,12 @@ int translate_dispatcher(Node node) {
         return NO_NEED_TO_GEN;
     }
     switch (node->tag) {
+        case PROG_is_EXTDEF:
+            return translate_ast(node);
+        case EXTDEF_is_SPEC_FUNC_COMPST:
+            return translate_extdef_func(node);
         case FUNC_is_ID_VAR:
-            return translate_func_is_id_var(node);
+            return translate_func_head(node);
         case COMPST_is_DEF_STMT:
             return translate_compst(node);
         case DEC_is_VARDEC:
@@ -73,10 +81,28 @@ int translate_dispatcher(Node node) {
     }
 }
 
+int translate_ast(Node ast) {
+    Node extdef = ast->child;
+    while (extdef != NULL) {
+        translate_dispatcher(extdef);
+        extdef = extdef->sibling;
+    }
+    return MULTI_INSTR;
+}
+
+int translate_extdef_func(Node extdef) {
+    Node spec = extdef->child;
+    Node func = spec->sibling;
+    translate_dispatcher(func);
+    Node compst = func->sibling;
+    translate_dispatcher(compst);
+    return MULTI_INSTR;
+}
+
 //
 // 翻译函数: 主要是生成参数声明指令 PARAM
 //
-int translate_func_is_id_var(Node func) {
+int translate_func_head(Node func) {
     Node funcname = func;
     Node param = funcname->sibling;
     while (param != NULL) {
