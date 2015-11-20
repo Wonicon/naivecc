@@ -93,7 +93,10 @@ int translate_dispatcher(Node node) {
         case '*': rd->var.type = rs->var.type * rt->var.type; break;\
         case '/': rd->var.type = rs->var.type / rt->var.type; break;\
     }\
-} while (0);
+    free_ope(&exp->dst);\
+    exp->dst = rd;\
+    return NO_NEED_TO_GEN;\
+} while (0)
 
 int translate_binary_operation(Node exp) {
     // 没有目标地址, 不需要翻译
@@ -108,6 +111,8 @@ int translate_binary_operation(Node exp) {
     rexp->dst = new_operand(OPE_TEMP);
     translate_dispatcher(rexp);
 
+    // TODO 检查变量在当前数据流中是否为常量
+
     // 常量计算
     Operand lope = lexp->dst;
     Operand rope = rexp->dst;
@@ -118,18 +123,11 @@ int translate_binary_operation(Node exp) {
             case OPE_INTEGER:
                 const_ope->type = OPE_INTEGER;
                 CALC(exp->val.operator[0], lope, rope, const_ope, integer);
-                break;
             case OPE_FLOAT:
-                const_ope->type = OPE_INTEGER;
+                const_ope->type = OPE_FLOAT;
                 CALC(exp->val.operator[0], lope, rope, const_ope, real);
-                break;
-            default:
-                assert(0);
+            default: free(const_ope);
         }
-
-        free_ope(&exp->dst);
-        exp->dst = const_ope;
-        return NO_NEED_TO_GEN;
     }
 
     switch (exp->val.operator[0]) {

@@ -36,6 +36,9 @@ struct Operand_ {
         int label;
         const char *funcname;
     } var;
+    int is_const;
+    int const_i;
+    float const_f;
 };
 
 enum IR_Type {
