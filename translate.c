@@ -39,6 +39,8 @@ int translate_extdef_func(Node extdef);
 
 int translate_ast(Node ast);
 
+int translate_stmt_is_compst(Node stmt);
+
 //
 // 用switch-case实现对不同类型(tag)node的分派
 // 也可以用函数指针表来实现, 不过函数指针表对枚举值的依赖太强
@@ -63,6 +65,8 @@ int translate_dispatcher(Node node) {
             return translate_dec_is_vardec(node);
         case DEF_is_SPEC_DEC:
             return translate_def_is_spec_dec(node);
+        case STMT_is_COMPST:
+            return translate_stmt_is_compst(node);
         case STMT_is_EXP:
             return translate_stmt_is_exp(node);
         case EXP_is_INT:
@@ -127,6 +131,13 @@ int translate_compst(Node compst) {
         child = child->sibling;
     }
     return MULTI_INSTR;
+}
+
+//
+// 翻译复合语句: 为了 dispatcher 的和谐统一......
+//
+int translate_stmt_is_compst(Node stmt) {
+    return translate_dispatcher(stmt->child);
 }
 
 //
