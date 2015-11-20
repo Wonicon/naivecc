@@ -101,7 +101,7 @@ Node simplify_func_call(const Node exp) {
     Node args = exp->child->sibling->sibling;
     Node tail = p->child;
     // TODO Ugly
-    while (1) {
+    while (args->type != YY_RP) {
         assert(args->type == YY_Args);
         tail->sibling = trans_node(args, ARG_is_EXP);
         tail = tail->sibling;
