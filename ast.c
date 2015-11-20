@@ -69,7 +69,9 @@ Node simplify_exp(const Node exp) {
         }
         case YY_LP:
         {
-            return simplify_exp(exp->child->sibling);
+            Node p = trans_node(exp, EXP_is_EXP);
+            p->child = simplify_exp(exp->child->sibling);
+            return p;
         }
         case YY_ID:
         {

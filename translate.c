@@ -48,6 +48,8 @@ int translate_binary_operation(Node exp);
 
 int translate_unary_operation(Node exp);
 
+int translate_exp_is_exp(Node exp);
+
 //
 // 用switch-case实现对不同类型(tag)node的分派
 // 也可以用函数指针表来实现, 不过函数指针表对枚举值的依赖太强
@@ -76,6 +78,8 @@ int translate_dispatcher(Node node) {
             return translate_stmt_is_compst(node);
         case STMT_is_EXP:
             return translate_stmt_is_exp(node);
+        case EXP_is_EXP:
+            return translate_exp_is_exp(node);
         case EXP_is_BINARY:
             return translate_binary_operation(node);
         case EXP_is_UNARY:
@@ -90,6 +94,18 @@ int translate_dispatcher(Node node) {
         default:
             return FAIL_TO_GEN;
     }
+}
+
+//
+// 翻译括号表达式
+//
+int translate_exp_is_exp(Node exp) {
+    // 需要继承!
+    exp->child->dst = exp->dst;
+    translate_dispatcher(exp->child);
+    // 还需要综合!
+    exp->dst = exp->child->dst;
+    return MULTI_INSTR;
 }
 
 //

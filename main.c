@@ -63,7 +63,6 @@ int main(int argc, char *argv[])
         test_translate();
     }
 
-    
     free_ast();
 #ifdef DEBUG
     print_symtab();

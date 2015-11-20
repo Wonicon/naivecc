@@ -48,6 +48,7 @@ enum ProductionTag {
     EXP_is_RELOP,
     EXP_is_BINARY,
     EXP_is_UNARY,
+    EXP_is_EXP,
     EXP_is_ID,
     EXP_is_ID_ARG,
     EXP_is_EXP_IDX,
