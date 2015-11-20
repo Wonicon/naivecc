@@ -20,7 +20,7 @@ Type _BASIC_INT = {
         { NULL },
         { NULL },
         { 0 },
-        4,
+        { 4 },
         0
 };
 
@@ -30,7 +30,7 @@ Type _BASIC_FLOAT = {
         { NULL },
         { NULL },
         { 0 },
-        4,
+        { 4 },
         0
 };
 

@@ -7,8 +7,6 @@
 #include <assert.h>
 #include <stdlib.h>
 
-typedef node_t *Node;
-
 //
 // 语法分析树结构体的转换构造函数
 //

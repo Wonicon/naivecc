@@ -9,7 +9,6 @@
 #include "lib.h"
 #include <assert.h>
 
-
 int is_lex_error = 0;
 int is_syn_error = 0;
 extern int is_greedy;
@@ -309,9 +308,10 @@ void semantic_analysis() {
 // 简化语法分析树
 //
 node_t *simplify_tree(const node_t *);
-static node_t *ast_tree;
+node_t *ast_tree;
 void simplify() {
     ast_tree = simplify_tree(prog);
+    puts_tree(ast_tree);
 }
 //
 // Release the parsing tree
