@@ -62,8 +62,8 @@ enum IR_Type {
     IR_DEREF_L,  // 写入 rd 指向的地址
 
     // 跳转类指令, 含义参考 MIPS
-    IR_BEQ,
     IR_JMP,
+    IR_BEQ,
     IR_BLT,
     IR_BLE,
     IR_BGT,

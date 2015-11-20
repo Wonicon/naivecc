@@ -82,6 +82,8 @@ int translate_ccond_not(Node exp);
 
 int translate_cond_exp(Node exp);
 
+int translate_return(Node exp);
+
 //
 // 用switch-case实现对不同类型(tag)node的分派
 // 也可以用函数指针表来实现, 不过函数指针表对枚举值的依赖太强
@@ -110,6 +112,8 @@ int translate_dispatcher(Node node) {
             return translate_stmt_is_compst(node);
         case STMT_is_EXP:
             return translate_stmt_is_exp(node);
+        case STMT_is_RETURN:
+            return translate_return(node);
         case EXP_is_EXP:
             return translate_exp_is_exp(node);
         case EXP_is_BINARY:
@@ -155,6 +159,15 @@ int translate_dispatcher(Node node) {
         default:
             return FAIL_TO_GEN;
     }
+}
+
+//
+// 翻译返回语句
+//
+int translate_return(Node exp) {
+    Node sub_exp = exp->child;
+    sub_exp->dst = new_operand(OPE_TEMP);
+    return new_instr(IR_RET, sub_exp->dst, NULL, NULL);
 }
 
 int translate_cond(Node exp) {
@@ -228,13 +241,13 @@ int translate_cond_and(Node exp) {
     right->label_false = exp->label_false;
 
     // 这里产生了 left 相关的代码
-    translate_dispatcher(left);
+    translate_cond(left);
 
     // 为真 非短路
     new_instr(IR_LABEL, left->label_true, NULL, NULL);
 
     // 继续执行 right 的代码
-    return translate_dispatcher(right);
+    return translate_cond(right);
 }
 
 //
@@ -249,13 +262,13 @@ int translate_cond_or(Node exp) {
     right->label_false = exp->label_false;
 
     // 这里产生了 left 相关的代码
-    translate_dispatcher(left);
+    translate_cond(left);
 
     // 为假 非短路
     new_instr(IR_LABEL, left->label_false, NULL, NULL);
 
     // 继续执行 right 的代码
-    return translate_dispatcher(right);
+    return translate_cond(right);
 }
 
 //
