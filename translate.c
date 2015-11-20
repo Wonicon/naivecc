@@ -37,6 +37,8 @@ int translate_stmt_is_exp(Node stmt);
 
 int translate_compst(Node compst);
 
+int translate_func_is_id_var(Node func);
+
 //
 // 用switch-case实现对不同类型(tag)node的分派
 // 也可以用函数指针表来实现, 不过函数指针表对枚举值的依赖太强
@@ -49,6 +51,8 @@ int translate_dispatcher(Node node) {
         return NO_NEED_TO_GEN;
     }
     switch (node->tag) {
+        case FUNC_is_ID_VAR:
+            return translate_func_is_id_var(node);
         case COMPST_is_DEF_STMT:
             return translate_compst(node);
         case DEC_is_VARDEC:
@@ -69,6 +73,31 @@ int translate_dispatcher(Node node) {
     }
 }
 
+//
+// 翻译函数: 主要是生成参数声明指令 PARAM
+//
+int translate_func_is_id_var(Node func) {
+    Node funcname = func;
+    Node param = funcname->sibling;
+    while (param != NULL) {
+        Node spec = param->child;
+        // 无脑找变量名
+        Node id = spec->child;
+        while (id->type != YY_ID) {
+            id = id->child;
+        }
+        sym_ent_t *sym = query(id->val.s, 0);
+        sym->address = new_operand(OPE_VAR);
+        // 实际的大小是在调用者那边说明
+        new_instr(IR_PRARM, sym->address, NULL, NULL);
+        param = param->sibling;
+    }
+    return MULTI_INSTR;
+}
+
+//
+// 翻译复合语句: 纯粹的遍历框架
+//
 int translate_compst(Node compst) {
     Node child = compst->child;
     while (child != NULL) {
@@ -78,9 +107,11 @@ int translate_compst(Node compst) {
     return MULTI_INSTR;
 }
 
+//
+// 翻译表达式: 如果没有赋值之类的, 这条基本不需要生成指令了
+//
 int translate_stmt_is_exp(Node stmt) {
     translate_dispatcher(stmt->child);
-    translate_dispatcher(stmt->sibling);
     return MULTI_INSTR;
 }
 

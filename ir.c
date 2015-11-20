@@ -104,7 +104,7 @@ static const char *ir_format[] = {
     "IF %s >= %s GOTO %s",  // BGE
     "IF %s != %s GOTO %s",  // BNE
     "RETURN %s",            // RETURN
-    "%sDEC %s [%s]",        // MALLOC, 第一个 %s 过滤 rd_s
+    "%sDEC %s %s",          // DEC, 第一个 %s 过滤 rd_s
     "%sARG %s",             // Pass argument, 第一个 %s 过滤 rd_s
     "%s := CALL %s",        // CALL
     "%sPARAM %s",           // DEC PARAM, 第一个 %s 过滤 rd_s
