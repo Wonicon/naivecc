@@ -4,7 +4,6 @@
 
 #include "translate.h"
 #include "ir.h"
-#include "node.h"
 #include "cmm_symtab.h"
 #include <assert.h>
 #include <stdlib.h>
@@ -25,9 +24,6 @@ int translate_exp_is_const(Node nd);
 int translate_exp_is_id(Node exp);
 
 int translate_exp_is_assign(Node assign_exp);
-
-// 即时解引用, 如果算出结果是地址, 那么可以直接在指令中解引用
-void intime_deref(Node exp) ;
 
 int translate_def_is_spec_dec(Node def);
 
@@ -260,10 +256,12 @@ int translate_exp_is_id(Node exp) {
         return FAIL_TO_GEN;
     }
 
+#ifdef TASK_2
     if (sym->type->class == CMM_STRUCT) {
         fprintf(stderr, "实验任务二: 不支持结构体类型");
         translate_state = UNSUPPORT;
     }
+#endif
 
     // 替换不必要的目标地址
     if (exp->dst != NULL) {
@@ -302,25 +300,8 @@ int translate_exp_is_const(Node nd) {
 }
 
 // 测试用函数
-Operand test_ope;
-int indent = 0;
-void traverse_(Node node) {
-    if (node == NULL) return;
-    print_instr(stdout);
-    node->dst = test_ope;
-    printf("%*s", indent, "");
-    puts(get_token_name(node->type));
-    indent += 2;
-    Node child = node->child;
-    translate_dispatcher(node);
-    while (child != NULL) {
-        traverse_(child);
-        child = child->sibling;
-    }
-    indent -= 2;
-}
-
 extern node_t *ast_tree;
 void test_translate() {
-    traverse_(ast_tree);
+    translate_ast(ast_tree);
+    print_instr(stdout);
 }
