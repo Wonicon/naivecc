@@ -121,10 +121,14 @@ int translate_unary_operation(Node exp) {
         if (rexp->dst->type == OPE_INTEGER) {
             const_ope->type = OPE_INTEGER;
             const_ope->var.integer = -rexp->dst->var.integer;
+            free_ope(&exp->dst);
+            exp->dst = const_ope;
             return NO_NEED_TO_GEN;
         } else if (rexp->dst->type == OPE_FLOAT) {
             const_ope->type = OPE_FLOAT;
             const_ope->var.real = -rexp->dst->var.real;
+            free_ope(&exp->dst);
+            exp->dst = const_ope;
             return NO_NEED_TO_GEN;
         } else {
             // 变量情况
