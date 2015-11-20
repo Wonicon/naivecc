@@ -11,6 +11,7 @@
 
 #define FAIL_TO_GEN -1
 #define NO_NEED_TO_GEN -2
+#define MULTI_INSTR -3
 
 typedef struct Operand_ *Operand;
 

@@ -33,6 +33,10 @@ int translate_def_is_spec_dec(Node def);
 
 int translate_dec_is_vardec(Node dec);
 
+int translate_stmt_is_exp(Node stmt);
+
+int translate_compst(Node compst);
+
 //
 // 用switch-case实现对不同类型(tag)node的分派
 // 也可以用函数指针表来实现, 不过函数指针表对枚举值的依赖太强
@@ -41,11 +45,18 @@ int translate_dec_is_vardec(Node dec);
 // 一般情况下指令是流式生成的, 也就是不需要回退.
 //
 int translate_dispatcher(Node node) {
+    if (node == NULL) {
+        return NO_NEED_TO_GEN;
+    }
     switch (node->tag) {
+        case COMPST_is_DEF_STMT:
+            return translate_compst(node);
         case DEC_is_VARDEC:
             return translate_dec_is_vardec(node);
         case DEF_is_SPEC_DEC:
             return translate_def_is_spec_dec(node);
+        case STMT_is_EXP:
+            return translate_stmt_is_exp(node);
         case EXP_is_INT:
         case EXP_is_FLOAT:
             return translate_exp_is_const(node);
@@ -56,6 +67,21 @@ int translate_dispatcher(Node node) {
         default:
             return FAIL_TO_GEN;
     }
+}
+
+int translate_compst(Node compst) {
+    Node child = compst->child;
+    while (child != NULL) {
+        translate_dispatcher(child);
+        child = child->sibling;
+    }
+    return MULTI_INSTR;
+}
+
+int translate_stmt_is_exp(Node stmt) {
+    translate_dispatcher(stmt->child);
+    translate_dispatcher(stmt->sibling);
+    return MULTI_INSTR;
 }
 
 //
@@ -89,16 +115,12 @@ int translate_dec_is_vardec(Node dec) {
 int translate_def_is_spec_dec(Node def) {
     Node spec = def->child;
     Node dec = spec->sibling;
-    // 返回值并没有什么用......
-    int final_ret = NO_NEED_TO_GEN;
     while (dec != NULL) {
-        int this_ret = translate_dispatcher(dec);
-        if (this_ret != NO_NEED_TO_GEN) {
-            final_ret = this_ret;
-        }
+        translate_dispatcher(dec);
         dec = dec->sibling;
     }
-    return final_ret;
+    translate_dispatcher(def->sibling);
+    return MULTI_INSTR;
 }
 
 //
