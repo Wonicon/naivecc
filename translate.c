@@ -5,6 +5,7 @@
 #include "translate.h"
 #include "ir.h"
 #include "cmm_symtab.h"
+#include "node.h"
 #include <assert.h>
 #include <stdlib.h>
 
@@ -41,6 +42,8 @@ int translate_ast(Node ast);
 
 int translate_stmt_is_compst(Node stmt);
 
+int translate_binary_operation(Node exp);
+
 //
 // 用switch-case实现对不同类型(tag)node的分派
 // 也可以用函数指针表来实现, 不过函数指针表对枚举值的依赖太强
@@ -69,6 +72,8 @@ int translate_dispatcher(Node node) {
             return translate_stmt_is_compst(node);
         case STMT_is_EXP:
             return translate_stmt_is_exp(node);
+        case EXP_is_BINARY:
+            return translate_binary_operation(node);
         case EXP_is_INT:
         case EXP_is_FLOAT:
             return translate_exp_is_const(node);
@@ -80,6 +85,62 @@ int translate_dispatcher(Node node) {
             return FAIL_TO_GEN;
     }
 }
+
+#define CALC(op, rs, rt, rd, type) do {\
+    switch (op) {\
+        case '+': rd->var.type = rs->var.type + rt->var.type; break;\
+        case '-': rd->var.type = rs->var.type - rt->var.type; break;\
+        case '*': rd->var.type = rs->var.type * rt->var.type; break;\
+        case '/': rd->var.type = rs->var.type / rt->var.type; break;\
+    }\
+} while (0);
+
+int translate_binary_operation(Node exp) {
+    // 没有目标地址, 不需要翻译
+    if (exp->dst == NULL) {
+        return NO_NEED_TO_GEN;
+    }
+
+    Node lexp = exp->child;
+    Node rexp = lexp->sibling;
+    lexp->dst = new_operand(OPE_TEMP);
+    translate_dispatcher(lexp);
+    rexp->dst = new_operand(OPE_TEMP);
+    translate_dispatcher(rexp);
+
+    // 常量计算
+    Operand lope = lexp->dst;
+    Operand rope = rexp->dst;
+    assert(lope && rope);
+    if (lope->type == rope->type) {
+        Operand const_ope = new_operand(OPE_NOT_USED);
+        switch (lope->type) {
+            case OPE_INTEGER:
+                const_ope->type = OPE_INTEGER;
+                CALC(exp->val.operator[0], lope, rope, const_ope, integer);
+                break;
+            case OPE_FLOAT:
+                const_ope->type = OPE_INTEGER;
+                CALC(exp->val.operator[0], lope, rope, const_ope, real);
+                break;
+            default:
+                assert(0);
+        }
+
+        free_ope(&exp->dst);
+        exp->dst = const_ope;
+        return NO_NEED_TO_GEN;
+    }
+
+    switch (exp->val.operator[0]) {
+        case '+': return new_instr(IR_ADD, lope, rope, exp->dst);
+        case '-': return new_instr(IR_SUB, lope, rope, exp->dst);
+        case '*': return new_instr(IR_DIV, lope, rope, exp->dst);
+        case '/': return new_instr(IR_MUL, lope, rope, exp->dst);
+        default: assert(0);
+    }
+}
+#undef CALC
 
 int translate_ast(Node ast) {
     Node extdef = ast->child;
