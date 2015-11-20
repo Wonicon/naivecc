@@ -84,6 +84,14 @@ int translate_cond_exp(Node exp);
 
 int translate_return(Node exp);
 
+int translate_if(Node exp);
+
+int translate_if_else(Node exp);
+
+int translate_while(Node stmt);
+
+int translate_call(Node call);
+
 //
 // 用switch-case实现对不同类型(tag)node的分派
 // 也可以用函数指针表来实现, 不过函数指针表对枚举值的依赖太强
@@ -114,6 +122,12 @@ int translate_dispatcher(Node node) {
             return translate_stmt_is_exp(node);
         case STMT_is_RETURN:
             return translate_return(node);
+        case STMT_is_IF:
+            return translate_if(node);
+        case STMT_is_IF_ELSE:
+            return translate_if_else(node);
+        case STMT_is_WHILE:
+            return translate_while(node);
         case EXP_is_EXP:
             return translate_exp_is_exp(node);
         case EXP_is_BINARY:
@@ -125,6 +139,8 @@ int translate_dispatcher(Node node) {
             return translate_exp_is_const(node);
         case EXP_is_ID:
             return translate_exp_is_id(node);
+        case EXP_is_ID_ARG:
+            return translate_call(node);
         case EXP_is_ASSIGN:
             return translate_exp_is_assign(node);
         case EXP_is_EXP_IDX:
@@ -159,6 +175,94 @@ int translate_dispatcher(Node node) {
         default:
             return FAIL_TO_GEN;
     }
+}
+
+static void pass_arg(Node arg) {
+    if (arg == NULL) {
+        return;
+    }
+    arg->child->dst = new_operand(OPE_TEMP);
+    translate_dispatcher(arg->child);
+
+    pass_arg(arg->sibling);
+
+    new_instr(IR_ARG, arg->child->dst, NULL, NULL);
+
+}
+
+int translate_call(Node call) {
+    Node func = call->child;
+    Node arg = func->sibling;
+
+    pass_arg(arg);
+
+    if (call->dst == NULL) {
+        call->dst = new_operand(OPE_TEMP);
+    }
+
+    Operand f = new_operand(OPE_FUNC);
+    f->var.funcname = func->val.s;
+    new_instr(IR_CALL, f, NULL, call->dst);
+    return MULTI_INSTR;
+}
+
+int translate_while(Node stmt) {
+    Node cond = stmt->child;
+    Node loop = cond->sibling;
+
+    cond->label_true = new_operand(OPE_LABEL);
+    cond->label_false = new_operand(OPE_LABEL);
+    Operand begin = new_operand(OPE_LABEL);
+
+    new_instr(IR_LABEL, begin, NULL, NULL);
+
+    translate_cond(cond);
+
+    new_instr(IR_LABEL, cond->label_true, NULL, NULL);
+
+    translate_dispatcher(loop);
+
+    new_instr(IR_JMP, begin, NULL, NULL);
+
+    new_instr(IR_LABEL, cond->label_false, NULL, NULL);
+
+    return MULTI_INSTR;
+}
+
+int translate_if_else(Node exp) {
+    Node cond = exp->child;
+    Node true_stmt = cond->sibling;
+    Node false_stmt = true_stmt->sibling;
+
+    cond->label_true = new_operand(OPE_LABEL);
+    cond->label_false = new_operand(OPE_LABEL);
+    Operand next = new_operand(OPE_LABEL);
+
+    translate_cond(cond);
+
+    new_instr(IR_LABEL, cond->label_true, NULL, NULL);
+
+    translate_dispatcher(true_stmt);
+
+    new_instr(IR_JMP, next, NULL, NULL);
+
+    translate_dispatcher(false_stmt);
+
+    new_instr(IR_LABEL, next, NULL, NULL);
+
+    return MULTI_INSTR;
+}
+
+int translate_if(Node exp) {
+    Node cond = exp->child;
+    Node stmt = cond->sibling;
+    cond->label_true = new_operand(OPE_LABEL);
+    cond->label_false = new_operand(OPE_LABEL);
+    translate_cond(cond);
+    new_instr(IR_LABEL, cond->label_true, NULL, NULL);
+    translate_dispatcher(stmt);
+    new_instr(IR_LABEL, cond->label_false, NULL, NULL);
+    return MULTI_INSTR;
 }
 
 //
