@@ -104,7 +104,7 @@ int translate_func_head(Node func) {
     while (param != NULL) {
         Node spec = param->child;
         // 无脑找变量名
-        Node id = spec->child;
+        Node id = spec->sibling;
         while (id->type != YY_ID) {
             id = id->child;
         }
