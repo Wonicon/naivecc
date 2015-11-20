@@ -274,6 +274,8 @@ int translate_exp_is_id(Node exp) {
 #endif
 
     // 替换不必要的目标地址
+    // 如果赋值语句结点重复进入, 则被 free 掉的不是无用的 temp,
+    // 而可能是到处引用的变量!
     if (exp->dst != NULL) {
         free(exp->dst);
     }
@@ -302,6 +304,8 @@ int translate_exp_is_const(Node nd) {
     }
 
     // 替换不必要的目标地址
+    // 如果赋值语句结点重复进入, 则被 free 掉的不是无用的 temp,
+    // 而可能是到处引用的变量!
     if (nd->dst != NULL) {
         free(nd->dst);
     }
