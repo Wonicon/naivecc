@@ -183,7 +183,6 @@ int translate_def_is_spec_dec(Node def) {
         translate_dispatcher(dec);
         dec = dec->sibling;
     }
-    translate_dispatcher(def->sibling);
     return MULTI_INSTR;
 }
 
