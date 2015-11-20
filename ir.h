@@ -40,7 +40,7 @@ struct Operand_ {
         int label;
         const char *funcname;
     } var;
-    Type *array_base;
+    Type *base_type;
     Operand offset;
     int is_const;
     int const_i;

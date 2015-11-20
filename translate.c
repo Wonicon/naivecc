@@ -186,6 +186,11 @@ static void pass_arg(Node arg) {
 
     pass_arg(arg->sibling);
 
+    Operand p = arg->child->dst;
+    if (p->base_type && p->base_type->class == CMM_ARRAY) {
+        // 按照测试样例, 数组要传地址
+        p->type = OPE_V_ADDR;
+    }
     new_instr(IR_ARG, arg->child->dst, NULL, NULL);
 
 }
@@ -273,6 +278,8 @@ int translate_if(Node exp) {
 int translate_return(Node exp) {
     Node sub_exp = exp->child;
     sub_exp->dst = new_operand(OPE_TEMP);
+    translate_dispatcher(sub_exp);
+    intime_deref(sub_exp);
     return new_instr(IR_RET, sub_exp->dst, NULL, NULL);
 }
 
@@ -396,7 +403,7 @@ int translate_exp_is_exp_idx(Node exp) {
     // 新的偏移量, 如果综合来的偏移量和下标有一个为非常量, 则要生成指令并转移操作数
 
     Operand offset = idx->dst;
-    int size = base->dst->array_base->base->type_size;
+    int size = base->dst->base_type->base->type_size;
     if (offset->type == OPE_INTEGER) {
         offset->var.integer = offset->var.integer * size;
     } else {
@@ -418,9 +425,10 @@ int translate_exp_is_exp_idx(Node exp) {
     // 现在我们就有了完整的偏移量
     if (exp->dst->type == OPE_V_ADDR) {
         // 说明在下标翻译过程中
-        exp->dst->var.index = base->dst->var.index;          // 保证基地址一致
-        exp->dst->array_base = base->dst->array_base->base;  // 数组降低一维
-        exp->dst->offset = offset;                           // 转移经过一系列计算的偏移量
+        exp->dst->type = base->dst->type;                  // 传递类型, 因为参数数组和变量数组行为不一致
+        exp->dst->var.index = base->dst->var.index;        // 保证基地址一致
+        exp->dst->base_type = base->dst->base_type->base;  // 数组降低一维
+        exp->dst->offset = offset;                         // 转移经过一系列计算的偏移量
         return MULTI_INSTR;
     }
 
@@ -592,7 +600,11 @@ int translate_func_head(Node func) {
             id = id->child;
         }
         sym_ent_t *sym = query(id->val.s, 0);
-        sym->address = new_operand(OPE_VAR);
+        if (sym->type->class == CMM_ARRAY) {
+            sym->address = new_operand(OPE_ADDR);
+        } else {
+            sym->address = new_operand(OPE_VAR);
+        }
         // 实际的大小是在调用者那边说明
         new_instr(IR_PRARM, sym->address, NULL, NULL);
         param = param->sibling;
@@ -638,6 +650,7 @@ int translate_dec_is_vardec(Node dec) {
         sym_ent_t *sym = query(iterator->val.s, 0);
         assert(sym->type->type_size == 4);
         sym->address = new_operand(OPE_VAR);
+        sym->address->base_type = sym->type;
         return NO_NEED_TO_GEN;
     }
 
@@ -647,6 +660,7 @@ int translate_dec_is_vardec(Node dec) {
 
     sym_ent_t *sym = query(iterator->val.s, 0);
     sym->address = new_operand(OPE_VAR);
+    sym->address->base_type = sym->type;
     Operand size = new_operand(OPE_INTEGER);
     size->var.integer = sym->type->type_size;
     return new_instr(IR_DEC, sym->address, size, NULL);
@@ -749,10 +763,11 @@ int translate_exp_is_id(Node exp) {
 
     // 上层希望存储到一个地址变量, 说明现在在寻址模式
     if (exp->dst && exp->dst->type == OPE_V_ADDR) {
+        exp->dst->type = sym->address->type;            // 位于参数的数组和位于变量的数组行为不一致!
         exp->dst->var.index = sym->address->var.index;  // 虽然类型不同, 但是编号保持一致
         exp->dst->offset = new_operand(OPE_INTEGER);    // 偏移量将来可能变成临时变量
         exp->dst->offset->var.integer = 0;              // 当前偏移量为常数 0
-        exp->dst->array_base = sym->type;               // 数组类型, 在上层使用 base 获得信息
+        exp->dst->base_type = sym->type;                // 数组类型, 在上层使用 base 获得信息
         return NO_NEED_TO_GEN;
     }
 
@@ -762,6 +777,7 @@ int translate_exp_is_id(Node exp) {
     if (exp->dst != NULL) {
         free(exp->dst);
     }
+
     exp->dst = sym->address;
     return NO_NEED_TO_GEN;
 }
@@ -799,6 +815,14 @@ int translate_exp_is_const(Node nd) {
 // 测试用函数
 extern node_t *ast_tree;
 void test_translate() {
+    Type *read = new_type(CMM_FUNC, "read", NULL, NULL);
+    read->ret = BASIC_INT;
+    insert("read", read, -1, 0);
+
+    Type *write = new_type(CMM_FUNC, "write", NULL, NULL);
+    write->param = new_type(CMM_PARAM, "o", NULL, NULL);
+    insert("write", write, -1, 0);
+
     translate_ast(ast_tree);
     print_instr(stdout);
 }
