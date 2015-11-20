@@ -164,12 +164,12 @@ int translate_extdef_func(Node extdef) {
 // 翻译函数: 主要是生成参数声明指令 PARAM
 //
 int translate_func_head(Node func) {
-    Node funcname = func;
+    Node funcname = func->child;
     Node param = funcname->sibling;
     while (param != NULL) {
         Node spec = param->child;
         // 无脑找变量名
-        Node id = spec->sibling;
+        Node id = spec->sibling->child;
         while (id->type != YY_ID) {
             id = id->child;
         }
