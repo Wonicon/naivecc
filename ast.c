@@ -239,6 +239,7 @@ Node simplify_def(const Node def) {
     while (dec->sibling) {
         iterator->sibling = simplify_dec(dec);
         iterator = iterator->sibling;
+        dec = dec->sibling->sibling->child;
     }
     iterator->sibling = simplify_dec(dec);
     return new_def;
