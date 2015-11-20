@@ -22,12 +22,21 @@ static char rd_s[NAME_LEN];
 //
 // 操作数构造函数
 //
+int new_variable();
+int new_temp();
+int new_addr();
+int new_lable();
 Operand new_operand(enum Ope_Type type) {
     Operand p = (Operand)malloc(sizeof(struct Operand_));
     p->type = type;
     switch (type) {
-        case OPE_VARIABLE:
+        case OPE_VAR:
             p->var.index = new_variable();
+        case OPE_TEMP:
+            p->var.index = new_temp();
+            break;
+        case OPE_ADDR:
+            p->var.index = new_addr();
             break;
         case OPE_LABEL:
             p->var.label = new_lable();
@@ -37,12 +46,14 @@ Operand new_operand(enum Ope_Type type) {
     }
     return p;
 }
+
 //
 // 中间代码构造函数
 // 返回 IR 在缓冲区中的下标
 //
 int new_instr(enum IR_Type type, Operand rs, Operand rt, Operand rd) {
     assert(nr_instr < MAX_LINE);
+
     instr_buffer[nr_instr].type = type;
     instr_buffer[nr_instr].rs = rs;
     instr_buffer[nr_instr].rt = rt;
@@ -61,12 +72,16 @@ void print_operand(Operand ope, char *str) {
         return;
     }
     switch (ope->type) {
-        case OPE_INTEGER:  sprintf(str, "#%d", ope->var.integer); break;
-        case OPE_FLOAT:    sprintf(str, "#%f", ope->var.real); break;
-        case OPE_LABEL:    sprintf(str, "L%d", ope->var.label); break;
-        case OPE_FUNC:     sprintf(str, "%s", ope->var.funcname); break;
-        case OPE_VARIABLE: sprintf(str, "var%d", ope->var.index); break;
-        default: sprintf(str, "%s", "");
+        case OPE_VAR:     sprintf(str, "v%d",  ope->var.index);    break;
+        case OPE_FUNC:    sprintf(str, "%s",   ope->var.funcname); break;
+        case OPE_TEMP:    sprintf(str, "t%d",  ope->var.index);    break;
+        case OPE_ADDR:    sprintf(str, "a%d",  ope->var.index);    break;
+        case OPE_DEREF:   sprintf(str, "*a%d", ope->var.index);    break;
+        case OPE_FLOAT:   sprintf(str, "#%f",  ope->var.real);     break;
+        case OPE_LABEL:   sprintf(str, "L%d",  ope->var.label);    break;
+        case OPE_V_ADDR:  sprintf(str, "&v%d", ope->var.index);    break;
+        case OPE_INTEGER: sprintf(str, "#%d",  ope->var.integer);  break;
+        default:          sprintf(str, "%s",   "");
     }
 }
 
@@ -131,14 +146,30 @@ void print_instr(FILE *file) {
 // 提供新的变量名(数字编号)
 //
 int new_variable() {
-    static int var_index = 0;
-    return var_index++;
+    static int index = 0;
+    return index++;
+}
+
+//
+// 提供新的临时变量(数字编号)
+//
+int new_temp() {
+    static int index = 0;
+    return index++;
+}
+
+//
+// 提供新的临时地址(数字编号)
+//
+int new_addr() {
+    static int index = 0;
+    return index++;
 }
 
 //
 // 提供新的标签(数字编号)
 //
 int new_lable() {
-    static int label_index= 0;
-    return label_index++;
+    static int index= 0;
+    return index++;
 }

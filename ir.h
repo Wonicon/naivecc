@@ -9,11 +9,18 @@
 #ifndef __IR_H__
 #define __IR_H__
 
+#define FAIL_TO_GEN -1
+#define NO_NEED_TO_GEN -2
+
 typedef struct Operand_ *Operand;
 
 enum Ope_Type {
     OPE_NOT_USED,
-    OPE_VARIABLE,
+    OPE_VAR,      // 参数, 和定义的变量, 注意事项: 数组变量使用该类型, 要想按下标访问, 则必须 &
+    OPE_TEMP,     // 编译器自行分配的临时变量
+    OPE_ADDR,     // 地址值
+    OPE_DEREF,    // 即时解引用
+    OPE_V_ADDR,   // 即时取地址
     OPE_INTEGER,
     OPE_FLOAT,
     OPE_LABEL,
@@ -85,7 +92,5 @@ struct IR {
 Operand new_operand(enum Ope_Type type);
 int new_instr(enum IR_Type type, Operand rs, Operand rt, Operand rd);
 void print_instr(FILE *stream);
-int new_variable();
-int new_lable();
 
 #endif // __IR_H__

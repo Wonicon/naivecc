@@ -11,14 +11,25 @@
 
 #define TASK_2
 
-#define FAIL_TO_GEN -1
-#define NO_NEED_TO_GEN -2
-
 enum TranslateState translate_state = FINE;
+
+static void free_ope(Operand *ptr) {
+    if (*ptr != NULL) {
+        free(*ptr);
+    }
+    *ptr = NULL;
+}
 
 int translate_exp_is_const(Node nd);
 
 int translate_exp_is_id(Node exp);
+
+int translate_exp_is_assign(Node assign_exp);
+
+// 即时解引用, 如果算出结果是地址, 那么可以直接在指令中解引用
+void intime_deref(Node exp) ;
+
+int translate_def_is_spec_dec(Node def);
 
 //
 // 用switch-case实现对不同类型(tag)node的分派
@@ -29,12 +40,86 @@ int translate_exp_is_id(Node exp);
 //
 int translate_dispatcher(Node node) {
     switch (node->tag) {
+        case DEF_is_SPEC_DEC:
+            return translate_def_is_spec_dec(node);
         case EXP_is_INT:
         case EXP_is_FLOAT:
             return translate_exp_is_const(node);
         case EXP_is_ID:
             return translate_exp_is_id(node);
-        default: return FAIL_TO_GEN;
+        case EXP_is_ASSIGN:
+            return translate_exp_is_assign(node);
+        default:
+            return FAIL_TO_GEN;
+    }
+}
+
+int translate_def_is_spec_dec(Node def) {
+    Node spec = def->child;
+    Node dec = spec->sibling;
+    int final_ret = NO_NEED_TO_GEN;
+    while (dec != NULL) {
+        int this_ret = translate_dispatcher(dec);
+        if (this_ret != NO_NEED_TO_GEN) {
+            final_ret = this_ret;
+        }
+        dec = dec->sibling;
+    }
+    return final_ret;
+}
+
+//
+// 翻译表达式: 赋值语句
+// 对于赋值语句, 如果左边的表达式不是值类型(数组和结构体0偏移的域也可以直接用值类型)
+// 那么就是数组或者结构体计算出来的偏移地址, 这时候是需要进行解引用操作
+//
+
+void intime_deref(Node exp);
+
+int translate_exp_is_assign(Node assign_exp) {
+    assert(assign_exp && assign_exp->tag == EXP_is_ASSIGN);
+
+    Node lexp = assign_exp->child;
+    Node rexp = lexp->sibling;
+
+    // 左值有两种情况:
+    //   1.变量
+    //   2.地址
+    // 其中变量由于是常量, 所以会释放提供的目标操作数并取而代之
+    // 地址运算应该是完全由下标表达式和成员访问表达式接管的,
+    // 常规的表达式(注意与指令生成的做区分)不应该遇到地址操作数,
+    // 如果遇到了, 可以即刻解引用. 由于地址的这种特性, 它也适合
+    // 直接取代直接提供的目标操作数, 直接返回.
+    // 所以左值这里没必要分配一个新的目标操作数, 反正会取而代之的.
+    // 注意区分赋值表达式和赋值指令(不过赋值指令也只有这里有用了)!
+    translate_dispatcher(lexp);
+
+    rexp->dst = new_operand(OPE_TEMP);
+    translate_dispatcher(rexp);
+
+    intime_deref(lexp);
+    intime_deref(rexp);  // 如果 rexp 直接是 array[...] 则会直接返回地址
+
+    // TODO 更准确地判断赋值左右的等价性
+    // TODO 这里可能会发生访问违例
+    if (lexp->dst->type == rexp->dst->type && lexp->dst->var.index == rexp->dst->var.index) {
+        free_ope(&lexp->dst);
+        free_ope(&rexp->dst);
+        return NO_NEED_TO_GEN;
+    }
+
+    return new_instr(IR_ASSIGN, rexp->dst, NULL, lexp->dst);
+}
+
+// 即时解引用, 如果算出结果是地址, 那么可以直接在指令中解引用
+void intime_deref(Node exp) {
+    if (exp->dst->type == OPE_ADDR) {
+        Operand p = new_operand(OPE_DEREF);
+        p->var.index = exp->dst->var.index;
+        exp->dst = p;
+        // 这边不需要考虑考虑 free
+        // 因为需要替换的操作数在 translate 过程中已经替换过了
+        // 这里只是为了能在指令里解引用而做了区分.
     }
 }
 
@@ -105,11 +190,11 @@ int translate_exp_is_const(Node nd) {
 }
 
 // 测试用函数
-Operand p;
+Operand test_ope;
 int indent = 0;
 void traverse_(Node node) {
     if (node == NULL) return;
-    node->dst = p;
+    node->dst = test_ope;
     printf("%*s", indent, "");
     puts(get_token_name(node->type));
     indent += 2;
@@ -124,7 +209,7 @@ void traverse_(Node node) {
 
 extern node_t *ast_tree;
 void test_translate() {
-    p = new_operand(OPE_VARIABLE);
+    test_ope = new_operand(OPE_VAR);
     traverse_(ast_tree);
     print_instr(stdout);
 }
