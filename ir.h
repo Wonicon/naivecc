@@ -19,7 +19,7 @@
 
 typedef struct Operand_ *Operand;
 
-enum Ope_Type {
+typedef enum {
     OPE_NOT_USED,
     OPE_VAR,      // 参数, 和定义的变量, 注意事项: 数组变量使用该类型, 要想按下标访问, 则必须 &
     OPE_TEMP,     // 编译器自行分配的临时变量
@@ -30,9 +30,9 @@ enum Ope_Type {
     OPE_FLOAT,
     OPE_LABEL,
     OPE_FUNC
-};
+} Ope_Type;
 struct Operand_ {
-    enum Ope_Type type;
+    Ope_Type type;
     union {
         int index;
         int integer;
@@ -42,12 +42,15 @@ struct Operand_ {
     } var;
     Type *base_type;
     Operand offset;
+    int label_ref_cnt;
     int is_const;
     int const_i;
     float const_f;
 };
 
-enum IR_Type {
+typedef enum {
+    // 无效指令
+    IR_NOP,
     IR_LABEL,
     IR_FUNC,
 
@@ -82,16 +85,14 @@ enum IR_Type {
     // I/O类指令
     IR_READ,
     IR_WRITE,
-
-    // 无效指令
-    IR_NOP
-};
-struct IR {
-    enum IR_Type type;
+} IR_Type;
+typedef struct {
+    IR_Type type;
     Operand rs;      // 第一源操作数
     Operand rt;      // 第二源操作数
     Operand rd;      // 目的操作数
-};
+    int block;
+} IR;
 
 #include "node.h"
 #include <stdio.h>
@@ -99,8 +100,8 @@ struct IR {
 //
 // 中间代码模块对外接都口
 //
-Operand new_operand(enum Ope_Type type);
-int new_instr(enum IR_Type type, Operand rs, Operand rt, Operand rd);
+Operand new_operand(Ope_Type type);
+int new_instr(IR_Type type, Operand rs, Operand rt, Operand rd);
 void print_instr(FILE *stream);
-
+IR_Type get_relop(const char *sym);
 #endif // __IR_H__

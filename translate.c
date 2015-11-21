@@ -23,21 +23,6 @@ static void free_ope(Operand *ptr) {
     *ptr = NULL;
 }
 
-struct {
-    enum IR_Type relop;
-    const char *str;
-    enum IR_Type anti;
-} relop_dict[] = {
-    { IR_BEQ, "==", IR_BNE },
-    { IR_BLT, "<" , IR_BGE },
-    { IR_BLE, "<=", IR_BGT },
-    { IR_BGT, ">" , IR_BLE },
-    { IR_BGE, ">=", IR_BLT },
-    { IR_BNE, "!=", IR_BEQ }
-};
-
-#define LENGTH(x) (sizeof(x) / sizeof(*x))
-
 int translate_exp_is_const(Node nd);
 
 int translate_exp_is_id(Node exp);
@@ -145,6 +130,7 @@ int translate_dispatcher(Node node) {
             return translate_exp_is_assign(node);
         case EXP_is_EXP_IDX:
             return translate_exp_is_exp_idx(node);
+        // 当逻辑表达式作为值类型表达式出现时, 需要做赋值准备
         case EXP_is_AND:
         case EXP_is_OR:
         case EXP_is_NOT:
@@ -339,12 +325,7 @@ int translate_cond_relop(Node exp) {
     translate_dispatcher(right);
 
     const char *op = exp->val.operator;
-    enum IR_Type relop = IR_BEQ;
-    for (int i = 0; i < LENGTH(relop_dict); ++i) {
-        if (!strcmp(relop_dict[i].str, op)) {
-            relop = relop_dict[i].relop;
-        }
-    }
+    IR_Type relop = get_relop(op);
 
     new_instr(relop, left->dst, right->dst, exp->label_true);
 
@@ -849,5 +830,7 @@ int translate_exp_is_const(Node nd) {
 extern node_t *ast_tree;
 void test_translate() {
     translate_ast(ast_tree);
-    print_instr(stdout);
+    FILE *fp = fopen("test.ir", "w");
+    print_instr(fp);
+    fclose(fp);
 }

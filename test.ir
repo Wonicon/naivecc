@@ -1,0 +1,12 @@
+FUNCTION main :
+IF v0 >= v1 GOTO L6
+v0 := #1
+GOTO L14
+LABEL L6 :
+IF v0 != v1 GOTO L12
+v0 := #2
+GOTO L14
+LABEL L12 :
+v0 := #3
+LABEL L14 :
+RETURN v0
