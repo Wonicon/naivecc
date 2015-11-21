@@ -694,6 +694,20 @@ int translate_def_is_spec_dec(Node def) {
 // 对于赋值语句, 如果左边的表达式不是值类型(数组和结构体0偏移的域也可以直接用值类型)
 // 那么就是数组或者结构体计算出来的偏移地址, 这时候是需要进行解引用操作
 //
+// [优化策略]
+// 很多指令自带赋值功能, 虽然这些运算指令的左值不能解引用, 但是对于如下表达式:
+//     a = b + c;
+// 我们可以直接生成指令 va := vb + vc
+// 我们目前朴素的赋值语句翻译(11月21日)会将上面的 c-- 代码翻译成这样:
+//     t1 := vb + vc
+//     va := t1
+// 由于我们先分析的左值表达式, 所以可以很明确的知道下面是要赋值给变量还是使用解引用指令,
+// 解引用的场合不可避免地要生成中间代码来传值.
+// 但是我们不能直接把变量操作数传递给右值表达式, 因为右值表达式在知道自己是常量的情况下会替换掉继承的操作数,
+// 所以我们采取的策略是给一个无关紧要的临时变量, 待右值指令生成完毕后, 考察其类型, 如果不是常量,
+// 必然会使用继承的操作数, 这时候可以修改该操作数的内容, 将其变换成左值变量. 不能使用直接修改指令的方法,
+// 因为像条件表达式这种, 很可能会在多处使用继承的目标操作数.
+//
 int translate_exp_is_assign(Node assign_exp) {
     assert(assign_exp && assign_exp->tag == EXP_is_ASSIGN);
 
@@ -719,12 +733,21 @@ int translate_exp_is_assign(Node assign_exp) {
     // TODO 更准确地判断赋值左右的等价性
     // TODO 这里可能会发生访问违例
     if (lexp->dst->type == rexp->dst->type && lexp->dst->var.index == rexp->dst->var.index) {
+        LOG("等价赋值");
         free_ope(&lexp->dst);
         free_ope(&rexp->dst);
         return NO_NEED_TO_GEN;
     }
 
-    return new_instr(IR_ASSIGN, rexp->dst, NULL, lexp->dst);
+    // [优化] 当左值为变量而右值为运算指令时, 将右值的目标操作数转化为变量
+    if (lexp->dst->type == OPE_VAR && rexp->dst->type == OPE_TEMP) {
+        LOG("(优化)左值为变量(编号%d), 直接赋值", lexp->dst->var.index);
+        rexp->dst->type = OPE_VAR;
+        rexp->dst->var.index = lexp->dst->var.index;
+        return NO_NEED_TO_GEN;
+    } else {
+        return new_instr(IR_ASSIGN, rexp->dst, NULL, lexp->dst);
+    }
 }
 
 // 即时解引用, 如果算出结果是地址, 那么可以直接在指令中解引用
