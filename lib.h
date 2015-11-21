@@ -7,7 +7,7 @@ typedef int bool;
 #define true (1)
 #define false (0)
 
-//#define DEBUG
+#define DEBUG
 #define concat(x, y) x ## y
 
 #ifdef DEBUG
@@ -15,7 +15,7 @@ typedef int bool;
 #define TEST(expr, s, ...) do {\
     if (!(expr)) {\
         LOG("Error" s, __VA_ARGS__);\
-        assert((expr));
+        assert((expr));\
     }\
 } while (0);
 #else
