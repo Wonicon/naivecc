@@ -159,6 +159,10 @@ Type *query_field(Type *target, const char *field_name) {
 
 void _print_type(const Type *type, char *end) {
     const Type *base, *link;
+    if (type == NULL) {
+        printf("void%s", end);
+        return;
+    }
     switch (type->class) {
         case CMM_INT:
         case CMM_FLOAT:
@@ -206,6 +210,9 @@ void _print_type(const Type *type, char *end) {
             }
             printf(")");
             break;
+        case CMM_TYPE:
+            _print_type(type->base, end);
+            return;
         default:
             assert(0);
     }
