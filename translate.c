@@ -199,6 +199,16 @@ int translate_call(Node call) {
     Node func = call->child;
     Node arg = func->sibling;
 
+    if (call->dst == NULL) {
+        call->dst = new_operand(OPE_TEMP);
+    }
+
+    if (!strcmp(func->val.s, "read")) {
+        return new_instr(IR_READ, NULL, NULL, call->dst);
+    } else if (!strcmp(func->val.s, "write")) {
+        translate_dispatcher(arg->child);
+        return new_instr(IR_WRITE, arg->child->dst, NULL, NULL);
+    }
     pass_arg(arg);
 
     if (call->dst == NULL) {
@@ -815,14 +825,6 @@ int translate_exp_is_const(Node nd) {
 // 测试用函数
 extern node_t *ast_tree;
 void test_translate() {
-    Type *read = new_type(CMM_FUNC, "read", NULL, NULL);
-    read->ret = BASIC_INT;
-    insert("read", read, -1, 0);
-
-    Type *write = new_type(CMM_FUNC, "write", NULL, NULL);
-    write->param = new_type(CMM_PARAM, "o", NULL, NULL);
-    insert("write", write, -1, 0);
-
     translate_ast(ast_tree);
     print_instr(stdout);
 }

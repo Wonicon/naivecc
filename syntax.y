@@ -311,7 +311,6 @@ node_t *simplify_tree(const node_t *);
 node_t *ast_tree;
 void simplify() {
     ast_tree = simplify_tree(prog);
-    puts_tree(ast_tree);
 }
 //
 // Release the parsing tree
