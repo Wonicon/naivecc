@@ -196,9 +196,12 @@ int translate_call(Node call) {
     if (!strcmp(func->val.s, "read")) {
         return new_instr(IR_READ, NULL, NULL, call->dst);
     } else if (!strcmp(func->val.s, "write")) {
+        arg->child->dst = new_operand(OPE_TEMP);
+        intime_deref(arg->child);
         translate_dispatcher(arg->child);
         return new_instr(IR_WRITE, arg->child->dst, NULL, NULL);
     }
+
     pass_arg(arg);
 
     if (call->dst == NULL) {
