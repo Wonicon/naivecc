@@ -98,6 +98,7 @@ int translate_dispatcher(Node node) {
         case COMPST_is_DEF_STMT:
             return translate_compst(node);
         case DEC_is_VARDEC:
+        case DEC_is_VARDEC_INITIALIZATION:
             return translate_dec_is_vardec(node);
         case DEF_is_SPEC_DEC:
             return translate_def_is_spec_dec(node);
@@ -175,7 +176,10 @@ static void pass_arg(Node arg) {
     Operand p = arg->child->dst;
     if (p->base_type && p->base_type->class == CMM_ARRAY) {
         // 按照测试样例, 数组要传地址
+        LOG("传参: 数组引用");
         p->type = OPE_V_ADDR;
+    } else {
+        intime_deref(arg->child);
     }
     new_instr(IR_ARG, arg->child->dst, NULL, NULL);
 
@@ -324,6 +328,9 @@ int translate_cond_relop(Node exp) {
     translate_dispatcher(left);
     translate_dispatcher(right);
 
+    intime_deref(left);
+    intime_deref(right);
+
     const char *op = exp->val.operator;
     IR_Type relop = get_relop(op);
 
@@ -435,10 +442,9 @@ int translate_exp_is_exp_idx(Node exp) {
     }
 
     if (offset->type == OPE_INTEGER && offset->var.integer == 0) {
-        // 伪造变量操作数
         exp->dst = new_operand(OPE_NOT_USED);
+        *exp->dst = *base->dst;
         exp->dst->type = OPE_VAR;
-        exp->dst->var.index = base->dst->var.index;
     } else {
         // 要生成加法指令
         exp->dst = new_operand(OPE_ADDR);
@@ -642,6 +648,18 @@ int translate_dec_is_vardec(Node dec) {
         assert(sym->type->type_size == 4);
         sym->address = new_operand(OPE_VAR);
         sym->address->base_type = sym->type;
+
+        if (vardec->sibling != NULL) {  // 有初始化语句
+            LOG("初始化");
+            vardec->sibling->dst = new_operand(OPE_TEMP);
+            int ret = translate_dispatcher(vardec->sibling);
+            if (ret != NO_NEED_TO_GEN) {
+                replace_operand_global(sym->address, vardec->sibling->dst);
+                return ret;
+            } else {
+                return new_instr(IR_ASSIGN, vardec->sibling->dst, NULL, sym->address);
+            }
+        }
         return NO_NEED_TO_GEN;
     }
 
@@ -650,7 +668,7 @@ int translate_dec_is_vardec(Node dec) {
     }
 
     sym_ent_t *sym = query(iterator->val.s, 0);
-    sym->address = new_operand(OPE_VAR);
+    sym->address = new_operand(OPE_V_ADDR);
     sym->address->base_type = sym->type;
     Operand size = new_operand(OPE_INTEGER);
     size->var.integer = sym->type->type_size;

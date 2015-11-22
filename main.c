@@ -69,13 +69,16 @@ int main(int argc, char *argv[])
         insert("write", write, -1, 0);
 
         semantic_analysis();
+
+#ifdef DEBUG
+        print_symtab();
+#endif
+        printf("======================================================\n");
+
         simplify();
         test_translate();
     }
 
     free_ast();
-#ifdef DEBUG
-    print_symtab();
-#endif
-    return 0;
+   return 0;
 }
