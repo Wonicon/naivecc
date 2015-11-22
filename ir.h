@@ -104,4 +104,5 @@ Operand new_operand(Ope_Type type);
 int new_instr(IR_Type type, Operand rs, Operand rt, Operand rd);
 void print_instr(FILE *stream);
 IR_Type get_relop(const char *sym);
+int replace_operand_global(Operand newbie, Operand old);
 #endif // __IR_H__

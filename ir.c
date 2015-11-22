@@ -7,7 +7,7 @@
 #include <string.h>
 #include <assert.h>
 
-#define NAME_LEN 128
+#define NAME_LEN 4096
 // 指令缓冲区
 static IR instr_buffer[MAX_LINE];
 
@@ -139,7 +139,7 @@ void print_single_instr(IR instr, FILE *file) {
     if (IR_BEQ <= instr.type && instr.type <= IR_BNE) {
         fprintf(file, ir_format[instr.type], rs_s, rt_s, rd_s);  // 交换顺序
     } else if (instr.type == IR_DEC) {  // 规划干不过特例
-        fprintf(file, ir_format[instr.type], rd_s, rs_s, rt_s + 1);
+        fprintf(file, ir_format[instr.type], rd_s, rs_s + 1, rt_s + 1);
 
     } else {
         fprintf(file, ir_format[instr.type], rd_s, rs_s, rt_s);
@@ -154,8 +154,10 @@ void print_single_instr(IR instr, FILE *file) {
 // 打印指令缓冲区中所有的已生成指令
 //
 void preprocess_ir();
+void print_block();
 void print_instr(FILE *file) {
     preprocess_ir();
+    print_block();
     for (int i = 0; i < nr_instr; i++) {
         print_single_instr(instr_buffer[i], file);
     }
@@ -247,14 +249,14 @@ int is_branch(IR *pIR) {
 //
 // 检查是否为跳转类指令
 int can_jump(IR *pIR) {
-    return pIR->type == IR_JMP && is_branch(pIR);
+    return pIR->type == IR_JMP || is_branch(pIR);
 }
 
 //
 // relop 字典使用接口
 //
 #define search_relop_common(name, field, type, miss_val) \
-    type name(IR_Type relop) {                      \
+    type name(IR_Type relop) {                           \
         for (int i = 0; i < LENGTH(relop_dict); i++) {   \
             if (relop_dict[i].relop == relop) {          \
                 return relop_dict[i].field;              \
@@ -276,6 +278,16 @@ IR_Type get_relop(const char *sym) {
     return IR_NOP;
 }
 
+void deref_label(IR *pIR) {
+    assert(pIR->type == IR_LABEL);
+    pIR->rs->label_ref_cnt--;
+    if (pIR->rs->label_ref_cnt == 0) {
+        pIR->type = IR_NOP;
+        free(pIR->rs);
+        pIR->rs = NULL;
+    }
+}
+
 //
 // 预处理 IR
 //
@@ -293,6 +305,7 @@ void preprocess_ir() {
     }
 
     // 简单的模式处理: Label true 就在 GOTO false 下面
+    // 以及 goto 后面就是对应的 label
     pIR = &instr_buffer[0];
     for (int i = 0; i < nr_instr - 2; i++) {
         if (is_branch(pIR) &&
@@ -300,12 +313,15 @@ void preprocess_ir() {
                 (pIR + 2)->type == IR_LABEL &&
                 pIR->rd == (pIR + 2)->rs) {
             pIR->type = get_relop_anti(pIR->type);
+            deref_label(pIR + 2);
             pIR->rd = (pIR + 1)->rs;
             (pIR + 1)->type = IR_NOP;
-            if (pIR->rd->label_ref_cnt == 1) {
-                (pIR + 2)->type = IR_NOP;
-                (pIR + 2)->rs = NULL;
-            }
+        } else if (pIR->type == IR_JMP &&
+                (pIR + 1)->type == IR_LABEL &&
+                (pIR + 1)->rs == pIR->rs) {
+            // goto 后面就是对应的 label
+            pIR->type = IR_NOP;
+            deref_label(pIR + 1);
         }
         pIR++;
     }
@@ -367,3 +383,46 @@ void preprocess_ir() {
 //   2. 跳转类指令的目标(就是 Label)
 //   3. 跳转类指令后面的那条指令
 //
+int is_leader(int ir_idx) {
+    return ir_idx == 0 ||
+           instr_buffer[ir_idx].type == IR_LABEL ||
+           can_jump(&instr_buffer[ir_idx - 1]);
+}
+
+//
+// 划分基本块
+//
+void block_partition() {
+    int block_num = 0;
+    for (int i = 0; i < nr_instr; i++) {
+        if (is_leader(i)) {
+            block_num++;
+        }
+        instr_buffer[i].block = block_num;
+    }
+}
+
+//
+// 打印基本块
+//
+void print_block() {
+    block_partition();
+
+    int current_block = 0;
+
+    int num_buf_sz = 16;
+    char num_buf[num_buf_sz];
+    char head[] = "####### BLOCK ";
+    char tail[] = "######################";
+    int tail_len = (int)strlen(tail);
+
+    for (int i = 0; i < nr_instr; i++) {
+        IR *pIR = &instr_buffer[i];
+        if (pIR->block != current_block) {
+            current_block = pIR->block;
+            int num_len = sprintf(num_buf, "%d ", current_block);
+            printf("%s%s%*s\n", head, num_buf, tail_len - num_len, tail);
+        }
+        print_single_instr(instr_buffer[i], stdout);
+    }
+}
