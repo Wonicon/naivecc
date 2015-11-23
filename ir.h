@@ -17,6 +17,8 @@
 #define NO_NEED_TO_GEN -2
 #define MULTI_INSTR MAX_LINE
 
+typedef struct DagNode_ *DagNode;
+
 typedef enum {
     OPE_NOT_USED,
     OPE_VAR,      // 变量
@@ -71,6 +73,8 @@ struct Operand_ {
     int liveness;      // 标记变量的活跃性, VAR和REF型变量一直活跃. 临时和地址初始不活跃
                        // TODO 这里有一个假设, 即中间代码使用的临时变量不会跨越基本块
     int next_use;      // 标记下一条需要该操作数的指令编号
+
+    DagNode dep;       // 依赖结点
 };
 
 typedef enum {
