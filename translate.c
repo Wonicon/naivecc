@@ -396,22 +396,23 @@ int translate_exp_is_exp_idx(Node exp) {
     Node base = exp->child;
     Node idx = base->sibling;
 
-    base->dst = new_operand(OPE_DEREF);  // 只是用来传递信号
+    base->dst = new_operand(OPE_REF_INFO);  // REF_INFO 存储基址操作数和总偏移, 为此栈独有
     idx->dst = new_operand(OPE_TEMP);
 
     translate_dispatcher(base);
     translate_dispatcher(idx);
+    try_deref(idx);  // 如果是数组做下标的话, 则不能忽视解引用
 
     // 现在我们已经准备好了一个基地址和偏移量, 以及"当前"数组的类型
     // 为了进一步计算偏移量, 我们需要访问数组的基类型, 获得基类型的大小, 用当前下标去计算
     // 新的偏移量, 如果综合来的偏移量和下标有一个为非常量, 则要生成指令并转移操作数
 
     Operand offset = idx->dst;
-    Operand ref = base->dst;
-    assert(ref->type == OPE_REF || ref->type == OPE_ADDR);
+    Operand ref_info = base->dst;
+    assert(ref_info->type == OPE_REF_INFO);
 
     // 计算本层偏移
-    int size = ref->sub_type->base->type_size;
+    int size = ref_info->base_type->base->type_size;
     if (offset->type == OPE_INTEGER) {
         offset->integer = offset->integer * size;
     } else {
@@ -423,34 +424,34 @@ int translate_exp_is_exp_idx(Node exp) {
     }
 
     // 计算总偏移
-    if (ref->offset->type == OPE_INTEGER && offset->type == OPE_INTEGER) {
+    if (ref_info->offset->type == OPE_INTEGER && offset->type == OPE_INTEGER) {
         LOG("Line %d: 地址偏移为常数, 直接计算, %d + %d = %d",
             exp->lineno,
-            ref->offset->integer,
+            ref_info->offset->integer,
             offset->integer,
-            ref->offset->integer + offset->integer
+            ref_info->offset->integer + offset->integer
         );
-        ref->offset->integer = offset->integer + ref->offset->integer;
+        ref_info->offset->integer = offset->integer + ref_info->offset->integer;
         free(offset);
-    } else if (ref->offset->type == OPE_INTEGER && ref->offset->integer == 0) {
+    } else if (ref_info->offset->type == OPE_INTEGER && ref_info->offset->integer == 0) {
         LOG("Line %d: 旧偏移量为常数0, 直接更新", exp->lineno);
-        free(ref->offset);
-        ref->offset = offset;
+        free(ref_info->offset);
+        ref_info->offset = offset;
     } else if (offset->type == OPE_INTEGER && offset->integer == 0) {
-        LOG("Line %d: 新增偏移量为常数0, 什么都不做", exp->lineno);
-        // Do nothing
+        LOG("Line %d: 新增偏移量为常数0, 释放掉", exp->lineno);
+        free(offset);
     } else {
         Operand p = new_operand(OPE_ADDR);
-        new_instr(IR_ADD, offset, ref->offset, p);
-        ref->offset = p;  // 再转移本层偏移量
+        new_instr(IR_ADD, offset, ref_info->offset, p);
+        ref_info->offset = p;  // 再转移本层偏移量
     }
 
     // 现在我们就有了完整的偏移量
-    if (exp->dst->type == OPE_DEREF) {
+    if (exp->dst->type == OPE_REF_INFO) {
         // 说明在下标翻译过程中
         LOG("下标递归翻译中");
-        ref->sub_type = ref->sub_type->base;
-        exp->dst = ref;
+        *exp->dst = *ref_info;
+        exp->dst->base_type = exp->dst->base_type->base;
         return MULTI_INSTR;
     }
 
@@ -462,14 +463,17 @@ int translate_exp_is_exp_idx(Node exp) {
         exp->dst = NULL;
     }
 
-    if (ref->offset->type == OPE_INTEGER && ref->offset->integer == 0) {
+    if (ref_info->offset->type == OPE_INTEGER && ref_info->offset->integer == 0) {
         LOG("Line %d: 引用类型首元素优化", exp->lineno);
-        exp->dst = (ref->type == OPE_REF) ? ref->_inline : ref;  // 区分变量数组和参数数组
+        exp->dst = (ref_info->ref->type == OPE_REF) ? ref_info->ref->_inline : ref_info->ref;  // 区分变量数组和参数数组
     } else {
         // 要生成加法指令
         exp->dst = new_operand(OPE_ADDR);
-        new_instr(IR_ADD, ref, ref->offset, exp->dst);
+        new_instr(IR_ADD, ref_info->ref, ref_info->offset, exp->dst);
     }
+
+    free(ref_info);
+
     return 0;
 }
 
@@ -811,12 +815,11 @@ int translate_exp_is_id(Node exp) {
 #endif
 
     // 上层希望存储到一个地址变量, 说明现在在寻址模式
-    if (exp->dst && exp->dst->type == OPE_DEREF) {
-        free(exp->dst);
-        exp->dst = sym->address;
-        sym->address->sub_type = sym->address->base_type;  // 初始综合属性
-        exp->dst->offset = new_operand(OPE_INTEGER);       // 偏移量将来可能变成临时变量
-        exp->dst->offset->integer = 0;                     // 当前偏移量为常数 0
+    if (exp->dst && exp->dst->type == OPE_REF_INFO) {
+        exp->dst->ref = sym->address;
+        exp->dst->base_type = sym->address->base_type;  // 初始综合属性
+        exp->dst->offset = new_operand(OPE_INTEGER);    // 偏移量将来可能变成临时变量
+        exp->dst->offset->integer = 0;                  // 当前偏移量为常数 0
         return NO_NEED_TO_GEN;
     }
 

@@ -29,30 +29,42 @@ typedef enum {
     OPE_INTEGER,
     OPE_FLOAT,
     OPE_LABEL,
-    OPE_FUNC
+    OPE_FUNC,
+    OPE_REF_INFO
 } Ope_Type;
 
 typedef struct Operand_ *Operand;
 
 struct Operand_ {
     Ope_Type type;     // 固有属性: 指示该操作数的类型, 用于打印和常量折叠
+
+    // OPE_LABEL
     int label;         // 固有属性: 指示该操作数作为标签时的编号(最后会被替换成行号)
+
+    // OPE_VAR, OPE_REF, OPE_TEMP, OPE_ADDR
     int index;         // 固有属性: 指示该操作数作为变量/引用/地址时的编号(3者独立)
+
+    // OPE_INT
     int integer;       // 固有属性: 该操作数作为整型常数的值
+
+    // OPE_FLOAT
     float real;        // 固有属性: 该操作数作为浮点型常数的值
+
+    // OPE_FUNC
     const char *name;  // 固有属性: 该操作数作为函数时的函数名
-    Type *base_type;   // 固有属性: 引用型操作数对应的类型, 关系到偏移量的计算
-    Operand _inline;    // 固有属性: 引用型操作数首元素, 有些时候可以用它省略一行指令
+
+    // OPE_REF, OPE_REF_INFO
+    Type *base_type;   // 综合属性: 引用型操作数对应的类型, 关系到偏移量的计算
+
+    // OPE_REF, OPE_ADDR
+    Operand _inline;   // 固有属性: 引用型操作数首元素, 有些时候可以用它省略一行指令
                        // INITIAL自身可以用这个指针访问到对应的引用操作数
 
-    Type *sub_type;    // 综合属性: 引用型操作数计算本层递归偏移量的依据
-                       // 由于是单向递归, 所以可以安心地进行擦写, 在翻译 ID 时初始化
-
+    // OPE_REF_INFO
+    Operand ref;       // 综合属性: 下标递归表达式使用, 结构体应该也能用
     Operand offset;    // 综合属性: 引用型操作数的偏移量
-                       // 在 EXP [ EXP ] 和 EXP . ID 的递归表达式中, 偏移量自底向上进行计算
-                       // 如果是常数, 我们计算新值并替换, 如果此层出现了变量, 则只能生成运算指令并替换为目标操作数
-                       // 在翻译 ID 时初始化
 
+    // OPE_LABEL
     int label_ref_cnt; // Label 作为跳转目标的引用次数, 在删除 GOTO 或者翻转 BRANCH 后, 如果引用计数归零, 可以删除
 };
 
