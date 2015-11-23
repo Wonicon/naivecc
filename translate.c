@@ -51,7 +51,7 @@ int translate_unary_operation(Node exp);
 
 int translate_exp_is_exp(Node exp);
 
-void intime_deref(Node exp);
+void try_deref(Node exp);
 
 int translate_exp_is_exp_idx(Node exp);
 
@@ -141,7 +141,7 @@ int translate_dispatcher(Node node) {
 
             if (node->dst != NULL) {
                 Operand value_false = new_operand(OPE_INTEGER);
-                value_false->var.integer = 0;
+                value_false->integer = 0;
                 new_instr(IR_ASSIGN, value_false, NULL, node->dst);
             }
 
@@ -151,7 +151,7 @@ int translate_dispatcher(Node node) {
 
             if (node->dst != NULL) {
                 Operand value_true = new_operand(OPE_INTEGER);
-                value_true->var.integer = 1;
+                value_true->integer = 1;
                 new_instr(IR_ASSIGN, value_true, NULL, node->dst);
             }
 
@@ -177,9 +177,9 @@ static void pass_arg(Node arg) {
     if (p->base_type && p->base_type->class == CMM_ARRAY) {
         // 按照测试样例, 数组要传地址
         LOG("传参: 数组引用");
-        p->type = OPE_V_ADDR;
+        p->type = OPE_REF;
     } else {
-        intime_deref(arg->child);
+        try_deref(arg->child);
     }
     new_instr(IR_ARG, arg->child->dst, NULL, NULL);
 
@@ -197,8 +197,8 @@ int translate_call(Node call) {
         return new_instr(IR_READ, NULL, NULL, call->dst);
     } else if (!strcmp(func->val.s, "write")) {
         arg->child->dst = new_operand(OPE_TEMP);
-        intime_deref(arg->child);
         translate_dispatcher(arg->child);
+        try_deref(arg->child);
         return new_instr(IR_WRITE, arg->child->dst, NULL, NULL);
     }
 
@@ -209,7 +209,7 @@ int translate_call(Node call) {
     }
 
     Operand f = new_operand(OPE_FUNC);
-    f->var.funcname = func->val.s;
+    f->name = func->val.s;
     new_instr(IR_CALL, f, NULL, call->dst);
     return MULTI_INSTR;
 }
@@ -282,7 +282,7 @@ int translate_return(Node exp) {
     Node sub_exp = exp->child;
     sub_exp->dst = new_operand(OPE_TEMP);
     translate_dispatcher(sub_exp);
-    intime_deref(sub_exp);
+    try_deref(sub_exp);
     return new_instr(IR_RET, sub_exp->dst, NULL, NULL);
 }
 
@@ -300,7 +300,7 @@ int translate_cond_exp(Node exp) {
     exp->dst = new_operand(OPE_TEMP);
     translate_dispatcher(exp);
     Operand const_zero = new_operand(OPE_INTEGER);
-    const_zero->var.integer = 0;
+    const_zero->integer = 0;
     new_instr(IR_BNE, exp->dst, const_zero, exp->label_true);
     new_instr(IR_JMP, exp->label_false, NULL, NULL);
     return MULTI_INSTR;
@@ -331,8 +331,8 @@ int translate_cond_relop(Node exp) {
     translate_dispatcher(left);
     translate_dispatcher(right);
 
-    intime_deref(left);
-    intime_deref(right);
+    try_deref(left);
+    try_deref(right);
 
     const char *op = exp->val.operator;
     IR_Type relop = get_relop(op);
@@ -393,7 +393,7 @@ int translate_exp_is_exp_idx(Node exp) {
     Node base = exp->child;
     Node idx = base->sibling;
 
-    base->dst = new_operand(OPE_V_ADDR);
+    base->dst = new_operand(OPE_DEREF);  // 只是用来传递信号
     idx->dst = new_operand(OPE_TEMP);
 
     translate_dispatcher(base);
@@ -404,54 +404,53 @@ int translate_exp_is_exp_idx(Node exp) {
     // 新的偏移量, 如果综合来的偏移量和下标有一个为非常量, 则要生成指令并转移操作数
 
     Operand offset = idx->dst;
-    int size = base->dst->base_type->base->type_size;
+    Operand ref = base->dst;
+    assert(ref->type == OPE_REF || ref->type == OPE_ADDR);
+
+    // 计算本层偏移
+    int size = ref->sub_type->base->type_size;
     if (offset->type == OPE_INTEGER) {
-        offset->var.integer = offset->var.integer * size;
+        offset->integer = offset->integer * size;
     } else {
         Operand p = new_operand(OPE_TEMP);
         Operand array_size = new_operand(OPE_INTEGER);
-        array_size->var.integer = size;
+        array_size->integer = size;
         new_instr(IR_MUL, offset, array_size, p);
         offset = p;  // 转移本层偏移量
     }
 
-    if (base->dst->offset->type == OPE_INTEGER && offset->type == OPE_INTEGER) {
-        offset->var.integer = offset->var.integer + base->dst->offset->var.integer;
+    // 计算总偏移
+    if (ref->offset->type == OPE_INTEGER && offset->type == OPE_INTEGER) {
+        offset->integer = offset->integer + base->dst->offset->integer;
     } else {
         Operand p = new_operand(OPE_TEMP);
-        new_instr(IR_ADD, offset, base->dst->offset, p);
+        new_instr(IR_ADD, offset, ref->offset, p);
         offset = p;  // 再转移本层偏移量
     }
 
     // 现在我们就有了完整的偏移量
-    if (exp->dst->type == OPE_V_ADDR) {
+    if (exp->dst->type == OPE_DEREF) {
         // 说明在下标翻译过程中
-        exp->dst->type = base->dst->type;                  // 传递类型, 因为参数数组和变量数组行为不一致
-        exp->dst->var.index = base->dst->var.index;        // 保证基地址一致
-        exp->dst->base_type = base->dst->base_type->base;  // 数组降低一维
-        exp->dst->offset = offset;                         // 转移经过一系列计算的偏移量
+        ref->offset = offset;
+        ref->sub_type = ref->sub_type->base;
+        exp->dst = ref;
         return MULTI_INSTR;
     }
 
     // 进入这里说明是最后一个阶段, 按道理要进行解引用
-    // 但是由于任何指令都可以内嵌解引用, 所以为了效率
-    // 这里直接算一个地址就往回送 (如果老老实实解引用
-    // 则还要多一条指令)
-    // 由于第一个元素直接用变量名访问在虚拟机里也是允许的,
-    // 所以总偏移为0时改成var送回去, 毕竟编号是一致的,
-    // 否则, 要用一个临时变量存储地址, 生成加法指令, 然后改成约定的待转换类型(ADD)传回去.
+    // 但是由于任何指令都可以内嵌解引用, 所以为了效率这里直接算一个地址就往回送
+    // (如果老老实实解引用则还要多一条指令)
     if (exp->dst->type == OPE_TEMP) {
         free(exp->dst);
+        exp->dst = NULL;
     }
 
-    if (offset->type == OPE_INTEGER && offset->var.integer == 0) {
-        exp->dst = new_operand(OPE_NOT_USED);
-        *exp->dst = *base->dst;
-        exp->dst->type = OPE_VAR;
+    if (offset->type == OPE_INTEGER && offset->integer == 0) {
+        exp->dst = ref->type == OPE_REF ? ref->_inline : ref;  // 区分变量数组和参数数组
     } else {
         // 要生成加法指令
         exp->dst = new_operand(OPE_ADDR);
-        new_instr(IR_ADD, base->dst, offset, exp->dst);
+        new_instr(IR_ADD, ref, offset, exp->dst);
     }
     return 0;
 }
@@ -480,13 +479,13 @@ int translate_unary_operation(Node exp) {
         Operand const_ope = new_operand(OPE_NOT_USED);
         if (rexp->dst->type == OPE_INTEGER) {
             const_ope->type = OPE_INTEGER;
-            const_ope->var.integer = -rexp->dst->var.integer;
+            const_ope->integer = -rexp->dst->integer;
             free_ope(&exp->dst);
             exp->dst = const_ope;
             return NO_NEED_TO_GEN;
         } else if (rexp->dst->type == OPE_FLOAT) {
             const_ope->type = OPE_FLOAT;
-            const_ope->var.real = -rexp->dst->var.real;
+            const_ope->real = -rexp->dst->real;
             free_ope(&exp->dst);
             exp->dst = const_ope;
             return NO_NEED_TO_GEN;
@@ -498,16 +497,16 @@ int translate_unary_operation(Node exp) {
 
     // 无脑上 0
     Operand p = new_operand(OPE_INTEGER);
-    p->var.integer = 0;
+    p->integer = 0;
     return new_instr(IR_SUB, p, rexp->dst, exp->dst);
 }
 
 #define CALC(op, rs, rt, rd, type) do {\
     switch (op) {\
-        case '+': rd->var.type = rs->var.type + rt->var.type; break;\
-        case '-': rd->var.type = rs->var.type - rt->var.type; break;\
-        case '*': rd->var.type = rs->var.type * rt->var.type; break;\
-        case '/': rd->var.type = rs->var.type / rt->var.type; break;\
+        case '+': rd->type = rs->type + rt->type; break;\
+        case '-': rd->type = rs->type - rt->type; break;\
+        case '*': rd->type = rs->type * rt->type; break;\
+        case '/': rd->type = rs->type / rt->type; break;\
     }\
     free_ope(&exp->dst);\
     exp->dst = rd;\
@@ -526,8 +525,8 @@ int translate_binary_operation(Node exp) {
     translate_dispatcher(lexp);
     rexp->dst = new_operand(OPE_TEMP);
     translate_dispatcher(rexp);
-    intime_deref(lexp);
-    intime_deref(rexp);
+    try_deref(lexp);
+    try_deref(rexp);
 
     // TODO 检查变量是否为常量
 
@@ -588,7 +587,7 @@ int translate_func_head(Node func) {
 
     // 声明函数头
     Operand rs = new_operand(OPE_FUNC);
-    rs->var.funcname = funcname->val.s;
+    rs->name = funcname->val.s;
     new_instr(IR_FUNC, rs, NULL, NULL);
 
     // 声明变量
@@ -602,6 +601,7 @@ int translate_func_head(Node func) {
         sym_ent_t *sym = query(id->val.s, 0);
         if (sym->type->class == CMM_ARRAY) {
             sym->address = new_operand(OPE_ADDR);
+            sym->address->base_type = sym->type;
         } else {
             sym->address = new_operand(OPE_VAR);
         }
@@ -671,10 +671,10 @@ int translate_dec_is_vardec(Node dec) {
     }
 
     sym_ent_t *sym = query(iterator->val.s, 0);
-    sym->address = new_operand(OPE_V_ADDR);
+    sym->address = new_operand(OPE_REF);
     sym->address->base_type = sym->type;
     Operand size = new_operand(OPE_INTEGER);
-    size->var.integer = sym->type->type_size;
+    size->integer = sym->type->type_size;
     return new_instr(IR_DEC, sym->address, size, NULL);
 }
 
@@ -729,12 +729,12 @@ int translate_exp_is_assign(Node assign_exp) {
     rexp->dst = new_operand(OPE_TEMP);
     translate_dispatcher(rexp);
 
-    intime_deref(lexp);
-    intime_deref(rexp);  // 如果 rexp 直接是 array[...] 则会直接返回地址
+    try_deref(lexp);
+    try_deref(rexp);  // 如果 rexp 直接是 array[...] 则会直接返回地址
 
     // TODO 更准确地判断赋值左右的等价性
     // TODO 这里可能会发生访问违例
-    if (lexp->dst->type == rexp->dst->type && lexp->dst->var.index == rexp->dst->var.index) {
+    if (lexp->dst->type == rexp->dst->type && lexp->dst->index == rexp->dst->index) {
         LOG("等价赋值");
         free_ope(&lexp->dst);
         free_ope(&rexp->dst);
@@ -743,24 +743,19 @@ int translate_exp_is_assign(Node assign_exp) {
 
     // [优化] 当左值为变量而右值为运算指令时, 将右值的目标操作数转化为变量
     if (lexp->dst->type == OPE_VAR && rexp->dst->type == OPE_TEMP) {
-        LOG("(优化)左值为变量(编号%d), 直接赋值", lexp->dst->var.index);
+        LOG("(优化)左值为变量(编号%d), 直接赋值", lexp->dst->index);
         rexp->dst->type = OPE_VAR;
-        rexp->dst->var.index = lexp->dst->var.index;
+        rexp->dst->index = lexp->dst->index;
         return NO_NEED_TO_GEN;
     } else {
         return new_instr(IR_ASSIGN, rexp->dst, NULL, lexp->dst);
     }
 }
 
-// 即时解引用, 如果算出结果是地址, 那么可以直接在指令中解引用
-void intime_deref(Node exp) {
+// 内联解引用, 如果算出结果是地址, 那么可以直接在指令中解引用
+void try_deref(Node exp) {
     if (exp->dst->type == OPE_ADDR) {
-        Operand p = new_operand(OPE_DEREF);
-        p->var.index = exp->dst->var.index;
-        exp->dst = p;
-        // 这边不需要考虑考虑 free
-        // 因为需要替换的操作数在 translate 过程中已经替换过了
-        // 这里只是为了能在指令里解引用而做了区分.
+        exp->dst = exp->dst->_inline;
     }
 }
 
@@ -797,12 +792,12 @@ int translate_exp_is_id(Node exp) {
 #endif
 
     // 上层希望存储到一个地址变量, 说明现在在寻址模式
-    if (exp->dst && exp->dst->type == OPE_V_ADDR) {
-        exp->dst->type = sym->address->type;            // 位于参数的数组和位于变量的数组行为不一致!
-        exp->dst->var.index = sym->address->var.index;  // 虽然类型不同, 但是编号保持一致
-        exp->dst->offset = new_operand(OPE_INTEGER);    // 偏移量将来可能变成临时变量
-        exp->dst->offset->var.integer = 0;              // 当前偏移量为常数 0
-        exp->dst->base_type = sym->type;                // 数组类型, 在上层使用 base 获得信息
+    if (exp->dst && exp->dst->type == OPE_DEREF) {
+        free(exp->dst);
+        exp->dst = sym->address;
+        sym->address->sub_type = sym->address->base_type;  // 初始综合属性
+        exp->dst->offset = new_operand(OPE_INTEGER);       // 偏移量将来可能变成临时变量
+        exp->dst->offset->integer = 0;                     // 当前偏移量为常数 0
         return NO_NEED_TO_GEN;
     }
 
@@ -827,11 +822,11 @@ int translate_exp_is_const(Node nd) {
     switch (nd->child->tag) {
         case TERM_INT:
             const_ope = new_operand(OPE_INTEGER);
-            const_ope->var.integer = nd->child->val.i;
+            const_ope->integer = nd->child->val.i;
             break;
         case TERM_FLOAT:
             const_ope = new_operand(OPE_FLOAT);
-            const_ope->var.real = nd->child->val.f;
+            const_ope->real = nd->child->val.f;
             break;
         default:
             return FAIL_TO_GEN;
@@ -842,6 +837,7 @@ int translate_exp_is_const(Node nd) {
     // 而可能是到处引用的变量!
     if (nd->dst != NULL) {
         free(nd->dst);
+        nd->dst = NULL;
     }
     nd->dst = const_ope;
     return NO_NEED_TO_GEN;

@@ -17,35 +17,43 @@
 #define NO_NEED_TO_GEN -2
 #define MULTI_INSTR MAX_LINE
 
-typedef struct Operand_ *Operand;
-
 typedef enum {
     OPE_NOT_USED,
-    OPE_VAR,      // 参数, 和定义的变量, 注意事项: 数组变量使用该类型, 要想按下标访问, 则必须 &
+    OPE_VAR,      // 变量
+    OPE_REF,      // 引用类型, 包括数组和结构类型, 引用类型的首元素支持不解引用直接访问
+                  // 所以引用类型会保存一个REFVAR分身
     OPE_TEMP,     // 编译器自行分配的临时变量
-    OPE_ADDR,     // 地址值
-    OPE_DEREF,    // 即时解引用
-    OPE_V_ADDR,   // 即时取地址
+    OPE_ADDR,     // 地址值, 类比REF, 保存一个DEREF分身用于内联
+    OPE_DEREF,    // 内联解引用
+    OPE_INITIAL,  // REF的首元素分身
     OPE_INTEGER,
     OPE_FLOAT,
     OPE_LABEL,
     OPE_FUNC
 } Ope_Type;
+
+typedef struct Operand_ *Operand;
+
 struct Operand_ {
-    Ope_Type type;
-    union {
-        int index;
-        int integer;
-        float real;
-        int label;
-        const char *funcname;
-    } var;
-    Type *base_type;
-    Operand offset;
-    int label_ref_cnt;
-    int is_const;
-    int const_i;
-    float const_f;
+    Ope_Type type;     // 固有属性: 指示该操作数的类型, 用于打印和常量折叠
+    int label;         // 固有属性: 指示该操作数作为标签时的编号(最后会被替换成行号)
+    int index;         // 固有属性: 指示该操作数作为变量/引用/地址时的编号(3者独立)
+    int integer;       // 固有属性: 该操作数作为整型常数的值
+    float real;        // 固有属性: 该操作数作为浮点型常数的值
+    const char *name;  // 固有属性: 该操作数作为函数时的函数名
+    Type *base_type;   // 固有属性: 引用型操作数对应的类型, 关系到偏移量的计算
+    Operand _inline;    // 固有属性: 引用型操作数首元素, 有些时候可以用它省略一行指令
+                       // INITIAL自身可以用这个指针访问到对应的引用操作数
+
+    Type *sub_type;    // 综合属性: 引用型操作数计算本层递归偏移量的依据
+                       // 由于是单向递归, 所以可以安心地进行擦写, 在翻译 ID 时初始化
+
+    Operand offset;    // 综合属性: 引用型操作数的偏移量
+                       // 在 EXP [ EXP ] 和 EXP . ID 的递归表达式中, 偏移量自底向上进行计算
+                       // 如果是常数, 我们计算新值并替换, 如果此层出现了变量, 则只能生成运算指令并替换为目标操作数
+                       // 在翻译 ID 时初始化
+
+    int label_ref_cnt; // Label 作为跳转目标的引用次数, 在删除 GOTO 或者翻转 BRANCH 后, 如果引用计数归零, 可以删除
 };
 
 typedef enum {
