@@ -11,7 +11,7 @@
 // 语法分析树结构体的转换构造函数
 //
 static Node trans_node(const Node nd, enum ProductionTag tag) {
-    Node p = (Node)malloc(sizeof(node_t));
+    Node p = (Node)malloc(sizeof(struct Node_));
     *p = *nd;
     p->tag = tag;
     p->child = NULL;

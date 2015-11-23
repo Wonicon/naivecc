@@ -6,7 +6,9 @@
 #include "ast.h"
 #include "ir.h"
 
-typedef struct _node_t {
+typedef struct Node_ *Node;
+
+struct Node_ {
     enum YYTNAME_INDEX type;
     enum ProductionTag tag;
     int lineno;
@@ -17,17 +19,15 @@ typedef struct _node_t {
         void *p;
         const char *operator;
     } val;
-    struct _node_t *child, *sibling;
+    Node child, sibling;
     Operand dst;  // 一个表达式可能需要上层提供的目标地址, 值类型可能会将这个字段的值替换 [Feature]
     Operand label_true;
     Operand label_false;
-} node_t;
+};
 
-typedef node_t *Node;
-
-node_t *new_node(enum YYTNAME_INDEX type);
-void free_node(node_t *nd);
-void puts_tree(node_t *nd);
-void analyze_program(node_t *program);
+Node new_node(enum YYTNAME_INDEX type);
+void free_node(Node nd);
+void puts_tree(Node nd);
+void analyze_program(Node program);
 
 #endif // NODE_H

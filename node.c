@@ -12,8 +12,8 @@ extern int is_check_return;
 //
 // node constructor, wrapping some initialization
 //
-node_t *new_node(enum YYTNAME_INDEX type) {
-    node_t *p = (node_t *)malloc(sizeof(node_t));
+Node new_node(enum YYTNAME_INDEX type) {
+    Node p = (Node)malloc(sizeof(struct Node_));
     memset(p, 0, sizeof(*p));
     p->type = type;
     return p;
@@ -25,7 +25,7 @@ node_t *new_node(enum YYTNAME_INDEX type) {
 // the string is stored in the string table
 // don't free them here.
 //
-void free_node(node_t *nd) {
+void free_node(Node nd) {
     if (nd == NULL) {
         return;
     }
@@ -39,7 +39,7 @@ void free_node(node_t *nd) {
 // print the content of this node, indented according to level
 // then print the child and sibling recursively in the newline
 //
-void midorder(node_t *nd, int level) {
+void midorder(Node nd, int level) {
     if (nd == NULL) {
         return;
     }
@@ -77,7 +77,7 @@ void midorder(node_t *nd, int level) {
 //
 // Print the ast of the program
 //
-void puts_tree(node_t *nd) {
+void puts_tree(Node nd) {
     midorder(nd, 0);
 }
 
@@ -98,17 +98,17 @@ fprintf(stderr, "Error type %d at Line %d: " fmt "\n", type, lineno, ## __VA_ARG
 //
 // Some pre-declaration
 //
-Type * analyze_specifier(const node_t *);     // required by analyze_[def|paramdec|extdef]
-Type *analyze_exp(node_t *exp, int scope);    // required by check_param_lsit, analyze_vardec
-Type *analyze_compst(node_t *, Type *, int);  // required by analyze_stmt
+Type * analyze_specifier(const Node );     // required by analyze_[def|paramdec|extdef]
+Type *analyze_exp(Node exp, int scope);    // required by check_param_lsit, analyze_vardec
+Type *analyze_compst(Node , Type *, int);  // required by analyze_stmt
 
 
-var_t analyze_vardec(node_t *vardec, Type *inh_type) {
+var_t analyze_vardec(Node vardec, Type *inh_type) {
     assert(vardec->type == YY_VarDec);
 
     if (vardec->child->type == YY_ID) {
         // Identifier
-        node_t *id = vardec->child;
+        Node id = vardec->child;
         var_t return_attr = { inh_type, id->lineno, id->val.s };
         return return_attr;
     } else if (vardec->child->type == YY_VarDec) {
@@ -117,7 +117,7 @@ var_t analyze_vardec(node_t *vardec, Type *inh_type) {
         // It should be a base type of the prior vardec, so we generate
         // a new array type first, and pass it as an inherit attribute
         // to the sub vardec.
-        node_t *sub_vardec = vardec->child;
+        Node sub_vardec = vardec->child;
         Type *temp_array = new_type(CMM_ARRAY, NULL, inh_type, NULL);
         temp_array->size = sub_vardec->sibling->sibling->val.i;
         temp_array->type_size = temp_array->size * inh_type->type_size;
@@ -130,10 +130,10 @@ var_t analyze_vardec(node_t *vardec, Type *inh_type) {
 
 
 // next comes from the declist behind
-var_t analyze_dec(node_t *dec, Type *type, int scope) {
+var_t analyze_dec(Node dec, Type *type, int scope) {
     assert(dec->type == YY_Dec);
 
-    node_t *vardec = dec->child;
+    Node vardec = dec->child;
     var_t var = analyze_vardec(vardec, type);
 
     // TODO is field need insert symbol?
@@ -151,7 +151,7 @@ var_t analyze_dec(node_t *dec, Type *type, int scope) {
         if (scope == STRUCT_SCOPE) {  // Field does not allow assignment
             SEMA_ERROR_MSG(15, dec->lineno, "Initialization in the structure definition is not allowed");
         } else {  // Assignment consistency check
-            node_t *exp = vardec->sibling->sibling;
+            Node exp = vardec->sibling->sibling;
             const Type *exp_type = analyze_exp(exp, scope);
             if (!typecmp(exp_type, type)) {
                 SEMA_ERROR_MSG(5, vardec->sibling->lineno, "Type mismatch");
@@ -164,9 +164,9 @@ var_t analyze_dec(node_t *dec, Type *type, int scope) {
 
 
 // next comes from the deflist behind
-Type *analyze_declist(node_t *declist, Type *type, int scope) {
+Type *analyze_declist(Node declist, Type *type, int scope) {
     assert(declist->type == YY_DecList);
-    node_t *dec = declist->child;
+    Node dec = declist->child;
 
     // Analyze the dec first in order to have a right symbol registering sequence.
     var_t var = analyze_dec(dec, type, scope);
@@ -178,7 +178,7 @@ Type *analyze_declist(node_t *declist, Type *type, int scope) {
     Type *next_field;
     if (dec->sibling != NULL) {
         // declist -> dec comma declist
-        node_t *sub_list = dec->sibling->sibling;
+        Node sub_list = dec->sibling->sibling;
         next_field = analyze_declist(sub_list, type, scope);
     } else {
         next_field = NULL;
@@ -196,12 +196,12 @@ Type *analyze_declist(node_t *declist, Type *type, int scope) {
 
 
 // next comes from the deflist behind
-Type *analyze_def(node_t *def, int scope) {
+Type *analyze_def(Node def, int scope) {
     assert(def->type == YY_Def);
 
     // Get body symbols
-    node_t *spec = def->child;
-    node_t *declist = spec->sibling;
+    Node spec = def->child;
+    Node declist = spec->sibling;
 
     // Handle Specifier
     Type *type = analyze_specifier(spec);
@@ -212,14 +212,14 @@ Type *analyze_def(node_t *def, int scope) {
 }
 
 
-Type *analyze_deflist(const node_t *deflist, int scope) {
+Type *analyze_deflist(const Node deflist, int scope) {
     assert(deflist->type == YY_DefList);
 
     // Resolve the first definition
-    node_t *def = deflist->child;
+    Node def = deflist->child;
     Type *field = analyze_def(def, scope);
     // Resolve the rest definitions if exists
-    node_t *sub_list = def->sibling;
+    Node sub_list = def->sibling;
     Type *sub_field = sub_list == NULL ? NULL : analyze_deflist(sub_list, scope);
 
     // If we are in a struct scope, these CmmField will be discarded.
@@ -238,10 +238,10 @@ Type *analyze_deflist(const node_t *deflist, int scope) {
 }
 
 
-Type *analyze_struct_spec(const node_t *struct_spec) {
+Type *analyze_struct_spec(const Node struct_spec) {
     assert(struct_spec->type == YY_StructSpecifier);
 
-    node_t *body = struct_spec->child->sibling;  // Jump tag 'struct'
+    Node body = struct_spec->child->sibling;  // Jump tag 'struct'
 
     //
     // Check whether this is a struct definition or declaration
@@ -250,7 +250,7 @@ Type *analyze_struct_spec(const node_t *struct_spec) {
         //
         // Declaration
         //
-        node_t *id = body->child;
+        Node id = body->child;
         sym_ent_t *ent = query(id->val.s, STRUCT_SCOPE);
         if (ent == NULL || ent->type->class != CMM_TYPE || ent->type->meta->class != CMM_STRUCT) {
             // The symbol is not found
@@ -336,7 +336,7 @@ Type *analyze_struct_spec(const node_t *struct_spec) {
 }
 
 
-Type * analyze_specifier(const node_t *specifier) {
+Type * analyze_specifier(const Node specifier) {
     if (specifier->child->type == YY_TYPE) {
         const char *type_name = specifier->child->val.s;
         if (!strcmp(type_name, BASIC_INT->name)) {
@@ -364,10 +364,10 @@ Type * analyze_specifier(const node_t *specifier) {
 // First we should analyze the VarList part. Because a parameter must follow a Specifier,
 // so we can avoid the hell of declist that inherits the same Specifier.
 // We can just register the parameter here.
-var_t analyze_paramdec(node_t *paramdec) {
+var_t analyze_paramdec(Node paramdec) {
     assert(paramdec->type == YY_ParamDec);
-    node_t *specifier = paramdec->child;
-    node_t *vardec = specifier->sibling;
+    Node specifier = paramdec->child;
+    Node vardec = specifier->sibling;
     Type *spec = analyze_specifier(specifier);
     var_t var = analyze_vardec(vardec, spec);
     int insert_ret = insert(var.name, var.type, paramdec->lineno, -1);
@@ -379,9 +379,9 @@ var_t analyze_paramdec(node_t *paramdec) {
 
 // Then we should link the paramdec's type up to form a param type list.
 // varlist should return a type of CmmParam, and the generation of CmmParam occurs here.
-Type *analyze_varlist(node_t *varlist) {
-    node_t *paramdec = varlist->child;
-    node_t *sub_varlist = paramdec->sibling == NULL ? NULL : paramdec->sibling->sibling;
+Type *analyze_varlist(Node varlist) {
+    Node paramdec = varlist->child;
+    Node sub_varlist = paramdec->sibling == NULL ? NULL : paramdec->sibling->sibling;
     assert(paramdec->type == YY_ParamDec);
     assert(sub_varlist == NULL || sub_varlist->type == YY_VarList);
 
@@ -396,10 +396,10 @@ Type *analyze_varlist(node_t *varlist) {
 //   FunDec -> ID LP VarList RP
 //   FunDec -> ID LP RP
 const char *
-analyze_fundec(node_t *fundec, Type *inh_type) {
+analyze_fundec(Node fundec, Type *inh_type) {
     assert(fundec->type == YY_FunDec);
-    node_t *id = fundec->child;
-    node_t *varlist = id->sibling->sibling;
+    Node id = fundec->child;
+    Node varlist = id->sibling->sibling;
 
     // Get identifier
     const char *name = id->val.s;
@@ -424,10 +424,10 @@ analyze_fundec(node_t *fundec, Type *inh_type) {
 }
 
 
-void analyze_extdeclist(node_t *extdeclist, Type *inh_type) {
+void analyze_extdeclist(Node extdeclist, Type *inh_type) {
     assert(extdeclist->type == YY_ExtDecList);
 
-    node_t *vardec = extdeclist->child;
+    Node vardec = extdeclist->child;
     assert(vardec->type == YY_VarDec);
     var_t var_attr = analyze_vardec(vardec, inh_type);
     if (insert(var_attr.name, var_attr.type, vardec->lineno, -1) < 0) {
@@ -445,7 +445,7 @@ void analyze_extdeclist(node_t *extdeclist, Type *inh_type) {
 // exp only return its type.
 // We use stmt analyzer to check the return type.
 //
-static inline int is_lval(const node_t *exp)
+static inline int is_lval(const Node exp)
 {
     assert(exp != NULL && exp->type == YY_Exp);
 
@@ -460,13 +460,13 @@ static inline int is_lval(const node_t *exp)
     }
     else 
     {
-        node_t *follow = exp->child->sibling;
+        Node follow = exp->child->sibling;
         return (follow != NULL && (follow->type == YY_LB || follow->type == YY_DOT));
     }
 }
 
 
-static int check_param_list(const Type *param, node_t *args, int scope) {
+static int check_param_list(const Type *param, Node args, int scope) {
     if (param == NULL && args->type == YY_RP) {
         return 1;
     } else if ((param == NULL && args->type != YY_RP) ||
@@ -475,7 +475,7 @@ static int check_param_list(const Type *param, node_t *args, int scope) {
         return 0;
     } else {
         assert(args->type == YY_Args);
-        node_t *arg = NULL;
+        Node arg = NULL;
         while (param != NULL) {
             arg = args->child;
             const Type *param_type = analyze_exp(arg, scope);
@@ -500,12 +500,12 @@ static int check_param_list(const Type *param, node_t *args, int scope) {
     }
 }
 
-const char *expr_to_s(node_t *exp);
+const char *expr_to_s(Node exp);
 // TODO Split this bulk function!
-Type *analyze_exp(node_t *exp, int scope) {
+Type *analyze_exp(Node exp, int scope) {
     assert(exp->type == YY_Exp);
 
-    node_t *id, *lexp, *rexp, *op;
+    Node id, lexp, rexp, op;
     Type *lexp_type = NULL, *rexp_type = NULL;
     sym_ent_t *query_result = NULL;
     switch (exp->child->type) {
@@ -631,12 +631,12 @@ Type *analyze_exp(node_t *exp, int scope) {
 // it is just a router, and receives the type of the composite 
 // statement, which may contain a return statement.
 //
-Type *analyze_stmt(node_t *stmt, Type *inh_func_type, int scope) {
+Type *analyze_stmt(Node stmt, Type *inh_func_type, int scope) {
     assert(stmt->type == YY_Stmt);
 
-    node_t *first = stmt->child;
-    node_t *exp;
-    node_t *sub_stmt;
+    Node first = stmt->child;
+    Node exp;
+    Node sub_stmt;
     Type *cond_type;  // Used to check condition type
     Type *return_type = NULL;
     Type *else_return_type;
@@ -692,8 +692,8 @@ Type *analyze_stmt(node_t *stmt, Type *inh_func_type, int scope) {
 //
 // Traverse the stmtlist
 //
-Type *analyze_stmtlist(node_t *stmtlist, Type *inh_func_type, int scope) {
-    node_t *stmt = stmtlist->child;
+Type *analyze_stmtlist(Node stmtlist, Type *inh_func_type, int scope) {
+    Node stmt = stmtlist->child;
     Type *return_type = analyze_stmt(stmt, inh_func_type, scope);
     Type *sub_return_type;
     if (stmt->sibling != NULL) {
@@ -708,10 +708,10 @@ Type *analyze_stmtlist(node_t *stmtlist, Type *inh_func_type, int scope) {
 // Second level analyzer router : CompSt
 // Currently the scope has no thing to do with analysis
 //
-Type *analyze_compst(node_t *compst, Type *inh_func_type, int scope) {
+Type *analyze_compst(Node compst, Type *inh_func_type, int scope) {
     assert(compst->type == YY_CompSt);
 
-    node_t *list = compst->child->sibling;
+    Node list = compst->child->sibling;
 
     Type *return_type = NULL;
     while (list != NULL) {
@@ -734,10 +734,10 @@ Type *analyze_compst(node_t *compst, Type *inh_func_type, int scope) {
 //   ExtDef -> Specifier FunDec CompSt
 //   ExtDef -> Specifier SEMI
 //
-void analyze_extdef(node_t *extdef) {
+void analyze_extdef(Node extdef) {
     assert(extdef->type == YY_ExtDef);
 
-    node_t *spec = extdef->child;
+    Node spec = extdef->child;
     Type *type = analyze_specifier(spec);
     Type *return_type;
     const char *func_name;
@@ -761,8 +761,8 @@ void analyze_extdef(node_t *extdef) {
 }
 
 
-void analyze_program(node_t *prog) {
-    node_t *extdef = prog->child->child;
+void analyze_program(Node prog) {
+    Node extdef = prog->child->child;
     while (extdef != NULL) {
         analyze_extdef(extdef);
         if (extdef->sibling != NULL) {
@@ -775,7 +775,7 @@ void analyze_program(node_t *prog) {
 
 
 // TODO Split this ugly function!
-void print_expr(const node_t *nd, FILE *fp) {
+void print_expr(Node nd, FILE *fp) {
     if (nd == NULL) {
         return;
     }
@@ -784,7 +784,7 @@ void print_expr(const node_t *nd, FILE *fp) {
         if (nd->sibling == NULL) {
             return;
         }
-        const node_t *op = nd->sibling;
+        Node op = nd->sibling;
         switch (op->type) {
             case YY_ASSIGNOP: case YY_RELOP:
             case YY_AND: case YY_OR:
@@ -849,7 +849,7 @@ void print_expr(const node_t *nd, FILE *fp) {
 }
 
 
-const char *expr_to_s(node_t *exp) {
+const char *expr_to_s(Node exp) {
     static char *s = NULL;
 
     assert(exp->type == YY_Exp);

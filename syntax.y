@@ -17,7 +17,7 @@ extern int is_greedy;
 #include "lex.yy.c"
 
 #include <stdio.h>
-static node_t *prog;
+static Node prog;
 static union YYSTYPE *YYVSP = NULL;
 #define S(x) # x
 #define concat(x, y) x ## y
@@ -29,7 +29,7 @@ static union YYSTYPE *YYVSP = NULL;
     yyval.nd->lineno = yyloc.first_line;\
     yyval.nd->val.s = yytname[name(x)];\
     yyval.nd->child = yyvsp[1 - n].nd;\
-    node_t *cur = yyvsp[1 - n].nd;\
+    Node cur = yyvsp[1 - n].nd;\
     cur->sibling = NULL;\
     int i = 2;\
     while (i <= n) {\
@@ -46,7 +46,7 @@ static union YYSTYPE *YYVSP = NULL;
     yyval.nd->lineno = yyloc.first_line;\
     yyval.nd->val.s = yytname[name(x)];\
     yyval.nd->child = yyvsp[1 - n].nd;\
-    node_t *cur = yyvsp[1 - n].nd;\
+    Node cur = yyvsp[1 - n].nd;\
     if (cur == NULL) break;\
     cur->sibling = NULL;\
     int i = 2;\
@@ -74,13 +74,13 @@ static union YYSTYPE *YYVSP = NULL;
 // Pre-declaration
 //
 int yyerror(const char *msg);
-void midorder(node_t *, int);
+void midorder(Node, int);
 
 %}
 
 /* declared types */
 %union {
-    node_t *nd;
+    Node nd;
 }
 
 %token <nd>
@@ -307,8 +307,8 @@ void semantic_analysis() {
 //
 // 简化语法分析树
 //
-node_t *simplify_tree(const node_t *);
-node_t *ast_tree;
+Node simplify_tree(const Node);
+Node ast_tree;
 void simplify() {
     ast_tree = simplify_tree(prog);
 }

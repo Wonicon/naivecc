@@ -866,7 +866,7 @@ int translate_exp_is_const(Node nd) {
 }
 
 // 测试用函数
-extern node_t *ast_tree;
+extern Node ast_tree;
 void test_translate() {
     translate_ast(ast_tree);
     FILE *fp = fopen("test.ir", "w");
