@@ -5,7 +5,6 @@
 #include "translate.h"
 #include "ir.h"
 #include "cmm_symtab.h"
-#include "node.h"
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
@@ -390,6 +389,10 @@ int translate_cond_or(Node exp) {
 // 翻译下标表达式
 //
 int translate_exp_is_exp_idx(Node exp) {
+    if (exp->dst == NULL) {
+        return NO_NEED_TO_GEN;
+    }
+
     Node base = exp->child;
     Node idx = base->sibling;
 
@@ -412,7 +415,7 @@ int translate_exp_is_exp_idx(Node exp) {
     if (offset->type == OPE_INTEGER) {
         offset->integer = offset->integer * size;
     } else {
-        Operand p = new_operand(OPE_TEMP);
+        Operand p = new_operand(OPE_ADDR);
         Operand array_size = new_operand(OPE_INTEGER);
         array_size->integer = size;
         new_instr(IR_MUL, offset, array_size, p);
@@ -421,17 +424,31 @@ int translate_exp_is_exp_idx(Node exp) {
 
     // 计算总偏移
     if (ref->offset->type == OPE_INTEGER && offset->type == OPE_INTEGER) {
-        offset->integer = offset->integer + base->dst->offset->integer;
+        LOG("Line %d: 地址偏移为常数, 直接计算, %d + %d = %d",
+            exp->lineno,
+            ref->offset->integer,
+            offset->integer,
+            ref->offset->integer + offset->integer
+        );
+        ref->offset->integer = offset->integer + ref->offset->integer;
+        free(offset);
+    } else if (ref->offset->type == OPE_INTEGER && ref->offset->integer == 0) {
+        LOG("Line %d: 旧偏移量为常数0, 直接更新", exp->lineno);
+        free(ref->offset);
+        ref->offset = offset;
+    } else if (offset->type == OPE_INTEGER && offset->integer == 0) {
+        LOG("Line %d: 新增偏移量为常数0, 什么都不做", exp->lineno);
+        // Do nothing
     } else {
-        Operand p = new_operand(OPE_TEMP);
+        Operand p = new_operand(OPE_ADDR);
         new_instr(IR_ADD, offset, ref->offset, p);
-        offset = p;  // 再转移本层偏移量
+        ref->offset = p;  // 再转移本层偏移量
     }
 
     // 现在我们就有了完整的偏移量
     if (exp->dst->type == OPE_DEREF) {
         // 说明在下标翻译过程中
-        ref->offset = offset;
+        LOG("下标递归翻译中");
         ref->sub_type = ref->sub_type->base;
         exp->dst = ref;
         return MULTI_INSTR;
@@ -445,12 +462,13 @@ int translate_exp_is_exp_idx(Node exp) {
         exp->dst = NULL;
     }
 
-    if (offset->type == OPE_INTEGER && offset->integer == 0) {
-        exp->dst = ref->type == OPE_REF ? ref->_inline : ref;  // 区分变量数组和参数数组
+    if (ref->offset->type == OPE_INTEGER && ref->offset->integer == 0) {
+        LOG("Line %d: 引用类型首元素优化", exp->lineno);
+        exp->dst = (ref->type == OPE_REF) ? ref->_inline : ref;  // 区分变量数组和参数数组
     } else {
         // 要生成加法指令
         exp->dst = new_operand(OPE_ADDR);
-        new_instr(IR_ADD, ref, offset, exp->dst);
+        new_instr(IR_ADD, ref, ref->offset, exp->dst);
     }
     return 0;
 }
@@ -743,7 +761,7 @@ int translate_exp_is_assign(Node assign_exp) {
 
     // [优化] 当左值为变量而右值为运算指令时, 将右值的目标操作数转化为变量
     if (lexp->dst->type == OPE_VAR && rexp->dst->type == OPE_TEMP) {
-        LOG("(优化)左值为变量(编号%d), 直接赋值", lexp->dst->index);
+        LOG("左值为变量(编号%d), 直接赋值", lexp->dst->index);
         rexp->dst->type = OPE_VAR;
         rexp->dst->index = lexp->dst->index;
         return NO_NEED_TO_GEN;
@@ -755,6 +773,7 @@ int translate_exp_is_assign(Node assign_exp) {
 // 内联解引用, 如果算出结果是地址, 那么可以直接在指令中解引用
 void try_deref(Node exp) {
     if (exp->dst->type == OPE_ADDR) {
+        LOG("Line %d: 内联解引用", exp->lineno);
         exp->dst = exp->dst->_inline;
     }
 }
