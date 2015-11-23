@@ -157,7 +157,9 @@ void preprocess_ir();
 void print_block();
 void print_instr(FILE *file) {
     preprocess_ir();
+#ifdef DEBUG
     print_block();
+#endif
     for (int i = 0; i < nr_instr; i++) {
         print_single_instr(instr_buffer[i], file);
     }

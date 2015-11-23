@@ -12,7 +12,7 @@
 
 #define TASK_2
 
-enum TranslateState translate_state = FINE;
+TranslateState translate_state = FINE;
 
 // TODO 每个 Compst 在跳转指令生成前可以计算所有常量
 // TODO 左值解引用只能用在赋值操作中, 不能像 & 和右解引用那样随意嵌入
@@ -554,8 +554,8 @@ int translate_binary_operation(Node exp) {
     switch (exp->val.operator[0]) {
         case '+': return new_instr(IR_ADD, lope, rope, exp->dst);
         case '-': return new_instr(IR_SUB, lope, rope, exp->dst);
-        case '*': return new_instr(IR_DIV, lope, rope, exp->dst);
-        case '/': return new_instr(IR_MUL, lope, rope, exp->dst);
+        case '*': return new_instr(IR_MUL, lope, rope, exp->dst);
+        case '/': return new_instr(IR_DIV, lope, rope, exp->dst);
         default: assert(0);
     }
 }
@@ -852,6 +852,10 @@ extern node_t *ast_tree;
 void test_translate() {
     translate_ast(ast_tree);
     FILE *fp = fopen("test.ir", "w");
-    print_instr(fp);
+    if (translate_state == FINE) {
+        print_instr(fp);
+    } else {
+        fputs("Cannot translate: Code contains variables or parameters of structure type.", stderr);
+    }
     fclose(fp);
 }
