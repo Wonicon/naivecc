@@ -8,6 +8,19 @@
 #include <assert.h>
 
 #define NAME_LEN 4096
+
+typedef struct Block_ *Block;
+
+typedef struct Block_ {
+    int start;
+    int end;
+    Block *next_true;
+    Block *next_false;
+} Block_;
+
+static Block_ blk_buf[MAX_LINE];
+static int nr_blk;
+
 // 指令缓冲区
 static IR instr_buffer[MAX_LINE];
 
@@ -36,10 +49,6 @@ struct {
 //
 // 操作数构造函数
 //
-int new_variable();
-int new_temp();
-int new_addr();
-int new_lable();
 Operand new_operand(Ope_Type type) {
     static int nr_var = 0;
     static int nr_ref = 0;
@@ -51,9 +60,11 @@ Operand new_operand(Ope_Type type) {
     p->type = type;
     switch (type) {
         case OPE_VAR:
+            p->liveness = ALIVE;
             p->index = nr_var++;
             break;
         case OPE_REF:
+            p->liveness = ALIVE;
             p->index = nr_ref++;
             p->_inline = new_operand(OPE_INITIAL);
             p->_inline->index = p->index;
@@ -69,7 +80,11 @@ Operand new_operand(Ope_Type type) {
             p->_inline->_inline = p;
             break;
         case OPE_LABEL:
+            p->liveness = 1;
             p->label = nr_label++;
+            break;
+        case OPE_FUNC:
+            p->liveness = 1;
             break;
         default:
             break;
@@ -331,6 +346,16 @@ void preprocess_ir() {
         pIR++;
     }
 
+    // 第一次压缩
+    for (int i = 0; i < nr_instr; i++) {
+        if (instr_buffer[i].type == IR_NOP) {
+            for (int j = i; j < nr_instr; j++) {
+                instr_buffer[j] = instr_buffer[j + 1];
+            }
+            nr_instr--;
+        }
+    }
+
     // 标签编号语义化
     pIR = &instr_buffer[0];
     for (int i = 0; i < nr_instr; i++) {
@@ -372,20 +397,71 @@ void preprocess_ir() {
 //
 int is_leader(int ir_idx) {
     return ir_idx == 0 ||
-           instr_buffer[ir_idx].type == IR_LABEL ||
-           can_jump(&instr_buffer[ir_idx - 1]);
+            instr_buffer[ir_idx].type == IR_LABEL ||
+            instr_buffer[ir_idx].type == IR_FUNC ||
+            can_jump(&instr_buffer[ir_idx - 1]);
+}
+
+int is_tmp(Operand ope) {
+    if (ope == NULL) {
+        return 0;
+    } else {
+        return ope->type == OPE_ADDR ||
+                ope->type == OPE_TEMP ||
+                ope->type == OPE_DEREF;
+    }
 }
 
 //
 // 划分基本块
 //
 void block_partition() {
-    int block_num = 0;
+    nr_blk = 0;
     for (int i = 0; i < nr_instr; i++) {
         if (is_leader(i)) {
-            block_num++;
+            blk_buf[nr_blk].start = i;
+            if (nr_blk > 0) {
+                blk_buf[nr_blk - 1].end = i;
+            }
+            nr_blk++;
         }
-        instr_buffer[i].block = block_num;
+        instr_buffer[i].block = nr_blk;
+    }
+    blk_buf[nr_blk - 1].end = nr_instr;
+}
+
+//
+// 分析基本块: 活跃性分析
+// end 不可取
+//
+Operand origin(Operand ope) {
+    if (ope->type == OPE_DEREF) return ope->_inline;
+    return ope;
+}
+
+void optimize_liveness(int start, int end) {
+    for (int i = end - 1; i >= start; i--) {
+        IR *ir = &instr_buffer[i];
+
+        // 保存当前状态
+        for (int k = 0; k < NR_OPE; k++) {
+            if (ir->operand[k]) {
+                ir->info[k].liveness = origin(ir->operand[k])->liveness;
+                ir->info[k].next_use = origin(ir->operand[k])->next_use;
+            }
+        }
+
+        if (ir->rd && is_tmp(ir->rd)) {
+            ir->rd->liveness = DISALIVE;
+            ir->rd->next_use = NO_USE;
+        }
+
+        for (int k = 0; k < NR_OPE; k++) {
+            if (k != RD_IDX && ir->operand[k] && is_tmp(ir->operand[k])) {
+                origin(ir->operand[k])->liveness = ALIVE;
+                origin(ir->operand[k])->next_use = i;
+            }
+        }
     }
 }
 
@@ -394,6 +470,10 @@ void block_partition() {
 //
 void print_block() {
     block_partition();
+
+    for (int i = 0; i < nr_blk; i++) {
+        optimize_liveness(blk_buf[i].start, blk_buf[i].end);
+    }
 
     int current_block = 0;
 
@@ -411,5 +491,11 @@ void print_block() {
             printf("%s%s%*s\n", head, num_buf, tail_len - num_len, tail);
         }
         print_single_instr(instr_buffer[i], stdout);
+        for (int j = 0; j < NR_OPE; j++) {
+            if (pIR->operand[j]) {
+                printf("%d ", pIR->info[j].liveness);
+            }
+        }
+        printf("\n");
     }
 }

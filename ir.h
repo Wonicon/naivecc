@@ -66,6 +66,11 @@ struct Operand_ {
 
     // OPE_LABEL
     int label_ref_cnt; // Label 作为跳转目标的引用次数, 在删除 GOTO 或者翻转 BRANCH 后, 如果引用计数归零, 可以删除
+
+    // 代码优化相关
+    int liveness;      // 标记变量的活跃性, VAR和REF型变量一直活跃. 临时和地址初始不活跃
+                       // TODO 这里有一个假设, 即中间代码使用的临时变量不会跨越基本块
+    int next_use;      // 标记下一条需要该操作数的指令编号
 };
 
 typedef enum {
@@ -106,12 +111,36 @@ typedef enum {
     IR_READ,
     IR_WRITE,
 } IR_Type;
+
+typedef struct {
+    int liveness;
+    int next_use;
+} OptimizeInfo;
+
+#define NR_OPE 3
+#define RD_IDX 0
+#define DISALIVE 0
+#define ALIVE 1
+#define NO_USE -1
 typedef struct {
     IR_Type type;
-    Operand rs;      // 第一源操作数
-    Operand rt;      // 第二源操作数
-    Operand rd;      // 目的操作数
+    union {
+        struct {
+            Operand rd;      // 目的操作数
+            Operand rs;      // 第一源操作数
+            Operand rt;      // 第二源操作数
+        };
+        Operand operand[NR_OPE];
+    };
     int block;
+    union {
+        struct {
+            OptimizeInfo rd_info;
+            OptimizeInfo rs_info;
+            OptimizeInfo rt_info;
+        };
+        OptimizeInfo info[NR_OPE];
+    };
 } IR;
 
 #include "node.h"
