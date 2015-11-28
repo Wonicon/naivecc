@@ -472,8 +472,11 @@ int translate_exp_is_exp_idx(Node exp) {
 
     if (ref_info->offset->type == OPE_INTEGER && ref_info->offset->integer == 0) {
         LOG("line %d: 计算出引用偏移量为 0, 不生成加法指令", exp->lineno);
-        exp->dst = ref_info->ref;  // 区分变量数组和参数数组
+        exp->dst = new_operand(ref_info->ref->type);  // 区分变量数组和参数数组
         exp->dst->base_type = ref_info->base_type->base;  // 多维数组
+        new_instr(IR_ASSIGN, ref_info->ref, NULL, exp->dst);  // 这个赋值是冗余的, 但是方便传递递归的类型信息,
+                                                              // 否则容易改动到全局变量的address的类型信息.
+                                                              // 这个在DAG中很容易消除.
     } else {
         // 要生成加法指令
         exp->dst = new_operand(OPE_ADDR);

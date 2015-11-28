@@ -47,33 +47,44 @@ DagNode new_dagnode(IR_Type ir_type, DagNode left, DagNode right)
 int cmp_dag_node(DagNode first, DagNode second)
 {
     if (first == NULL && second == NULL) {
-        return 1;
+        return true;
     } else if (first == NULL || second == NULL) {
-        return 0;
+        return false;
     }
 
-    if (first->type == second->type) {
-        if (first->type == DAG_OP) {
-            return first->op.ir_type == second->op.ir_type &&
-                   cmp_dag_node(first->op.left, second->op.left) && cmp_dag_node(first->op.right, second->op.right);
-        } else if (first->type== DAG_LEAF) {
-            Operand left = first->leaf.initial_value;
-            Operand right = second->leaf.initial_value;
-            if (left->type == right->type) {
-                switch (left->type) {
-                    case OPE_INTEGER: return left->integer == right->integer;
-                    case OPE_FLOAT: return left->real == right->real;
-                    default: return left == right;
-                }
-            } else {
-                return 0;
+    if (first->type != second->type) {
+        return false;
+    }
+
+    if (first->type == DAG_OP) {
+        if (first->op.ir_type != second->op.ir_type) {
+            return false;
+        }
+
+        if (cmp_dag_node(first->op.left, second->op.left) && cmp_dag_node(first->op.right, second->op.right)) {
+                return true;
+        }
+
+        // 交换律
+        if (first->op.ir_type == IR_ADD || first->op.ir_type == IR_MUL) {
+            return cmp_dag_node(first->op.left, second->op.right) && cmp_dag_node(first->op.right, second->op.left);
+        }
+
+        return false;
+    } else if (first->type== DAG_LEAF) {
+        Operand left = first->leaf.initial_value;
+        Operand right = second->leaf.initial_value;
+        if (left->type == right->type) {
+            switch (left->type) {
+                case OPE_INTEGER: return left->integer == right->integer;
+                case OPE_FLOAT: return left->real == right->real;
+                default: return left == right;
             }
         } else {
-            return 0;
+            return false;
         }
-    } else {
-        return 0;
     }
+    return false;
 }
 
 //

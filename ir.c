@@ -488,9 +488,16 @@ static void gen_dag_from_instr(IR *pIR)
     }
 
     if (rd) {
-        rd->dep = query_dag_node(pIR->type, rs ? rs->dep : NULL, rt ? rt->dep : NULL);
-        if (rd->dep->op.embody == NULL) {
-            rd->dep->op.embody = rd;
+        if (pIR->type == IR_ASSIGN && rs && (rs->type == OPE_VAR || rs->type == OPE_ADDR)) {
+            LOG("赋值语句, 传递依赖");
+            rd->dep = rs->dep;
+        } else {
+            rd->dep = query_dag_node(pIR->type, rs ? rs->dep : NULL, rt ? rt->dep : NULL);
+            if (rd->dep->op.embody == NULL) {
+                rd->dep->op.embody = rd;
+            } else {
+                LOG("已经有代表操作数");
+            }
         }
     }
 }
@@ -537,7 +544,9 @@ void gen_from_dag(int start, int end)
         if (p->rd) {
             gen_from_dag_(p->rd->dep);
             if (p->rd->type == OPE_VAR && p->rd->dep->op.embody != p->rd) {  // 变量出口活跃!?
-                new_instr_(&ir_from_dag[nr_ir_from_dag++], IR_ASSIGN, p->rd->dep->op.embody, NULL, p->rd);
+                new_instr_(&ir_from_dag[nr_ir_from_dag++], IR_ASSIGN,
+                           p->rd->dep->type == DAG_LEAF ? p->rd->dep->leaf.initial_value : p->rd->dep->op.embody,
+                           NULL, p->rd);
             }
         } else {
             new_instr_(&ir_from_dag[nr_ir_from_dag++],
