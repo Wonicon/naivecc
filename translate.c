@@ -473,9 +473,11 @@ int translate_exp_is_exp_idx(Node exp) {
     if (ref_info->offset->type == OPE_INTEGER && ref_info->offset->integer == 0) {
         LOG("line %d: 计算出引用偏移量为 0, 不生成加法指令", exp->lineno);
         exp->dst = ref_info->ref;  // 区分变量数组和参数数组
+        exp->dst->base_type = ref_info->base_type->base;  // 多维数组
     } else {
         // 要生成加法指令
         exp->dst = new_operand(OPE_ADDR);
+        exp->dst->base_type = ref_info->base_type->base;  // 多维数组
         new_instr(IR_ADD, ref_info->ref, ref_info->offset, exp->dst);
     }
 
@@ -770,7 +772,7 @@ int translate_exp_is_assign(Node assign_exp) {
         replace_operand_global(lexp->dst, rexp->dst);
         return NO_NEED_TO_GEN;
     } else if (lexp->dst->type == OPE_ADDR) {   // 左边是引用
-        return new_instr(IR_DEREF_L, rexp->dst, NULL, lexp->dst);
+        return new_instr(IR_DEREF_L, lexp->dst, rexp->dst, NULL);
     } else {
         LOG("直接的赋值情况应该不会发生了");
         return new_instr(IR_ASSIGN, rexp->dst, NULL, lexp->dst);

@@ -9,6 +9,7 @@
 
 #include "dag.h"
 #include <stdlib.h>
+#include <string.h>
 #include <assert.h>
 
 #define MAX 2048
@@ -20,15 +21,12 @@ void init_dag()
     nr_dag_node = 0;
 }
 
-DagNode new_leaf(Operand ope)
+DagNode  new_leaf(Operand ope)
 {
     DagNode p = (DagNode)malloc(sizeof(*p));
-    // TODO 解引用信息还原!
-    if (ope->type == OPE_DEREF) {
-    } else {
-        p->leaf.initial_value = ope;
-    }
+    memset(p, 0, sizeof(*p));
     p->type = DAG_LEAF;
+    p->leaf.initial_value = ope;
     dag_buf[nr_dag_node++] = p;
     return p;
 }
@@ -36,6 +34,8 @@ DagNode new_leaf(Operand ope)
 DagNode new_dagnode(IR_Type ir_type, DagNode left, DagNode right)
 {
     DagNode p = (DagNode)malloc(sizeof(*p));
+    assert(p != left && p != right);
+    memset(p, 0, sizeof(*p));
     p->op.ir_type = ir_type;
     p->op.left = left;
     p->op.right = right;
@@ -46,8 +46,12 @@ DagNode new_dagnode(IR_Type ir_type, DagNode left, DagNode right)
 
 int cmp_dag_node(DagNode first, DagNode second)
 {
-    assert(first);
-    assert(second);
+    if (first == NULL && second == NULL) {
+        return 1;
+    } else if (first == NULL || second == NULL) {
+        return 0;
+    }
+
     if (first->type == second->type) {
         if (first->type == DAG_OP) {
             return first->op.ir_type == second->op.ir_type &&
@@ -67,7 +71,6 @@ int cmp_dag_node(DagNode first, DagNode second)
         } else {
             return 0;
         }
-
     } else {
         return 0;
     }
@@ -76,10 +79,14 @@ int cmp_dag_node(DagNode first, DagNode second)
 //
 // 查找 (op, left, right) 三元组, 没有的话新建该结点
 //
+void print_dag_(DagNode dag, int level);
+int count = 0;
 DagNode query_dag_node(IR_Type ir_type, DagNode left, DagNode right)
 {
+    count++;
     DagNode p = new_dagnode(ir_type, left, right);
     for (int i = nr_dag_node - 2; i >= 0; i--) {  // 回避新建的该结点
+        LOG("比较第%d个DAG结点", i + 1);
         if (cmp_dag_node(dag_buf[i], p)) {
             LOG("发现公共子表达式");
             free(p);
@@ -94,7 +101,7 @@ DagNode query_dag_node(IR_Type ir_type, DagNode left, DagNode right)
 // 测试打印
 //
 void print_operand(Operand ope, char *str);
-static void print_dag_(DagNode dag, int level)
+void print_dag_(DagNode dag, int level)
 {
     if (dag == NULL) {
         return;

@@ -141,7 +141,7 @@ static const char *ir_format[] = {
     "%s := %s / %s",        // DIV
     "%s := &%s",            // ADDR
     "%s := *%s",            // DEREF_R
-    "*%s := %s",            // DEREF_L
+    "%s*%s := %s",          // DEREF_L, 虽然地址在左边, 但是是参数
     "%sGOTO %s",            // JMP
     "IF %s == %s GOTO %s",  // BEQ
     "IF %s < %s GOTO %s",   // BLT
@@ -249,8 +249,19 @@ int is_branch(IR *pIR) {
 
 //
 // 检查是否为跳转类指令
-int can_jump(IR *pIR) {
-    return pIR->type == IR_JMP || is_branch(pIR) || pIR->type == IR_CALL;
+bool can_jump(IR *pIR) {
+    if (is_branch(pIR)) {
+        return true;
+    } else {
+        switch (pIR->type) {
+            case IR_JMP:
+            case IR_CALL:
+            case IR_WRITE:
+                return true;
+            default:
+                return false;
+        }
+    }
 }
 
 //
@@ -398,6 +409,7 @@ int is_leader(int ir_idx) {
     return ir_idx == 0 ||
             instr_buffer[ir_idx].type == IR_LABEL ||
             instr_buffer[ir_idx].type == IR_FUNC ||
+            instr_buffer[ir_idx].type == IR_READ ||
             can_jump(&instr_buffer[ir_idx - 1]);
 }
 
@@ -433,10 +445,6 @@ void block_partition() {
 // 分析基本块: 活跃性分析
 // end 不可取
 //
-Operand origin(Operand ope) {
-    return ope;
-}
-
 void optimize_liveness(int start, int end) {
     for (int i = end - 1; i >= start; i--) {
         IR *ir = &instr_buffer[i];
@@ -444,8 +452,8 @@ void optimize_liveness(int start, int end) {
         // 保存当前状态
         for (int k = 0; k < NR_OPE; k++) {
             if (ir->operand[k]) {
-                ir->info[k].liveness = origin(ir->operand[k])->liveness;
-                ir->info[k].next_use = origin(ir->operand[k])->next_use;
+                ir->info[k].liveness = ir->operand[k]->liveness;
+                ir->info[k].next_use = ir->operand[k]->next_use;
             }
         }
 
@@ -456,8 +464,8 @@ void optimize_liveness(int start, int end) {
 
         for (int k = 0; k < NR_OPE; k++) {
             if (k != RD_IDX && ir->operand[k] && is_tmp(ir->operand[k])) {
-                origin(ir->operand[k])->liveness = ALIVE;
-                origin(ir->operand[k])->next_use = i;
+                ir->operand[k]->liveness = ALIVE;
+                ir->operand[k]->next_use = i;
             }
         }
     }
@@ -470,11 +478,11 @@ static void gen_dag_from_instr(IR *pIR)
     Operand rs = pIR->rs;
     Operand rt = pIR->rt;
     Operand rd = pIR->rd;
-    if (rs && !origin(rs)->dep) {
+    if (rs && !rs->dep) {
         LOG("rs新建叶子");
         rs->dep = new_leaf(rs);
     }
-    if (rt && !origin(rt)->dep) {
+    if (rt && !rt->dep) {
         LOG("rt新建叶子");
         rt->dep = new_leaf(rt);
     }
@@ -487,22 +495,20 @@ static void gen_dag_from_instr(IR *pIR)
     }
 }
 
-void gen_dag(int start, int end)
-{
-    init_dag();
-    for (int i = start; i < end; i++) {
-        if (can_jump(&instr_buffer[i])) {
-            break;
-        }
-        gen_dag_from_instr(&instr_buffer[i]);
-    }
-    print_dag();
-}
-
 IR ir_from_dag[128];
 int nr_ir_from_dag = 0;
 extern DagNode dag_buf[];
 extern int nr_dag_node;
+
+void gen_dag(int start, int end)
+{
+    init_dag();
+    for (int i = start; i < end; i++) {
+        gen_dag_from_instr(&instr_buffer[i]);
+    }
+    //print_dag();
+}
+
 int new_dag_ir(IR_Type type, Operand rs, Operand rt, Operand rd)
 {
     new_instr_(&ir_from_dag[nr_ir_from_dag], type, rs, rt, rd);
@@ -514,12 +520,11 @@ Operand gen_from_dag_(DagNode dag)
     if (dag == NULL) {
         return NULL;
     } else if (dag->type == DAG_LEAF) {
-        return dag->leaf.initial_value;
+        return dag->leaf.initial_value;  // 叶结点用于返回初始值
     } else if (dag->type == DAG_OP && !dag->op.has_gen) {
-        // TODO 解引用信息!
         new_dag_ir(dag->op.ir_type, gen_from_dag_(dag->op.left), gen_from_dag_(dag->op.right), dag->op.embody);
-        dag->op.has_gen = 1;
-        return dag->op.embody;
+        dag->op.has_gen = 1;  // 防止重复生成
+        return dag->op.embody;  // 使用统一的代表操作数, 提供后续优化机会
     } else {
         return dag->op.embody;
     }
@@ -527,15 +532,39 @@ Operand gen_from_dag_(DagNode dag)
 
 void gen_from_dag(int start, int end)
 {
-    for (int i = end - 1; i >= start; i--) {
+    for (int i = start; i < end; i++) {
         IR *p = &instr_buffer[i];
-        if (!can_jump(p) && p->rd) {
+        if (p->rd) {
             gen_from_dag_(p->rd->dep);
+            if (p->rd->type == OPE_VAR && p->rd->dep->op.embody != p->rd) {  // 变量出口活跃!?
+                new_instr_(&ir_from_dag[nr_ir_from_dag++], IR_ASSIGN, p->rd->dep->op.embody, NULL, p->rd);
+            }
+        } else {
+            new_instr_(&ir_from_dag[nr_ir_from_dag++],
+                       p->type,
+                       p->rs ? gen_from_dag_(p->rs->dep) : NULL,
+                       p->rt ? gen_from_dag_(p->rt->dep) : NULL,
+                       NULL);
         }
     }
 
+    FILE *fp = fopen("dag.ir", "w");
     for (int i = 0; i < nr_ir_from_dag; i++) {
-        print_single_instr(ir_from_dag[i], stdout);
+        print_single_instr(ir_from_dag[i], fp);
+    }
+    fclose(fp);
+
+    for (int i = start; i < end; i++) {
+        IR *p = &instr_buffer[i];
+        for (int j = 0; j < 3; j++) {
+            if (p->operand[j]) {
+                p->operand[j]->dep = NULL;
+            }
+        }
+    }
+    for (int i = 0; i < nr_dag_node; i++) {
+        free(dag_buf[i]);
+        dag_buf[i] = NULL;
     }
 }
 
@@ -543,14 +572,14 @@ void gen_from_dag(int start, int end)
 // 打印基本块
 //
 void print_block() {
-    //block_partition();
+    block_partition();
 
     for (int i = 0; i < nr_blk; i++) {
-        //optimize_liveness(blk_buf[i].start, blk_buf[i].end);
-        //gen_dag(blk_buf[i].start, blk_buf[i].end);
-        //gen_from_dag(blk_buf[i].start, blk_buf[i].end);
+        optimize_liveness(blk_buf[i].start, blk_buf[i].end);
+        gen_dag(blk_buf[i].start, blk_buf[i].end);
+        gen_from_dag(blk_buf[i].start, blk_buf[i].end);
     }
-#if 0
+#if 1
     int current_block = 0;
 
     int num_buf_sz = 16;
@@ -567,12 +596,14 @@ void print_block() {
             printf("%s%s%*s\n", head, num_buf, tail_len - num_len, tail);
         }
         print_single_instr(instr_buffer[i], stdout);
+#if 0
         for (int j = 0; j < NR_OPE; j++) {
             if (pIR->operand[j]) {
                 printf("%d ", pIR->info[j].liveness);
             }
         }
         printf("\n");
+#endif
     }
 #endif
 }
