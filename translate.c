@@ -176,6 +176,11 @@ static void pass_arg(Node arg) {
     if (p->base_type && p->base_type->class == CMM_ARRAY) {
         // 按照测试样例, 数组要传地址
         LOG("传参: 数组引用");
+        assert(p->type == OPE_REF || p->type == OPE_ADDR);
+        if (p->type == OPE_REF) {
+            arg->child->dst = new_operand(OPE_ADDR);
+            new_instr(IR_ADDR, p, NULL, arg->child->dst);
+        }
     } else {
         try_deref(arg->child);
     }
