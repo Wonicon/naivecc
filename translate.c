@@ -176,12 +176,10 @@ static void pass_arg(Node arg) {
     if (p->base_type && p->base_type->class == CMM_ARRAY) {
         // 按照测试样例, 数组要传地址
         LOG("传参: 数组引用");
-        p->type = OPE_REF;
     } else {
         try_deref(arg->child);
     }
     new_instr(IR_ARG, arg->child->dst, NULL, NULL);
-
 }
 
 int translate_call(Node call) {
@@ -677,6 +675,7 @@ int translate_dec_is_vardec(Node dec) {
         if (vardec->sibling != NULL) {  // 有初始化语句
             LOG("初始化");
             vardec->sibling->dst = new_operand(OPE_TEMP);
+#if 0
             int ret = translate_dispatcher(vardec->sibling);
             if (ret != NO_NEED_TO_GEN) {
                 replace_operand_global(sym->address, vardec->sibling->dst);
@@ -684,6 +683,11 @@ int translate_dec_is_vardec(Node dec) {
             } else {
                 return new_instr(IR_ASSIGN, vardec->sibling->dst, NULL, sym->address);
             }
+#else
+            translate_dispatcher(vardec->sibling);
+            try_deref(vardec->sibling);
+            return new_instr(IR_ASSIGN, vardec->sibling->dst, NULL, sym->address);
+#endif
         }
         return NO_NEED_TO_GEN;
     }
