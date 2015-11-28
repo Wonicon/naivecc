@@ -47,6 +47,12 @@ struct {
 };
 #define LENGTH(x) (sizeof(x) / sizeof(*x))
 
+IR ir_from_dag[128];
+int nr_ir_from_dag = 0;
+extern DagNode dag_buf[];
+extern int nr_dag_node;
+
+
 //
 // 操作数构造函数
 //
@@ -186,7 +192,9 @@ void print_single_instr(IR instr, FILE *file) {
 //
 void preprocess_ir();
 void print_block();
-void print_instr(FILE *file) {
+void inline_replace(IR buf[], int nr);
+void print_instr(FILE *file)
+{
     preprocess_ir();
 #ifdef DEBUG
     print_block();
@@ -194,6 +202,14 @@ void print_instr(FILE *file) {
     for (int i = 0; i < nr_instr; i++) {
         print_single_instr(instr_buffer[i], file);
     }
+
+    inline_replace(ir_from_dag, nr_ir_from_dag);
+
+    FILE *fp = fopen("dag.ir", "w");
+    for (int i = 0; i < nr_ir_from_dag; i++) {
+        print_single_instr(ir_from_dag[i], fp);
+    }
+    fclose(fp);
 }
 
 //
@@ -488,7 +504,7 @@ static void gen_dag_from_instr(IR *pIR)
     }
 
     if (rd) {
-        if (pIR->type == IR_ASSIGN && rs && (rs->type == OPE_VAR || rs->type == OPE_ADDR)) {
+        if (pIR->type == IR_ASSIGN && rs) {
             LOG("赋值语句, 传递依赖");
             rd->dep = rs->dep;
         } else {
@@ -501,11 +517,6 @@ static void gen_dag_from_instr(IR *pIR)
         }
     }
 }
-
-IR ir_from_dag[128];
-int nr_ir_from_dag = 0;
-extern DagNode dag_buf[];
-extern int nr_dag_node;
 
 void gen_dag(int start, int end)
 {
@@ -537,6 +548,25 @@ Operand gen_from_dag_(DagNode dag)
     }
 }
 
+//
+// 将 a := *b 和 a := &b 内联到指令中
+//
+void inline_replace(IR buf[], int nr)
+{
+    for (int i = 0; i < nr; i++) {
+        IR *pir = &buf[i];
+        if (pir->type == IR_DEREF_R) {
+            pir->type = IR_NOP;
+            pir->rd->type = OPE_DEREF;
+            pir->rd->index = pir->rs->index;
+        } else if (pir->type == IR_ADDR) {
+            pir->type = IR_NOP;
+            pir->rd->type = OPE_REFADDR;
+            pir->rd->index = pir->rs->index;
+        }
+    }
+}
+
 void gen_from_dag(int start, int end)
 {
     for (int i = start; i < end; i++) {
@@ -556,12 +586,6 @@ void gen_from_dag(int start, int end)
                        NULL);
         }
     }
-
-    FILE *fp = fopen("dag.ir", "w");
-    for (int i = 0; i < nr_ir_from_dag; i++) {
-        print_single_instr(ir_from_dag[i], fp);
-    }
-    fclose(fp);
 
     for (int i = start; i < end; i++) {
         IR *p = &instr_buffer[i];
