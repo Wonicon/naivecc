@@ -3,6 +3,7 @@
 //
 
 #include "ir.h"
+#include "dag.h"
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
@@ -96,13 +97,17 @@ Operand new_operand(Ope_Type type) {
 // 中间代码构造函数
 // 返回 IR 在缓冲区中的下标
 //
-int new_instr(IR_Type type, Operand rs, Operand rt, Operand rd) {
+void new_instr_(IR *pIR, IR_Type type, Operand rs, Operand rt, Operand rd) {
     assert(nr_instr < MAX_LINE);
 
-    instr_buffer[nr_instr].type = type;
-    instr_buffer[nr_instr].rs = rs;
-    instr_buffer[nr_instr].rt = rt;
-    instr_buffer[nr_instr].rd = rd;
+    pIR->type = type;
+    pIR->rs = rs;
+    pIR->rt = rt;
+    pIR->rd = rd;
+}
+
+int new_instr(IR_Type type, Operand rs, Operand rt, Operand rd) {
+    new_instr_(&instr_buffer[nr_instr], type, rs, rt, rd);
     return nr_instr++;
 }
 
@@ -251,7 +256,7 @@ int is_branch(IR *pIR) {
 //
 // 检查是否为跳转类指令
 int can_jump(IR *pIR) {
-    return pIR->type == IR_JMP || is_branch(pIR);
+    return pIR->type == IR_JMP || is_branch(pIR) || pIR->type == IR_CALL;
 }
 
 //
@@ -465,16 +470,94 @@ void optimize_liveness(int start, int end) {
     }
 }
 
+static void gen_dag_from_instr(IR *pIR)
+{
+    LOG("转换:");
+    print_single_instr(*pIR, stdout);
+    Operand rs = pIR->rs;
+    Operand rt = pIR->rt;
+    Operand rd = pIR->rd;
+    if (rs && !origin(rs)->dep) {
+        LOG("rs新建叶子");
+        rs->dep = new_leaf(rs);
+    }
+    if (rt && !origin(rt)->dep) {
+        LOG("rt新建叶子");
+        rt->dep = new_leaf(rt);
+    }
+
+    if (rd) {
+        rd->dep = query_dag_node(pIR->type, rs ? rs->dep : NULL, rt ? rt->dep : NULL);
+        if (rd->dep->op.embody == NULL) {
+            rd->dep->op.embody = rd;
+        }
+    }
+}
+
+void gen_dag(int start, int end)
+{
+    init_dag();
+    for (int i = start; i < end; i++) {
+        if (can_jump(&instr_buffer[i])) {
+            break;
+        }
+        gen_dag_from_instr(&instr_buffer[i]);
+    }
+    print_dag();
+}
+
+IR ir_from_dag[128];
+int nr_ir_from_dag = 0;
+extern DagNode dag_buf[];
+extern int nr_dag_node;
+int new_dag_ir(IR_Type type, Operand rs, Operand rt, Operand rd)
+{
+    new_instr_(&ir_from_dag[nr_ir_from_dag], type, rs, rt, rd);
+    return nr_ir_from_dag++;
+}
+
+Operand gen_from_dag_(DagNode dag)
+{
+    if (dag == NULL) {
+        return NULL;
+    } else if (dag->type == DAG_LEAF) {
+        return dag->leaf.initial_value;
+    } else if (dag->type == DAG_OP && !dag->op.has_gen) {
+        // TODO 解引用信息!
+        new_dag_ir(dag->op.ir_type, gen_from_dag_(dag->op.left), gen_from_dag_(dag->op.right), dag->op.embody);
+        dag->op.has_gen = 1;
+        return dag->op.embody;
+    } else {
+        return dag->op.embody;
+    }
+}
+
+void gen_from_dag(int start, int end)
+{
+    for (int i = end - 1; i >= start; i--) {
+        IR *p = &instr_buffer[i];
+        if (!can_jump(p) && p->rd) {
+            gen_from_dag_(p->rd->dep);
+        }
+    }
+
+    for (int i = 0; i < nr_ir_from_dag; i++) {
+        print_single_instr(ir_from_dag[i], stdout);
+    }
+}
+
 //
 // 打印基本块
 //
 void print_block() {
-    block_partition();
+    //block_partition();
 
     for (int i = 0; i < nr_blk; i++) {
-        optimize_liveness(blk_buf[i].start, blk_buf[i].end);
+        //optimize_liveness(blk_buf[i].start, blk_buf[i].end);
+        //gen_dag(blk_buf[i].start, blk_buf[i].end);
+        //gen_from_dag(blk_buf[i].start, blk_buf[i].end);
     }
-
+#if 0
     int current_block = 0;
 
     int num_buf_sz = 16;
@@ -498,4 +581,5 @@ void print_block() {
         }
         printf("\n");
     }
+#endif
 }
