@@ -23,11 +23,10 @@ typedef enum {
     OPE_NOT_USED,
     OPE_VAR,      // 变量
     OPE_REF,      // 引用类型, 包括数组和结构类型, 引用类型的首元素支持不解引用直接访问
-                  // 所以引用类型会保存一个REFVAR分身
     OPE_TEMP,     // 编译器自行分配的临时变量
-    OPE_ADDR,     // 地址值, 类比REF, 保存一个DEREF分身用于内联
+    OPE_ADDR,     // 地址值
     OPE_DEREF,    // 内联解引用
-    OPE_INITIAL,  // REF的首元素分身
+    OPE_REFADDR,  // REF的首元素分身
     OPE_INTEGER,
     OPE_FLOAT,
     OPE_LABEL,
@@ -57,10 +56,6 @@ struct Operand_ {
 
     // OPE_REF, OPE_REF_INFO
     Type *base_type;   // 综合属性: 引用型操作数对应的类型, 关系到偏移量的计算
-
-    // OPE_REF, OPE_ADDR
-    Operand _inline;   // 固有属性: 引用型操作数首元素, 有些时候可以用它省略一行指令
-                       // INITIAL自身可以用这个指针访问到对应的引用操作数
 
     // OPE_REF_INFO
     Operand ref;       // 综合属性: 下标递归表达式使用, 结构体应该也能用

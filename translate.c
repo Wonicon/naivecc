@@ -453,17 +453,21 @@ int translate_exp_is_exp_idx(Node exp) {
         return MULTI_INSTR;
     }
 
-    // 进入这里说明是最后一个阶段, 按道理要进行解引用
-    // 但是由于任何指令都可以内嵌解引用, 所以为了效率这里直接算一个地址就往回送
-    // (如果老老实实解引用则还要多一条指令)
-    if (exp->dst->type == OPE_TEMP) {
+    // 进入这里说明是最后一个阶段, 要将地址进行解引用
+    // 虽然任何指令都可以内嵌解引用, 但是这样会产生复杂的依赖和同步问题,
+    // 所以比较好的策略是先生成一个解引用赋值指令, 进行完所有的优化后, 找到这些解引用赋值,
+    // 然后将属性替换, 删除该指令.
+    // TODO 在全部优化结束后, 遍历指令, 将解引用赋值替换成内联解引用
+    if (exp->dst->type != OPE_TEMP) {
+        LOG("(warn)没有来自上层exp(行号: %d)的目标操作数, 这不符合常理", exp->lineno);
+    } else {
         free(exp->dst);
         exp->dst = NULL;
     }
 
     if (ref_info->offset->type == OPE_INTEGER && ref_info->offset->integer == 0) {
-        LOG("Line %d: 引用类型首元素优化", exp->lineno);
-        exp->dst = (ref_info->ref->type == OPE_REF) ? ref_info->ref->_inline : ref_info->ref;  // 区分变量数组和参数数组
+        LOG("line %d: 计算出引用偏移量为 0, 不生成加法指令", exp->lineno);
+        exp->dst = ref_info->ref;  // 区分变量数组和参数数组
     } else {
         // 要生成加法指令
         exp->dst = new_operand(OPE_ADDR);
@@ -471,7 +475,6 @@ int translate_exp_is_exp_idx(Node exp) {
     }
 
     free(ref_info);
-
     return 0;
 }
 
@@ -673,21 +676,11 @@ int translate_dec_is_vardec(Node dec) {
         sym->address->base_type = sym->type;
 
         if (vardec->sibling != NULL) {  // 有初始化语句
-            LOG("初始化");
+            LOG("翻译初始化语句");
             vardec->sibling->dst = new_operand(OPE_TEMP);
-#if 0
-            int ret = translate_dispatcher(vardec->sibling);
-            if (ret != NO_NEED_TO_GEN) {
-                replace_operand_global(sym->address, vardec->sibling->dst);
-                return ret;
-            } else {
-                return new_instr(IR_ASSIGN, vardec->sibling->dst, NULL, sym->address);
-            }
-#else
             translate_dispatcher(vardec->sibling);
             try_deref(vardec->sibling);
             return new_instr(IR_ASSIGN, vardec->sibling->dst, NULL, sym->address);
-#endif
         }
         return NO_NEED_TO_GEN;
     }
@@ -755,7 +748,6 @@ int translate_exp_is_assign(Node assign_exp) {
     rexp->dst = new_operand(OPE_TEMP);
     translate_dispatcher(rexp);
 
-    try_deref(lexp);
     try_deref(rexp);  // 如果 rexp 直接是 array[...] 则会直接返回地址
 
     // TODO 更准确地判断赋值左右的等价性
@@ -770,10 +762,12 @@ int translate_exp_is_assign(Node assign_exp) {
     // [优化] 当左值为变量而右值为运算指令时, 将右值的目标操作数转化为变量
     if (lexp->dst->type == OPE_VAR && rexp->dst->type == OPE_TEMP) {
         LOG("左值为变量(编号%d), 直接赋值", lexp->dst->index);
-        rexp->dst->type = OPE_VAR;
-        rexp->dst->index = lexp->dst->index;
+        replace_operand_global(lexp->dst, rexp->dst);
         return NO_NEED_TO_GEN;
+    } else if (lexp->dst->type == OPE_ADDR) {   // 左边是引用
+        return new_instr(IR_DEREF_L, rexp->dst, NULL, lexp->dst);
     } else {
+        LOG("直接的赋值情况应该不会发生了");
         return new_instr(IR_ASSIGN, rexp->dst, NULL, lexp->dst);
     }
 }
@@ -781,8 +775,9 @@ int translate_exp_is_assign(Node assign_exp) {
 // 内联解引用, 如果算出结果是地址, 那么可以直接在指令中解引用
 void try_deref(Node exp) {
     if (exp->dst->type == OPE_ADDR) {
-        LOG("Line %d: 内联解引用", exp->lineno);
-        exp->dst = exp->dst->_inline;
+        Operand tmp = new_operand(OPE_TEMP);
+        new_instr(IR_DEREF_R, exp->dst, NULL, tmp);
+        exp->dst = tmp;
     }
 }
 
@@ -820,11 +815,21 @@ int translate_exp_is_id(Node exp) {
 
     // 上层希望存储到一个地址变量, 说明现在在寻址模式
     if (exp->dst && exp->dst->type == OPE_REF_INFO) {
-        exp->dst->ref = sym->address;
         exp->dst->base_type = sym->address->base_type;  // 初始综合属性
         exp->dst->offset = new_operand(OPE_INTEGER);    // 偏移量将来可能变成临时变量
         exp->dst->offset->integer = 0;                  // 当前偏移量为常数 0
-        return NO_NEED_TO_GEN;
+        switch (sym->address->type) {
+            case OPE_ADDR:
+                exp->dst->ref = sym->address;
+                return NO_NEED_TO_GEN;
+            case OPE_REF:
+                assert(exp->dst->ref == NULL);
+                exp->dst->ref = new_operand(OPE_ADDR);
+                return new_instr(IR_ADDR, sym->address, NULL, exp->dst->ref);
+            default:
+                LOG("Unexpected sym->address->type");
+                assert(0);
+        }
     }
 
     // 替换不必要的目标地址

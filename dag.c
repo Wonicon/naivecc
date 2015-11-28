@@ -25,7 +25,6 @@ DagNode new_leaf(Operand ope)
     DagNode p = (DagNode)malloc(sizeof(*p));
     // TODO 解引用信息还原!
     if (ope->type == OPE_DEREF) {
-        p->leaf.initial_value = ope->_inline;
     } else {
         p->leaf.initial_value = ope;
     }

@@ -67,18 +67,12 @@ Operand new_operand(Ope_Type type) {
         case OPE_REF:
             p->liveness = ALIVE;
             p->index = nr_ref++;
-            p->_inline = new_operand(OPE_INITIAL);
-            p->_inline->index = p->index;
-            p->_inline->_inline = p;
             break;
         case OPE_TEMP:
             p->index = nr_tmp++;
             break;
         case OPE_ADDR:
             p->index = nr_addr++;
-            p->_inline = new_operand(OPE_DEREF);
-            p->_inline->index = p->index;
-            p->_inline->_inline = p;
             break;
         case OPE_LABEL:
             p->liveness = 1;
@@ -123,7 +117,7 @@ void print_operand(Operand ope, char *str) {
     }
     switch (ope->type) {
         case OPE_VAR:     sprintf(str, "v%d",  ope->index);    break;
-        case OPE_REF:     sprintf(str, "&r%d", ope->index);    break;
+        case OPE_REF:     sprintf(str, "r%d",  ope->index);    break;
         case OPE_FUNC:    sprintf(str, "%s",   ope->name);     break;
         case OPE_TEMP:    sprintf(str, "t%d",  ope->index);    break;
         case OPE_ADDR:    sprintf(str, "a%d",  ope->index);    break;
@@ -131,7 +125,7 @@ void print_operand(Operand ope, char *str) {
         case OPE_FLOAT:   sprintf(str, "#%f",  ope->real);     break;
         case OPE_LABEL:   sprintf(str, "L%d",  ope->label);    break;
         case OPE_INTEGER: sprintf(str, "#%d",  ope->integer);  break;
-        case OPE_INITIAL: sprintf(str, "r%d",  ope->index);    break;
+        case OPE_REFADDR: sprintf(str, "&r%d", ope->index);    break;
         default:          sprintf(str, "%s",   "");
     }
 }
@@ -176,7 +170,7 @@ void print_single_instr(IR instr, FILE *file) {
     if (IR_BEQ <= instr.type && instr.type <= IR_BNE) {
         fprintf(file, ir_format[instr.type], rs_s, rt_s, rd_s);  // 交换顺序
     } else if (instr.type == IR_DEC) {  // 规划干不过特例
-        fprintf(file, ir_format[instr.type], rd_s, rs_s + 1, rt_s + 1);
+        fprintf(file, ir_format[instr.type], rd_s, rs_s, rt_s + 1);
 
     } else {
         fprintf(file, ir_format[instr.type], rd_s, rs_s, rt_s);
@@ -440,7 +434,6 @@ void block_partition() {
 // end 不可取
 //
 Operand origin(Operand ope) {
-    if (ope->type == OPE_DEREF) return ope->_inline;
     return ope;
 }
 
