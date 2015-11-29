@@ -7,7 +7,7 @@
 
 #include "ir.h"
 
-typedef struct DagNode_ *DagNode;
+typedef struct DagNode_ *pDagNode;
 
 typedef enum {
     DAG_NA,
@@ -15,14 +15,14 @@ typedef enum {
     DAG_LEAF
 } DagNodeType;
 
-struct DagNode_ {
+typedef struct DagNode_ {
     DagNodeType type;
 
     struct {
         // 非叶子结点
         IR_Type ir_type;    // 操作类型
-        DagNode left;       // 左子节点
-        DagNode right;      // 右子节点
+        pDagNode left;       // 左子节点
+        pDagNode right;      // 右子节点
         Operand embody;     // "代表"目的操作数
         int has_gen;        // 是否生成过指令
     } op;
@@ -31,11 +31,11 @@ struct DagNode_ {
     struct {
         Operand initial_value;
     } leaf;
-};
+} DagNode;
 
 void init_dag();
-DagNode new_leaf(Operand ope);
-DagNode new_dagnode(IR_Type ir_type, DagNode left, DagNode right);
-DagNode query_dag_node(IR_Type ir_type, DagNode left, DagNode right);
+pDagNode new_leaf(Operand ope);
+pDagNode new_dagnode(IR_Type ir_type, pDagNode left, pDagNode right);
+pDagNode query_dag_node(IR_Type ir_type, pDagNode left, pDagNode right);
 void print_dag();
 #endif // __DAG_H__

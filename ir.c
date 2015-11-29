@@ -9,7 +9,7 @@
 #include <string.h>
 #include <assert.h>
 
-#define NAME_LEN 4096
+#define NAME_LEN 32
 
 typedef struct Block_ *Block;
 
@@ -34,12 +34,6 @@ static char rs_s[NAME_LEN];
 static char rt_s[NAME_LEN];
 static char rd_s[NAME_LEN];
 
-// 操作数缓冲区, 用于当前基本块的分析
-struct {
-    Operand buf[4096];
-    int count;
-} opetab;
-
 struct {
     IR_Type relop;
     const char *str;
@@ -55,7 +49,7 @@ struct {
 
 #define LENGTH(x) (sizeof(x) / sizeof(*x))
 
-IR ir_from_dag[128];
+IR ir_from_dag[MAX_LINE];
 int nr_ir_from_dag = 0;
 extern DagNode dag_buf[];
 extern int nr_dag_node;
@@ -119,7 +113,6 @@ void print_single_instr(IR instr, FILE *file) {
         fprintf(file, ir_format[instr.type], rs_s, rt_s, rd_s);  // 交换顺序
     } else if (instr.type == IR_DEC) {  // 规划干不过特例
         fprintf(file, ir_format[instr.type], rd_s, rs_s, rt_s + 1);
-
     } else {
         fprintf(file, ir_format[instr.type], rd_s, rs_s, rt_s);
     }
@@ -142,20 +135,18 @@ void print_instr(FILE *file)
 
     print_block();
 #ifdef DEBUG
+    FILE *fp = fopen("dag.ir", "w");
+#else
+    FILE *fp = file;
+#endif
+#ifdef DEBUG
     for (int i = 0; i < nr_instr; i++) {
         print_single_instr(instr_buffer[i], file);
     }
 #endif
 
-    // 更多的优化
-
     inline_replace(ir_from_dag, nr_ir_from_dag);
 
-#ifdef DEBUG
-    FILE *fp = fopen("dag.ir", "w");
-#else
-    FILE *fp = file;
-#endif
     for (int i = 0; i < nr_ir_from_dag; i++) {
         print_single_instr(ir_from_dag[i], fp);
     }
@@ -520,7 +511,7 @@ void inline_replace(IR buf[], int nr)
     }
 }
 
-Operand gen_from_dag_(DagNode dag)
+Operand gen_from_dag_(pDagNode dag)
 {
     if (dag == NULL) {
         return NULL;
@@ -539,7 +530,7 @@ void gen_instr_from_dag(int start, int end)
 {
     for (int i = start; i < end; i++) {
         IR *p = &instr_buffer[i];
-        gen_from_dag_(p->rd->dep);
+        if (!is_tmp(p->rd) || p->type == IR_CALL) gen_from_dag_(p->rd->dep);
     }
 
     // 处理出口变量
@@ -573,12 +564,7 @@ void gen_instr_from_dag(int start, int end)
                 p->operand[j]->dep = NULL;
             }
         }
-    }
-
-    for (int i = 0; i < nr_dag_node; i++) {
-        free(dag_buf[i]);
-        dag_buf[i] = NULL;
-    }
+    }d
 }
 
 //

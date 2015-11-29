@@ -21,6 +21,7 @@ bool is_tmp(Operand ope);
 Operand new_operand(Ope_Type type);
 void print_operand(Operand ope, char *str);
 Operand calc_const(IR_Type op, Operand left, Operand right);
+Operand get_neg(Operand ope);
 
 // 调试
 #ifdef DEBUG

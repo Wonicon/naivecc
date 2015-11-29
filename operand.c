@@ -141,9 +141,7 @@ bool is_tmp(Operand ope)
     if (ope == NULL) {
         return false;
     } else {
-        return ope->type == OPE_ADDR ||
-               ope->type == OPE_TEMP ||
-               ope->type == OPE_DEREF;
+        return ope->type == OPE_ADDR || ope->type == OPE_TEMP;
     }
 }
 
@@ -194,4 +192,23 @@ Operand calc_const(IR_Type op, Operand left, Operand right)
         default: assert(0);
     }
     return rst;
+}
+
+Operand get_neg(Operand ope)
+{
+    if (is_const(ope)) {
+        Operand p = new_operand(ope->type);
+        if (ope->type == OPE_INTEGER) {
+            p->integer = -ope->integer;
+        } else if (ope->type == OPE_FLOAT) {
+            p->real = -ope->real;
+        } else {
+            LOG("Error");
+            assert(0);
+        }
+        return p;
+    } else {
+        LOG("Not const");
+        assert(0);
+    }
 }

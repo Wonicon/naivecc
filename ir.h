@@ -11,13 +11,13 @@
 
 #include "cmm_type.h"
 
-#define MAX_LINE 2048
+#define MAX_LINE 4096
 
 #define FAIL_TO_GEN -1
 #define NO_NEED_TO_GEN -2
 #define MULTI_INSTR MAX_LINE
 
-typedef struct DagNode_ *DagNode;
+typedef struct DagNode_ *pDagNode;
 
 typedef enum {
     OPE_NOT_USED,
@@ -70,7 +70,7 @@ struct Operand_ {
                        // TODO 这里有一个假设, 即中间代码使用的临时变量不会跨越基本块
     int next_use;      // 标记下一条需要该操作数的指令编号
 
-    DagNode dep;       // 依赖结点
+    pDagNode dep;       // 依赖结点
 };
 
 typedef enum {
