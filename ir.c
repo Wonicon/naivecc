@@ -145,13 +145,6 @@ void print_instr(FILE *file)
     }
 #endif
 
-    // 第二趟
-    memcpy(instr_buffer, ir_from_dag, sizeof(ir_from_dag));
-    nr_instr = nr_ir_from_dag;
-    memset(ir_from_dag, 0, sizeof(ir_from_dag));
-    nr_ir_from_dag = 0;
-    print_block();
-
     inline_replace(ir_from_dag, nr_ir_from_dag);
 
     for (int i = 0; i < nr_ir_from_dag; i++) {
