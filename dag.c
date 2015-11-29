@@ -8,6 +8,7 @@
 //
 
 #include "dag.h"
+#include "operand.h"
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
@@ -108,7 +109,6 @@ pDagNode query_dag_node(IR_Type ir_type, pDagNode left, pDagNode right)
     }
 
     pDagNode optimal;
-
     if ((optimal = const_associativity(p->op.ir_type, p->op.left, p->op.right))) {  // 结合律
         p = optimal;
     }
@@ -117,6 +117,7 @@ pDagNode query_dag_node(IR_Type ir_type, pDagNode left, pDagNode right)
         p = optimal;
     }
 
+    assert(p->type != DAG_OP || (IR_NOP <= p->op.ir_type && p->op.ir_type <= IR_WRITE));
     return p;
 }
 
@@ -144,10 +145,25 @@ bool exchangable(IR_Type op)
     return op == IR_ADD || op == IR_MUL;
 }
 
+bool check_counter(IR_Type op, pDagNode left, pDagNode right) {
+    if (op == IR_ADD && left->op.ir_type == op && right->op.ir_type == IR_SUB && cmp_dag_node(left->op.right, right->op.right)) {
+        return true;
+    } else if (op == IR_MUL && left->op.ir_type == op && right->op.ir_type == IR_DIV && cmp_dag_node(left->op.right, right->op.right)) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
 // What the hell!
 pDagNode const_associativity(IR_Type op, pDagNode left, pDagNode right)
 {
     IR_Type top_op[4][4];
+    for (int i = 0; i < 4; i++) {
+        for (int j = 0; j < 4; j++) {
+            top_op[i][j] = IR_NOP;
+        }
+    }
 #define OFF(x) (x - IR_ADD)
     // 对于同级操作符+/-, *//, 可以无二义的按中序形式展开
     // 下表是在中序情况下, 将后两个操作数结合, 其操作符的变化情况
@@ -164,7 +180,6 @@ pDagNode const_associativity(IR_Type op, pDagNode left, pDagNode right)
     top_op[OFF(IR_DIV)][OFF(IR_MUL)] = IR_DIV;
     top_op[OFF(IR_DIV)][OFF(IR_DIV)] = IR_MUL;
     // 噫, 搞了半天这表就是个逆运算取反......
-#undef OFF
 
 
     if (left == NULL || right == NULL || IR_ADD > op || op > IR_DIV) {
@@ -174,6 +189,10 @@ pDagNode const_associativity(IR_Type op, pDagNode left, pDagNode right)
         Operand result = calc_const(op, left->leaf.initial_value, right->leaf.initial_value);
         return new_leaf(result);
     } else if (is_const_dag_node(left) && is_same_op_level(op, right->op.ir_type)) {
+        if (!is_tmp(right->op.embody)) {
+            LOG("不能折叠非临时变量");
+            return NULL;
+        }
         // 左边为常数, 右边为运算, 可应用结合律
         // 相当于后两个操作数结合的情况, 要考虑第二个操作符去掉括号后的变化
         IR_Type lop = op;  // 由于右边为运算, 所以左操作即本函数的参数op
@@ -184,11 +203,11 @@ pDagNode const_associativity(IR_Type op, pDagNode left, pDagNode right)
             Operand rlope = right->op.left->leaf.initial_value;  // 可以确认右结点的左结点可以拿出Operand
             Operand const_rst = calc_const(lop, lope, rlope);  // 左和右左中序相邻, 可以直接计算
             pDagNode leaf = new_leaf(const_rst);
-            return new_dagnode(top_op[lop][rop], leaf, right->op.right);  // 第二个操作符为取消结合后的, 同样适用上表.
+            return new_dagnode(top_op[OFF(lop)][OFF(rop)], leaf, right->op.right);  // 第二个操作符为取消结合后的, 同样适用上表.
         } else if (is_const_dag_node(right->op.right)) {
             LOG("C1 op1 (V op2 C2) -> C1 op1 V op3 C2 -> (C1 op3 C2) op1 V");
             Operand rrope = right->op.right->leaf.initial_value;  // 可以确认右结点的右结点可以拿出Operand
-            Operand const_rst = calc_const(top_op[lop][rop], lope, rrope);  // 获得取消结合后的操作符, 并且移动到前面
+            Operand const_rst = calc_const(top_op[OFF(lop)][OFF(rop)], lope, rrope);  // 获得取消结合后的操作符, 并且移动到前面
             pDagNode leaf = new_leaf(const_rst);
             return new_dagnode(lop, leaf, right->op.left);  // 操作符不需要处理
         } else {
@@ -196,6 +215,10 @@ pDagNode const_associativity(IR_Type op, pDagNode left, pDagNode right)
             return NULL;
         }
     } else if (is_const_dag_node(right) && is_same_op_level(op, left->op.ir_type)) {
+        if (!is_tmp(left->op.embody)) {
+            LOG("不能折叠非临时变量");
+            return NULL;
+        }
         // 左边为运算, 右边为常数, 可应用结合律
         // 此模式相当于中序, 所以有一种情况只需要移位不需要查表
         // 但是另外一种情况要考虑结合后操作符的变化
@@ -212,7 +235,7 @@ pDagNode const_associativity(IR_Type op, pDagNode left, pDagNode right)
         } else if (is_const_dag_node(left->op.right)) {
             LOG("(V op1 C1) op2 C2 -> V op1 (C1 op3 C2)");
             Operand lrope = left->op.right->leaf.initial_value;
-            Operand const_rst = calc_const(top_op[lop][rop], lrope, rope);
+            Operand const_rst = calc_const(top_op[OFF(lop)][OFF(rop)], lrope, rope);
             pDagNode leaf = new_leaf(const_rst);
             return new_dagnode(lop, left->op.left, leaf);
         } else {
@@ -221,8 +244,14 @@ pDagNode const_associativity(IR_Type op, pDagNode left, pDagNode right)
         }
     } else {
         LOG("左右都不是常量");
+        if (exchangable(op)) {
+            if (check_counter(op, left, right) || check_counter(op, right, left)) {
+                return new_dagnode(op, left->op.left, right->op.left);
+            }
+        }
         return NULL;
     }
+#undef OFF
 }
 
 pDagNode erase_identity(IR_Type op, pDagNode left, pDagNode right)
