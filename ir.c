@@ -203,7 +203,7 @@ void print_instr(FILE *file)
         print_single_instr(instr_buffer[i], file);
     }
 
-    //inline_replace(ir_from_dag, nr_ir_from_dag);
+    inline_replace(ir_from_dag, nr_ir_from_dag);
 
     FILE *fp = fopen("dag.ir", "w");
     for (int i = 0; i < nr_ir_from_dag; i++) {
@@ -524,7 +524,6 @@ void gen_dag(int start, int end)
     for (int i = start; i < end; i++) {
         gen_dag_from_instr(&instr_buffer[i]);
     }
-    //print_dag();
 }
 
 int new_dag_ir(IR_Type type, Operand rs, Operand rt, Operand rd)
@@ -555,6 +554,9 @@ void inline_replace(IR buf[], int nr)
 {
     for (int i = 0; i < nr; i++) {
         IR *pir = &buf[i];
+        if (pir->rd && (pir->rd->type == OPE_VAR || pir->rd->type == OPE_REF)) {  // 变量不能被修改!
+            continue;
+        }
         if (pir->type == IR_DEREF_R) {
             pir->type = IR_NOP;
             pir->rd->type = OPE_DEREF;

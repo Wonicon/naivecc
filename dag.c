@@ -61,6 +61,13 @@ int cmp_dag_node(DagNode first, DagNode second)
             return false;
         }
 
+        // 解引用不能被优化
+        // 优化的结果会导致非代表元用代表元来赋值, 而地址值可能在别的变量中用于寻址赋值,
+        // 所以代表元里存储的不一定是新的值.
+        if (first->op.ir_type == IR_DEREF_R) {
+            return false;
+        }
+
         if (cmp_dag_node(first->op.left, second->op.left) && cmp_dag_node(first->op.right, second->op.right)) {
                 return true;
         }
