@@ -10,7 +10,7 @@ void ast();
 void semantic_analysis();
 void free_ast();
 void simplify();
-void test_translate();
+void translate();
 
 extern int yydebug;
 
@@ -72,13 +72,12 @@ int main(int argc, char *argv[])
 
 #ifdef DEBUG
         print_symtab();
-#endif
         printf("======================================================\n");
-
+#endif
         simplify();
-        test_translate();
+        translate();
     }
 
     free_ast();
-   return 0;
+    return 0;
 }

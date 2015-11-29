@@ -686,7 +686,6 @@ int translate_dec_is_vardec(Node dec) {
     Node iterator = vardec->child;
     if (iterator->type == YY_ID) {  // 普通变量声明, 分配空间就好了.
         sym_ent_t *sym = query(iterator->val.s, 0);
-        assert(sym->type->type_size == 4);
         sym->address = new_operand(OPE_VAR);
         sym->address->base_type = sym->type;
 
@@ -823,7 +822,6 @@ int translate_exp_is_id(Node exp) {
 
 #ifdef TASK_2
     if (sym->type->class == CMM_STRUCT) {
-        fprintf(stderr, "实验任务二: 不支持结构体类型");
         translate_state = UNSUPPORT;
     }
 #endif
@@ -891,13 +889,19 @@ int translate_exp_is_const(Node nd) {
 
 // 测试用函数
 extern Node ast_tree;
-void test_translate() {
+void translate() {
     translate_ast(ast_tree);
+#ifdef DEBUG
     FILE *fp = fopen("test.ir", "w");
+#else
+    FILE *fp = stdout;
+#endif
     if (translate_state == FINE) {
         print_instr(fp);
     } else {
-        fputs("Cannot translate: Code contains variables or parameters of structure type.", stderr);
+        fputs("Cannot translate: Code contains variables or parameters of structure type.\n", stderr);
     }
+#ifdef DEBUG
     fclose(fp);
+#endif
 }

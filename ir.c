@@ -137,21 +137,31 @@ void print_block();
 void inline_replace(IR buf[], int nr);
 void print_instr(FILE *file)
 {
+    // 相当于窥孔优化
     preprocess_ir();
-#ifdef DEBUG
+
     print_block();
-#endif
+#ifdef DEBUG
     for (int i = 0; i < nr_instr; i++) {
         print_single_instr(instr_buffer[i], file);
     }
+#endif
+
+    // 更多的优化
 
     inline_replace(ir_from_dag, nr_ir_from_dag);
 
+#ifdef DEBUG
     FILE *fp = fopen("dag.ir", "w");
+#else
+    FILE *fp = file;
+#endif
     for (int i = 0; i < nr_ir_from_dag; i++) {
         print_single_instr(ir_from_dag[i], fp);
     }
+#ifdef DEBUG
     fclose(fp);
+#endif
 }
 
 //
