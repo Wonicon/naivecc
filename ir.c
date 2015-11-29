@@ -701,7 +701,7 @@ void gen_from_dag(int start, int end)
             }
         }
     }
-    
+
     for (int i = 0; i < nr_dag_node; i++) {
         free(dag_buf[i]);
         dag_buf[i] = NULL;

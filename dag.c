@@ -114,7 +114,7 @@ DagNode query_dag_node(IR_Type ir_type, DagNode left, DagNode right)
         }
     }
 
-    //erase_identity(&p, ir_type, left, right);
+    erase_identity(&p, ir_type, left, right);
 
     return p;
 }
