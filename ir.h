@@ -23,6 +23,7 @@ typedef enum {
     OPE_NOT_USED,
     OPE_VAR,      // 变量
     OPE_REF,      // 引用类型, 包括数组和结构类型, 引用类型的首元素支持不解引用直接访问
+    OPE_BOOL,     // 由于布尔值跨基本块却不能被优化掉, 所以开此特例
     OPE_TEMP,     // 编译器自行分配的临时变量
     OPE_ADDR,     // 地址值
     OPE_DEREF,    // 内联解引用

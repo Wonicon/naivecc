@@ -139,6 +139,10 @@ int translate_dispatcher(Node node) {
             node->label_false = new_operand(OPE_LABEL);
 
             if (node->dst != NULL) {
+                if (node->dst->type == OPE_TEMP) {
+                    free(node->dst);
+                    node->dst = new_operand(OPE_BOOL);
+                }
                 Operand value_false = new_operand(OPE_INTEGER);
                 value_false->integer = 0;
                 new_instr(IR_ASSIGN, value_false, NULL, node->dst);

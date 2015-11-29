@@ -60,6 +60,7 @@ Operand new_operand(Ope_Type type) {
     static int nr_var = 0;
     static int nr_ref = 0;
     static int nr_tmp = 0;
+    static int nr_bool = 0;
     static int nr_addr = 0;
     static int nr_label = 0;
 
@@ -73,6 +74,10 @@ Operand new_operand(Ope_Type type) {
         case OPE_REF:
             p->liveness = ALIVE;
             p->index = nr_ref++;
+            break;
+        case OPE_BOOL:
+            p->liveness = ALIVE;
+            p->index = nr_bool++;
             break;
         case OPE_TEMP:
             p->index = nr_tmp++;
@@ -124,6 +129,7 @@ void print_operand(Operand ope, char *str) {
     switch (ope->type) {
         case OPE_VAR:     sprintf(str, "v%d",  ope->index);    break;
         case OPE_REF:     sprintf(str, "r%d",  ope->index);    break;
+        case OPE_BOOL:    sprintf(str, "b%d",  ope->index);    break;
         case OPE_FUNC:    sprintf(str, "%s",   ope->name);     break;
         case OPE_TEMP:    sprintf(str, "t%d",  ope->index);    break;
         case OPE_ADDR:    sprintf(str, "a%d",  ope->index);    break;
@@ -612,11 +618,23 @@ Operand gen_from_dag_(DagNode dag)
 //
 // 将 a := *b 和 a := &b 内联到指令中
 //
+bool is_always_live(Operand ope)
+{
+    switch (ope->type) {
+        case OPE_VAR:
+        case OPE_REF:
+        case OPE_BOOL:
+            return true;
+        default:
+            return false;
+    }
+}
+
 void inline_replace(IR buf[], int nr)
 {
     for (int i = 0; i < nr; i++) {
         IR *pir = &buf[i];
-        if (pir->rd && (pir->rd->type == OPE_VAR || pir->rd->type == OPE_REF)) {  // 变量不能被修改!
+        if (pir->rd && is_always_live(pir->rd)) {  // 变量不能被修改!
             continue;
         }
         if (pir->type == IR_DEREF_R) {
@@ -631,16 +649,19 @@ void inline_replace(IR buf[], int nr)
     }
 
     // 消除 *&r
+#if 1
     for (int i = 0; i < nr; i++) {
         IR *pir = &buf[i];
         if (pir->rs && pir->rs->type == OPE_REFADDR && pir->type == IR_DEREF_L) {
             pir->type = IR_ASSIGN;
-            pir->rd = pir->rs;
+            pir->rd = new_operand(OPE_NOT_USED);
             pir->rd->type = OPE_REF;
+            pir->rd->index = pir->rs->index;
             pir->rs = pir->rt;
             pir->rt = NULL;
         }
     }
+#endif
 }
 
 void gen_from_dag(int start, int end)
@@ -649,7 +670,7 @@ void gen_from_dag(int start, int end)
         IR *p = &instr_buffer[i];
         if (p->rd) {
             gen_from_dag_(p->rd->dep);
-            if (p->rd->type == OPE_VAR && p->rd->dep->op.embody != p->rd) {  // 变量出口活跃!?
+            if (is_always_live(p->rd) && p->rd->dep->op.embody != p->rd) {  // 变量出口活跃!?
 #ifdef DEBUG
                 char strbuf[64];
                 print_operand(p->rd, strbuf);
@@ -660,6 +681,10 @@ void gen_from_dag(int start, int end)
                            NULL, p->rd);
             }
         } else {
+            // 没有目标操作数的指令一定要生成:
+            // GOTO, LABEL, FUNCTION
+            // 还有最重要的 *=
+            // 顺序生成能保证原来的顺序不变
             new_instr_(&ir_from_dag[nr_ir_from_dag++],
                        p->type,
                        p->rs ? gen_from_dag_(p->rs->dep) : NULL,
@@ -676,6 +701,7 @@ void gen_from_dag(int start, int end)
             }
         }
     }
+    
     for (int i = 0; i < nr_dag_node; i++) {
         free(dag_buf[i]);
         dag_buf[i] = NULL;
