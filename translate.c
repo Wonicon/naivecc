@@ -4,6 +4,7 @@
 
 #include "translate.h"
 #include "ir.h"
+#include "operand.h"
 #include "cmm_symtab.h"
 #include <assert.h>
 #include <stdlib.h>
