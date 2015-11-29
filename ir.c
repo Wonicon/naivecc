@@ -203,7 +203,7 @@ void print_instr(FILE *file)
         print_single_instr(instr_buffer[i], file);
     }
 
-    inline_replace(ir_from_dag, nr_ir_from_dag);
+    //inline_replace(ir_from_dag, nr_ir_from_dag);
 
     FILE *fp = fopen("dag.ir", "w");
     for (int i = 0; i < nr_ir_from_dag; i++) {
@@ -574,6 +574,11 @@ void gen_from_dag(int start, int end)
         if (p->rd) {
             gen_from_dag_(p->rd->dep);
             if (p->rd->type == OPE_VAR && p->rd->dep->op.embody != p->rd) {  // 变量出口活跃!?
+#ifdef DEBUG
+                char strbuf[64];
+                print_operand(p->rd, strbuf);
+                LOG("%s是变量且不是依赖表达式的代表, 生成赋值语句", strbuf);
+#endif
                 new_instr_(&ir_from_dag[nr_ir_from_dag++], IR_ASSIGN,
                            p->rd->dep->type == DAG_LEAF ? p->rd->dep->leaf.initial_value : p->rd->dep->op.embody,
                            NULL, p->rd);
@@ -629,14 +634,6 @@ void print_block() {
             printf("%s%s%*s\n", head, num_buf, tail_len - num_len, tail);
         }
         print_single_instr(instr_buffer[i], stdout);
-#if 0
-        for (int j = 0; j < NR_OPE; j++) {
-            if (pIR->operand[j]) {
-                printf("%d ", pIR->info[j].liveness);
-            }
-        }
-        printf("\n");
-#endif
     }
 #endif
 }

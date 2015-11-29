@@ -96,34 +96,3 @@ void print_symtab() {
         }
     }
 }
-
-#ifdef TEST_SYM
-int main()
-#else
-int test_sym()
-#endif /* TEST_SYM */
-{
-    Type *s = new_type(CMM_FUNC, "helloworld", BASIC_INT, NULL);
-    Type *a1 = new_type(CMM_ARRAY, NULL, BASIC_FLOAT, NULL);
-    a1->size = 10;
-    Type *a2 = new_type(CMM_ARRAY, NULL, a1, NULL);
-    a2->size = 20;
-    Type *a3 = new_type(CMM_ARRAY, NULL, a2, NULL);
-    a3->size = 30;
-
-    insert(s->name, s, 10, -1);
-    insert(s->name, s, 10, -1);
-    insert("a_new_array", a3, 10, 0);
-    print_symtab();
-
-    sym_ent_t *ret = query("a_new_array", 0);
-    if (ret != NULL) {
-        printf("Found!\n");
-    }
-
-    ret = query("sdf", 0);
-    if (ret == NULL) {
-        printf("Miss\n");
-    }
-    return 0;
-}
