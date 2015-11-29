@@ -35,11 +35,7 @@ void addope(Operand ope)
             return;
         }
     }
-#ifdef DEBUG
-    char strbuf[32];
-    print_operand(ope, strbuf);
-    LOG("加入操作数:%s", strbuf);
-#endif
+    LOG_OPE(ope);
     opetab.buf[opetab.count++] = ope;
 }
 

@@ -98,12 +98,9 @@ int cmp_dag_node(DagNode first, DagNode second)
 // 查找 (op, left, right) 三元组, 没有的话新建该结点
 // 由于此处就在构造DAG结点了, 所以在这里进行模式匹配
 //
-void print_dag_(DagNode dag, int level);
 void erase_identity(DagNode *out, IR_Type op, DagNode left, DagNode right);
-int count = 0;
 DagNode query_dag_node(IR_Type ir_type, DagNode left, DagNode right)
 {
-    count++;
     DagNode p = new_dagnode(ir_type, left, right);
     for (int i = nr_dag_node - 2; i >= 0; i--) {  // 回避新建的该结点
         if (cmp_dag_node(dag_buf[i], p)) {
@@ -114,7 +111,10 @@ DagNode query_dag_node(IR_Type ir_type, DagNode left, DagNode right)
         }
     }
 
+    // 消除单位元
     erase_identity(&p, ir_type, left, right);
+
+    // 结合律
 
     return p;
 }
@@ -156,35 +156,4 @@ void erase_identity(DagNode *out, IR_Type op, DagNode left, DagNode right)
 #undef INT_IDENTITY_CHECK
 #undef FLOAT_IDENTITY_CHECK
 #undef FIND_IDENTITY
-}
-
-//
-// 测试打印
-//
-void print_operand(Operand ope, char *str);
-void print_dag_(DagNode dag, int level)
-{
-    if (dag == NULL) {
-        return;
-    } else {
-        int indent = 2 * level;
-        char str[16];
-        if (dag->type == DAG_LEAF) {
-            print_operand(dag->leaf.initial_value, str);
-            printf("%*sleaf: %s\n", indent, "", str);
-        } else if (dag->type == DAG_OP) {
-            printf("%*snode: op %d\n", indent, "", dag->op.ir_type);
-            print_dag_(dag->op.left, level + 1);
-            print_dag_(dag->op.right, level + 1);
-        } else {
-            LOG("Unexpected dag");
-            assert(0);
-        }
-    }
-}
-void print_dag()
-{
-    for (int i = nr_dag_node - 1; i >= 0; i--) {
-        print_dag_(dag_buf[i], 0);
-    }
 }
