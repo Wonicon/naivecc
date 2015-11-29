@@ -3,6 +3,7 @@
 //
 
 #include "ir.h"
+#include "operand.h"
 #include "dag.h"
 #include <stdlib.h>
 #include <string.h>
@@ -32,6 +33,12 @@ int nr_instr;
 static char rs_s[NAME_LEN];
 static char rt_s[NAME_LEN];
 static char rd_s[NAME_LEN];
+
+// 操作数缓冲区, 用于当前基本块的分析
+struct {
+    Operand buf[4096];
+    int count;
+} opetab;
 
 struct {
     IR_Type relop;
@@ -559,16 +566,19 @@ static void gen_dag_from_instr(IR *pIR)
     if (rs && !rs->dep) {
         LOG("rs新建叶子");
         rs->dep = new_leaf(rs);
+        addope(rs);
     }
     if (rt && !rt->dep) {
         LOG("rt新建叶子");
         rt->dep = new_leaf(rt);
+        addope(rt);
     }
 
     // 虽然 rd 对应的操作数可能会与 rs / rt 相同
     // 但是我们用于搜索的依据的是 rs / rt 的依赖结点, 如果操作数相同,
     // 依赖结点最后会被更新, 就是另外一个搜索依据了.
     if (rd) {
+        addope(rd);
         if (pIR->type == IR_ASSIGN && rs) {
             LOG("赋值语句, 传递依赖");
             rd->dep = rs->dep;
@@ -592,6 +602,7 @@ static void gen_dag_from_instr(IR *pIR)
 void gen_dag(IR buf[], int start, int end)
 {
     init_dag();
+    init_opetable();
     for (int i = start; i < end; i++) {
         gen_dag_from_instr(&buf[i]);
     }
@@ -641,7 +652,7 @@ void inline_replace(IR buf[], int nr)
         IR *pir = &buf[i];
         if (pir->rs && pir->rs->type == OPE_REFADDR && pir->type == IR_DEREF_L) {
             pir->type = IR_ASSIGN;
-            pir->rd = new_operand(OPE_NOT_USED);
+            pir->rd = new_operand(OPE_NOT_USED);  // 防止对引用变量产生副作用
             pir->rd->type = OPE_REF;
             pir->rd->index = pir->rs->index;
             pir->rs = pir->rt;
@@ -665,37 +676,37 @@ Operand gen_from_dag_(DagNode dag)
     }
 }
 
-void gen_from_dag(int start, int end)
+void gen_instr_from_dag(int start, int end)
 {
     for (int i = start; i < end; i++) {
         IR *p = &instr_buffer[i];
-        if (p->rd) {
-            gen_from_dag_(p->rd->dep);
-            if (is_always_live(p->rd) && p->rd->dep->op.embody != p->rd) {  // 变量出口活跃!?
-#ifdef DEBUG
-                char strbuf[64];
-                print_operand(p->rd, strbuf);
-                LOG("%s是变量且不是依赖表达式的代表, 生成赋值语句", strbuf);
-#endif
-                new_instr_(&ir_from_dag[nr_ir_from_dag++], IR_ASSIGN,
-                           p->rd->dep->type == DAG_LEAF ? p->rd->dep->leaf.initial_value : p->rd->dep->op.embody,
-                           NULL, p->rd);
-            } else if (p->rd->type == OPE_NOT_USED) {
+        gen_from_dag_(p->rd->dep);
+    }
 
+    // 处理出口变量
+    int idx = 0;
+    Operand ope;
+    IR last = ir_from_dag[nr_ir_from_dag - 1];
+    if (last.type != IR_RET) {
+        // 不需要在最后是return的情况下保留变量终值, 因为不需要了
+        // 至于引用类型, 由于是纯操作数的 *= 转化来的, 肯定会顺序生成.
+        if (can_jump(&last)) {
+            nr_ir_from_dag = nr_ir_from_dag - 1;
+        }
+        while ((ope = getope(idx++))) {
+            if (is_always_live(ope) && gen_from_dag_(ope->dep) != ope) {
+                LOG("有木有");
+                new_instr_(ir_from_dag + nr_ir_from_dag, IR_ASSIGN, gen_from_dag_(ope->dep), NULL, ope);
+                nr_ir_from_dag++;
             }
-        } else {
-            // 没有目标操作数的指令一定要生成:
-            // GOTO, LABEL, FUNCTION
-            // 还有最重要的 *=
-            // 顺序生成能保证原来的顺序不变
-            new_instr_(&ir_from_dag[nr_ir_from_dag++],
-                       p->type,
-                       p->rs ? gen_from_dag_(p->rs->dep) : NULL,
-                       p->rt ? gen_from_dag_(p->rt->dep) : NULL,
-                       NULL);
+        }
+        if (can_jump(&last)) {
+            ir_from_dag[nr_ir_from_dag++] = last;
         }
     }
 
+
+    // 清理操作数
     for (int i = start; i < end; i++) {
         IR *p = &instr_buffer[i];
         for (int j = 0; j < 3; j++) {
@@ -722,7 +733,7 @@ void print_block() {
         int end = blk_buf[i].end;
         optimize_liveness(beg, end);
         gen_dag(instr_buffer, beg, end);
-        gen_from_dag(beg, end);
+        gen_instr_from_dag(beg, end);
     }
 #if 1
     int current_block = 0;
