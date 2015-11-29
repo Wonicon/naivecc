@@ -277,8 +277,6 @@ bool can_jump(IR *pIR) {
     } else {
         switch (pIR->type) {
             case IR_JMP:
-            case IR_CALL:
-            case IR_WRITE:
                 return true;
             default:
                 return false;
@@ -490,7 +488,6 @@ int is_leader(int ir_idx) {
     return ir_idx == 0 ||
             instr_buffer[ir_idx].type == IR_LABEL ||
             instr_buffer[ir_idx].type == IR_FUNC ||
-            instr_buffer[ir_idx].type == IR_READ ||
             can_jump(&instr_buffer[ir_idx - 1]);
 }
 
@@ -583,6 +580,12 @@ static void gen_dag_from_instr(IR *pIR)
                 LOG("已经有代表操作数");
             }
         }
+    } else {
+        // *= 没有目的操作数, 但是不能直接使用源操作数的依赖
+        // 新操作数只对该条指令有效, 不会有全局的副作用
+        pIR->rd = new_operand(OPE_NOT_USED);
+        pIR->rd->dep = new_dagnode(pIR->type, rs ? rs->dep : NULL, rt ? rt->dep : NULL);
+        pIR->rd->dep->op.embody = pIR->rd;
     }
 }
 
@@ -598,21 +601,6 @@ int new_dag_ir(IR_Type type, Operand rs, Operand rt, Operand rd)
 {
     new_instr_(&ir_from_dag[nr_ir_from_dag], type, rs, rt, rd);
     return nr_ir_from_dag++;
-}
-
-Operand gen_from_dag_(DagNode dag)
-{
-    if (dag == NULL) {
-        return NULL;
-    } else if (dag->type == DAG_LEAF) {
-        return dag->leaf.initial_value;  // 叶结点用于返回初始值
-    } else if (dag->type == DAG_OP && !dag->op.has_gen) {
-        new_dag_ir(dag->op.ir_type, gen_from_dag_(dag->op.left), gen_from_dag_(dag->op.right), dag->op.embody);
-        dag->op.has_gen = 1;  // 防止重复生成
-        return dag->op.embody;  // 使用统一的代表操作数, 提供后续优化机会
-    } else {
-        return dag->op.embody;
-    }
 }
 
 //
@@ -649,7 +637,6 @@ void inline_replace(IR buf[], int nr)
     }
 
     // 消除 *&r
-#if 1
     for (int i = 0; i < nr; i++) {
         IR *pir = &buf[i];
         if (pir->rs && pir->rs->type == OPE_REFADDR && pir->type == IR_DEREF_L) {
@@ -661,7 +648,21 @@ void inline_replace(IR buf[], int nr)
             pir->rt = NULL;
         }
     }
-#endif
+}
+
+Operand gen_from_dag_(DagNode dag)
+{
+    if (dag == NULL) {
+        return NULL;
+    } else if (dag->type == DAG_LEAF) {
+        return dag->leaf.initial_value;  // 叶结点用于返回初始值
+    } else if (dag->type == DAG_OP && !dag->op.has_gen) {
+        new_dag_ir(dag->op.ir_type, gen_from_dag_(dag->op.left), gen_from_dag_(dag->op.right), dag->op.embody);
+        dag->op.has_gen = 1;  // 防止重复生成
+        return dag->op.embody;  // 使用统一的代表操作数, 提供后续优化机会
+    } else {
+        return dag->op.embody;
+    }
 }
 
 void gen_from_dag(int start, int end)
@@ -679,6 +680,8 @@ void gen_from_dag(int start, int end)
                 new_instr_(&ir_from_dag[nr_ir_from_dag++], IR_ASSIGN,
                            p->rd->dep->type == DAG_LEAF ? p->rd->dep->leaf.initial_value : p->rd->dep->op.embody,
                            NULL, p->rd);
+            } else if (p->rd->type == OPE_NOT_USED) {
+
             }
         } else {
             // 没有目标操作数的指令一定要生成:
