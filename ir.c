@@ -281,6 +281,65 @@ bool can_jump(IR *pIR) {
 }
 
 //
+// 检查常量
+//
+bool is_const(Operand ope)
+{
+    return ope->type == OPE_INTEGER || ope->type == OPE_FLOAT;
+}
+
+//
+// 常量计算
+//
+Operand calc_const(IR_Type op, Operand left, Operand right)
+{
+    assert(left->type == right->type && is_const(left));
+    assert(IR_ADD <= op && op <= IR_DIV);
+
+    Operand rst = new_operand(left->type);
+    switch (left->type) {
+        case OPE_INTEGER: {
+            switch (op) {
+                case IR_ADD:
+                    rst->integer = left->integer + right->integer;
+                    break;
+                case IR_SUB:
+                    rst->integer = left->integer - right->integer;
+                    break;
+                case IR_MUL:
+                    rst->integer = left->integer * right->integer;
+                    break;
+                case IR_DIV:
+                    rst->integer = left->integer / right->integer;
+                    break;
+                default: assert(0);
+            }
+            break;
+        }
+        case OPE_FLOAT: {
+            switch (op) {
+                case IR_ADD:
+                    rst->real = left->real + right->real;
+                    break;
+                case IR_SUB:
+                    rst->real = left->real - right->real;
+                    break;
+                case IR_MUL:
+                    rst->real = left->real * right->real;
+                    break;
+                case IR_DIV:
+                    rst->real = left->real / right->real;
+                    break;
+                default: assert(0);
+            }
+            break;
+        }
+        default: assert(0);
+    }
+    return rst;
+}
+
+//
 // relop 字典使用接口
 //
 #define search_relop_common(name, field, type, miss_val) \
@@ -503,6 +562,9 @@ static void gen_dag_from_instr(IR *pIR)
         rt->dep = new_leaf(rt);
     }
 
+    // 虽然 rd 对应的操作数可能会与 rs / rt 相同
+    // 但是我们用于搜索的依据的是 rs / rt 的依赖结点, 如果操作数相同,
+    // 依赖结点最后会被更新, 就是另外一个搜索依据了.
     if (rd) {
         if (pIR->type == IR_ASSIGN && rs) {
             LOG("赋值语句, 传递依赖");
@@ -518,11 +580,11 @@ static void gen_dag_from_instr(IR *pIR)
     }
 }
 
-void gen_dag(int start, int end)
+void gen_dag(IR buf[], int start, int end)
 {
     init_dag();
     for (int i = start; i < end; i++) {
-        gen_dag_from_instr(&instr_buffer[i]);
+        gen_dag_from_instr(&buf[i]);
     }
 }
 
@@ -565,6 +627,18 @@ void inline_replace(IR buf[], int nr)
             pir->type = IR_NOP;
             pir->rd->type = OPE_REFADDR;
             pir->rd->index = pir->rs->index;
+        }
+    }
+
+    // 消除 *&r
+    for (int i = 0; i < nr; i++) {
+        IR *pir = &buf[i];
+        if (pir->rs && pir->rs->type == OPE_REFADDR && pir->type == IR_DEREF_L) {
+            pir->type = IR_ASSIGN;
+            pir->rd = pir->rs;
+            pir->rd->type = OPE_REF;
+            pir->rs = pir->rt;
+            pir->rt = NULL;
         }
     }
 }
@@ -615,9 +689,11 @@ void print_block() {
     block_partition();
 
     for (int i = 0; i < nr_blk; i++) {
-        optimize_liveness(blk_buf[i].start, blk_buf[i].end);
-        gen_dag(blk_buf[i].start, blk_buf[i].end);
-        gen_from_dag(blk_buf[i].start, blk_buf[i].end);
+        int beg = blk_buf[i].start;
+        int end = blk_buf[i].end;
+        optimize_liveness(beg, end);
+        gen_dag(instr_buffer, beg, end);
+        gen_from_dag(beg, end);
     }
 #if 1
     int current_block = 0;

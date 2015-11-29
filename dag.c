@@ -96,23 +96,66 @@ int cmp_dag_node(DagNode first, DagNode second)
 
 //
 // 查找 (op, left, right) 三元组, 没有的话新建该结点
+// 由于此处就在构造DAG结点了, 所以在这里进行模式匹配
 //
 void print_dag_(DagNode dag, int level);
+void erase_identity(DagNode *out, IR_Type op, DagNode left, DagNode right);
 int count = 0;
 DagNode query_dag_node(IR_Type ir_type, DagNode left, DagNode right)
 {
     count++;
     DagNode p = new_dagnode(ir_type, left, right);
     for (int i = nr_dag_node - 2; i >= 0; i--) {  // 回避新建的该结点
-        LOG("比较第%d个DAG结点", i + 1);
         if (cmp_dag_node(dag_buf[i], p)) {
-            LOG("发现公共子表达式");
+            LOG("在第%d个DAG结点发现公共子表达式", i);
             free(p);
             nr_dag_node--;
             return dag_buf[i];
         }
     }
+
+    erase_identity(&p, ir_type, left, right);
+
     return p;
+}
+
+void erase_identity(DagNode *out, IR_Type op, DagNode left, DagNode right)
+{
+    // 模式匹配模板 单位元发现
+#define INT_IDENTITY_CHECK(x, y) (x->type == OPE_INTEGER && x->integer == y)
+#define FLOAT_IDENTITY_CHECK(x, y) (x->type == OPE_FLOAT && abs(x->real - y) < 1e-10)
+#define STR(x) # x
+#define FIND_IDENTITY(Left, Right, Identity)                                                                           \
+    do {                                                                                                               \
+        Operand init = Left->leaf.initial_value;                                                                       \
+        if (Left->type == DAG_LEAF && is_const(init)                                                                   \
+              && (INT_IDENTITY_CHECK(init, Identity) || FLOAT_IDENTITY_CHECK(init, Identity))) {                       \
+            LOG("单位元发现: %s是%s", STR(Left), STR(Identity));                                                      \
+            free(*out);                                                                                                \
+            nr_dag_node--;                                                                                             \
+            *out = Right;                                                                                              \
+            return;\
+        }                                                                                                              \
+    } while (0)
+    // 模式匹配 单位元发现
+    // 利用falldown实现交换律
+    switch (op) {
+        case IR_ADD:
+            FIND_IDENTITY(left, right, 0);
+        case IR_SUB:
+            FIND_IDENTITY(right, left, 0);
+            break;
+        case IR_MUL:
+            FIND_IDENTITY(left, right, 1);
+        case IR_DIV:
+            FIND_IDENTITY(right, left, 1);
+            break;
+        default:
+            break;
+    }
+#undef INT_IDENTITY_CHECK
+#undef FLOAT_IDENTITY_CHECK
+#undef FIND_IDENTITY
 }
 
 //
