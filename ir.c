@@ -439,10 +439,12 @@ static void gen_dag_from_instr(IR *pIR)
         LOG("rs新建叶子");
         rs->dep = new_leaf(rs);
         addope(rs);
+        add_depend(rs->dep, rs);
     }
     if (rt && !rt->dep) {
         LOG("rt新建叶子");
         rt->dep = new_leaf(rt);
+        add_depend(rt->dep, rt);
         addope(rt);
     }
 
@@ -451,7 +453,7 @@ static void gen_dag_from_instr(IR *pIR)
     // 依赖结点最后会被更新, 就是另外一个搜索依据了.
     if (rd && !can_jump(pIR)) {
         addope(rd);
-        if (rd->dep && rd->dep->type == DAG_OP) {
+        if (rd->dep) {
             LOG("取消引用");
             rd->dep->ref_count--;
             delete_depend(rd);
@@ -544,7 +546,12 @@ Operand gen_single_instr_from_dag(pDagNode dag)
     }
 
     if (dag->type == DAG_LEAF) {
-        return dag->initial_value;  // 叶结点用于返回初始值
+        Operand old_init = dag->initial_value;
+        Operand current = query_operand_depending_on(dag);
+        if (old_init != current && current != NULL) {
+            dag->initial_value = current;
+        }
+        return old_init;  // 叶结点用于返回初始值
     } else if (dag->type == DAG_OP && !dag->has_gen) {
         dag->embody = query_operand_depending_on(dag);
         new_dag_ir(dag->op, gen_single_instr_from_dag(dag->left), gen_single_instr_from_dag(dag->right), dag->embody);
@@ -563,6 +570,9 @@ void gen_instr_from_dag(int start, int end)
         IR *p = &instr_buffer[i];
         if (p->depend->ref_count > 0 || p->type == IR_CALL) {
             pDagNode dag;
+            if (p->type == IR_CALL) {
+                bp();
+            }
             if (p->rd) {
                 dag = query_dagnode_depended_on(p->rd);
             } else {
