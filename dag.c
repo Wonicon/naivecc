@@ -36,6 +36,7 @@ bool pair_eq(int index, pDagNode dagnode, Operand operand)
 void add_depend(pDagNode dagnode, Operand operand)
 {
 #ifdef DEBUG
+    assert(depend_count < MAX * 2);
     for (int i = 0; i < depend_count; i++) {
         if (pair_eq(i, dagnode, operand)) {
             LOG("依赖关系冲突!");
@@ -45,6 +46,7 @@ void add_depend(pDagNode dagnode, Operand operand)
 #endif
     depend_buf[depend_count].dagnode = dagnode;
     depend_buf[depend_count].operand = operand;
+    depend_count++;
 }
 
 // 删除operand对应的依赖关系
@@ -60,6 +62,7 @@ void delete_depend(Operand operand)
             for (int j = i; j < depend_count - 1; j++) {
                 depend_buf[j] = depend_buf[j + 1];
             }
+            depend_count--;
             flag = true;
 #ifndef DEBUG
             break;
