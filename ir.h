@@ -133,6 +133,7 @@ typedef struct {
         Operand operand[NR_OPE];
     };
     int block;
+    pDagNode depend;
     union {
         struct {
             OptimizeInfo rd_info;

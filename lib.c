@@ -4,8 +4,8 @@
 
 char *cmm_strdup(const char *str)
 {
-    int len = strlen(str);
-    char *s = (char *)malloc(sizeof(*str) * (len + 1));
+    char *s = (char *)malloc(strlen(str));
+    memset(s, 0, strlen(str) + 1);
     strcpy(s, str);
     return s;
 }

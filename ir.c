@@ -452,6 +452,7 @@ static void gen_dag_from_instr(IR *pIR)
                 LOG("已经有代表操作数");
             }
         }
+        pIR->depend = rd->dep;
     } else {
         // *= 没有目的操作数, 但是不能直接使用源操作数的依赖
         // 新操作数只对该条指令有效, 不会有全局的副作用
@@ -530,7 +531,9 @@ void gen_instr_from_dag(int start, int end)
 {
     for (int i = start; i < end; i++) {
         IR *p = &instr_buffer[i];
-        if (!(is_tmp(p->rd) || is_always_live(p->rd)) || p->type == IR_CALL) {
+        if (p->type == IR_DEREF_L || p->type == IR_CALL) {
+        }
+        if (!(is_tmp(p->rd)) || p->type == IR_CALL) {
             gen_from_dag_(p->rd->dep);
         }
     }
@@ -552,6 +555,7 @@ void gen_instr_from_dag(int start, int end)
                 nr_ir_from_dag++;
             }
         }
+
         if (can_jump(&last)) {
             ir_from_dag[nr_ir_from_dag++] = last;
         }

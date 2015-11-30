@@ -860,6 +860,7 @@ const char *expr_to_s(Node exp) {
         free(s);
     }
     s = (char *)malloc((size_t)(len + 1));
+    memset(s, 0, (size_t)(len + 1));
     rewind(tmp);
     fgets(s, len + 1, tmp);
     fclose(tmp);

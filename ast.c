@@ -6,12 +6,14 @@
 #include "node.h"
 #include <assert.h>
 #include <stdlib.h>
+#include <string.h>
 
 //
 // 语法分析树结构体的转换构造函数
 //
 static Node trans_node(const Node nd, enum ProductionTag tag) {
     Node p = (Node)malloc(sizeof(struct Node_));
+    memset(p, 0, sizeof(*p));
     *p = *nd;
     p->tag = tag;
     p->child = NULL;

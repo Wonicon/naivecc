@@ -72,6 +72,7 @@ Operand new_operand(Ope_Type type) {
     static int nr_label = 0;
 
     Operand p = (Operand)malloc(sizeof(struct Operand_));
+    memset(p, 0, sizeof(*p));
     p->type = type;
     switch (type) {
         case OPE_VAR:

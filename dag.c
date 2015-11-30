@@ -123,7 +123,15 @@ pDagNode query_dag_node(IR_Type ir_type, pDagNode left, pDagNode right)
 
 bool is_const_dag_node(pDagNode nd)
 {
-    return nd->type == DAG_LEAF && is_const(nd->leaf.initial_value);
+    return nd && nd->type == DAG_LEAF && is_const(nd->leaf.initial_value);
+}
+
+bool is_anti_op(IR_Type first, IR_Type second)
+{
+    return (first == IR_ADD && second == IR_SUB) ||
+            (first == IR_SUB && second == IR_ADD) ||
+            (first == IR_MUL && second == IR_DIV) ||
+            (first == IR_DIV && second == IR_MUL);
 }
 
 bool is_same_op_level(IR_Type first, IR_Type second)
@@ -244,13 +252,60 @@ pDagNode const_associativity(IR_Type op, pDagNode left, pDagNode right)
         }
     } else {
         LOG("左右都不是常量");
-        if (exchangable(op)) {
-            if (check_counter(op, left, right) || check_counter(op, right, left)) {
-                return new_dagnode(op, left->op.left, right->op.left);
+        if (exchangable(op) && (check_counter(op, left, right) || check_counter(op, right, left))) {
+            LOG("(A op B) op (C anti B) -> A op C");
+            return new_dagnode(op, left->op.left, right->op.left);
+        } else if (is_same_op_level(op, IR_ADD) && is_anti_op(op, left->op.ir_type) && cmp_dag_node(right, left->op.right)) {
+            LOG("(A op B) anti B -> A");
+            return left->op.left;
+        } else if (is_same_op_level(op, IR_ADD) && is_anti_op(op, right->op.ir_type) && cmp_dag_node(left, right->op.right)) {
+            LOG("A op (B anti A) -> B");
+            return right->op.left;
+        } else if (is_const_dag_node(left->op.right) && is_const_dag_node(right->op.right) &&
+                is_same_op_level(op, left->op.ir_type) && is_same_op_level(op, right->op.ir_type)) {
+            LOG("(A op1 C1) op2 (B op3 C2) -> (A op2 B) op1 C3");
+            pDagNode v = new_dagnode(op, left->op.left, right->op.left);
+            v->op.embody = new_operand(OPE_TEMP);
+            Operand c = calc_const(top_op[OFF(left->op.ir_type)][OFF(right->op.ir_type)],
+                                   left->op.right->leaf.initial_value, right->op.right->leaf.initial_value);
+
+            return new_dagnode(left->op.ir_type, v, new_leaf(c));
+        }
+
+        if (left->op.ir_type == right->op.ir_type &&
+                is_same_op_level(left->op.ir_type, IR_MUL) &&
+                is_same_op_level(op, IR_ADD)) {
+            LOG("分配率优化?");
+            IR_Type high_level_op = left->op.ir_type;
+            bool mul = high_level_op == IR_MUL;
+            pDagNode ll = left->op.left;
+            pDagNode lr = left->op.right;
+            pDagNode rl = right->op.left;
+            pDagNode rr = right->op.right;
+
+            if (cmp_dag_node(lr, rr)) {
+                pDagNode v = query_dag_node(op, ll, rl);
+                v->op.embody = new_operand(OPE_TEMP);
+                return new_dagnode(high_level_op, v, lr);
+            } else if (mul && cmp_dag_node(ll, rl)) {
+                pDagNode v = query_dag_node(op, lr, rr);
+                v->op.embody = new_operand(OPE_TEMP);
+                return new_dagnode(high_level_op, v, ll);
+            } else if (mul && cmp_dag_node(lr, rl)) {
+                pDagNode v = query_dag_node(op, ll, rr);
+                v->op.embody = new_operand(OPE_TEMP);
+                return new_dagnode(high_level_op, v, lr);
+            } else if (mul && cmp_dag_node(ll, rr)) {
+                pDagNode v = query_dag_node(op, lr, rl);
+                v->op.embody = new_operand(OPE_TEMP);
+                return new_dagnode(high_level_op, v, ll);
+            } else {
+                LOG("无法结合");
             }
         }
-        return NULL;
     }
+
+    return NULL;
 #undef OFF
 }
 
