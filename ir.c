@@ -9,7 +9,7 @@
 #include <string.h>
 #include <assert.h>
 
-#define NAME_LEN 32
+#define NAME_LEN 120
 
 typedef struct Block_ *Block;
 
@@ -464,8 +464,8 @@ static void gen_dag_from_instr(IR *pIR)
             } else {
                 rd->dep = query_dag_node(pIR->type, rs ? rs->dep : NULL, rt ? rt->dep : NULL);
             }
-            if (rd->dep->op.embody == NULL) {
-                rd->dep->op.embody = rd;
+            if (rd->dep->embody == NULL) {
+                rd->dep->embody = rd;
             } else {
                 LOG("已经有代表操作数");
             }
@@ -477,7 +477,7 @@ static void gen_dag_from_instr(IR *pIR)
     } else {
         // 没有目标操作数的指令必须被生成
         pIR->depend = new_dagnode(pIR->type, rs ? rs->dep : NULL, rt ? rt->dep : NULL);
-        pIR->depend->op.embody = pIR->rd;
+        pIR->depend->embody = pIR->rd;
         pIR->depend->ref_count = 1;
     }
 }
@@ -539,13 +539,13 @@ Operand gen_single_instr_from_dag(pDagNode dag)
     }
 
     if (dag->type == DAG_LEAF) {
-        return dag->leaf.initial_value;  // 叶结点用于返回初始值
-    } else if (dag->type == DAG_OP && !dag->op.has_gen) {
-        new_dag_ir(dag->op.ir_type, gen_single_instr_from_dag(dag->op.left), gen_single_instr_from_dag(dag->op.right), dag->op.embody);
-        dag->op.has_gen = 1;  // 防止重复生成
-        return dag->op.embody;  // 使用统一的代表操作数, 提供后续优化机会
+        return dag->initial_value;  // 叶结点用于返回初始值
+    } else if (dag->type == DAG_OP && !dag->has_gen) {
+        new_dag_ir(dag->op, gen_single_instr_from_dag(dag->left), gen_single_instr_from_dag(dag->right), dag->embody);
+        dag->has_gen = 1;  // 防止重复生成
+        return dag->embody;  // 使用统一的代表操作数, 提供后续优化机会
     } else {
-        return dag->op.embody;
+        return dag->embody;
     }
 }
 

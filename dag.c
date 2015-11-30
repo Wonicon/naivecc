@@ -27,7 +27,7 @@ pDagNode new_leaf(Operand ope)
     pDagNode p = &dag_buf[nr_dag_node++];
     memset(p, 0, sizeof(*p));
     p->type = DAG_LEAF;
-    p->leaf.initial_value = ope;
+    p->initial_value = ope;
     return p;
 }
 
@@ -35,9 +35,9 @@ pDagNode new_dagnode(IR_Type ir_type, pDagNode left, pDagNode right)
 {
     pDagNode p = &dag_buf[nr_dag_node++];
     memset(p, 0, sizeof(*p));
-    p->op.ir_type = ir_type;
-    p->op.left = left;
-    p->op.right = right;
+    p->op = ir_type;
+    p->left = left;
+    p->right = right;
     p->type = DAG_OP;
     return p;
 }
@@ -55,30 +55,30 @@ int cmp_dag_node(pDagNode first, pDagNode second)
     }
 
     if (first->type == DAG_OP) {
-        if (first->op.ir_type != second->op.ir_type) {
+        if (first->op != second->op) {
             return false;
         }
 
         // 解引用不能被优化
         // 优化的结果会导致非代表元用代表元来赋值, 而地址值可能在别的变量中用于寻址赋值,
         // 所以代表元里存储的不一定是新的值.
-        if (first->op.ir_type == IR_DEREF_R) {
+        if (first->op == IR_DEREF_R) {
             return false;
         }
 
-        if (cmp_dag_node(first->op.left, second->op.left) && cmp_dag_node(first->op.right, second->op.right)) {
+        if (cmp_dag_node(first->left, second->left) && cmp_dag_node(first->right, second->right)) {
             return true;
         }
 
         // 交换律
-        if (first->op.ir_type == IR_ADD || first->op.ir_type == IR_MUL) {
-            return cmp_dag_node(first->op.left, second->op.right) && cmp_dag_node(first->op.right, second->op.left);
+        if (first->op == IR_ADD || first->op == IR_MUL) {
+            return cmp_dag_node(first->left, second->right) && cmp_dag_node(first->right, second->left);
         }
 
         return false;
     } else if (first->type== DAG_LEAF) {
-        Operand left = first->leaf.initial_value;
-        Operand right = second->leaf.initial_value;
+        Operand left = first->initial_value;
+        Operand right = second->initial_value;
         if (left->type == right->type) {
             switch (left->type) {
                 case OPE_INTEGER: return left->integer == right->integer;
@@ -109,24 +109,24 @@ pDagNode query_dag_node(IR_Type ir_type, pDagNode left, pDagNode right)
     }
 
     pDagNode optimal;
-    if ((optimal = const_associativity(p->op.ir_type, p->op.left, p->op.right))) {  // 结合律
+    if ((optimal = const_associativity(p->op, p->left, p->right))) {  // 结合律
         p = optimal;
     }
 
-    if ((optimal = erase_identity(p->op.ir_type, p->op.left, p->op.right))) {  // 消除单位元
+    if ((optimal = erase_identity(p->op, p->left, p->right))) {  // 消除单位元
         p = optimal;
     }
 
-    assert(p->type != DAG_OP || (IR_NOP <= p->op.ir_type && p->op.ir_type <= IR_WRITE));
+    assert(p->type != DAG_OP || (IR_NOP <= p->op && p->op <= IR_WRITE));
 
-    if (p->op.left) p->op.left->ref_count++;
-    if (p->op.right) p->op.right->ref_count++;
+    if (p->left) p->left->ref_count++;
+    if (p->right) p->right->ref_count++;
     return p;
 }
 
 bool is_const_dag_node(pDagNode nd)
 {
-    return nd && nd->type == DAG_LEAF && is_const(nd->leaf.initial_value);
+    return nd && nd->type == DAG_LEAF && is_const(nd->initial_value);
 }
 
 bool is_anti_op(IR_Type first, IR_Type second)
@@ -157,9 +157,9 @@ bool exchangable(IR_Type op)
 }
 
 bool check_counter(IR_Type op, pDagNode left, pDagNode right) {
-    if (op == IR_ADD && left->op.ir_type == op && right->op.ir_type == IR_SUB && cmp_dag_node(left->op.right, right->op.right)) {
+    if (op == IR_ADD && left->op == op && right->op == IR_SUB && cmp_dag_node(left->right, right->right)) {
         return true;
-    } else if (op == IR_MUL && left->op.ir_type == op && right->op.ir_type == IR_DIV && cmp_dag_node(left->op.right, right->op.right)) {
+    } else if (op == IR_MUL && left->op == op && right->op == IR_DIV && cmp_dag_node(left->right, right->right)) {
         return true;
     } else {
         return false;
@@ -197,36 +197,36 @@ pDagNode const_associativity(IR_Type op, pDagNode left, pDagNode right)
         return NULL;
     } else if (is_const_dag_node(left) && is_const_dag_node(right)) {
         LOG("左右皆为常量");
-        Operand result = calc_const(op, left->leaf.initial_value, right->leaf.initial_value);
+        Operand result = calc_const(op, left->initial_value, right->initial_value);
         return new_leaf(result);
-    } else if (is_const_dag_node(left) && is_same_op_level(op, right->op.ir_type)) {
-        if (!is_tmp(right->op.embody)) {
+    } else if (is_const_dag_node(left) && is_same_op_level(op, right->op)) {
+        if (!is_tmp(right->embody)) {
             LOG("不能折叠非临时变量");
             return NULL;
         }
         // 左边为常数, 右边为运算, 可应用结合律
         // 相当于后两个操作数结合的情况, 要考虑第二个操作符去掉括号后的变化
         IR_Type lop = op;  // 由于右边为运算, 所以左操作即本函数的参数op
-        IR_Type rop = right->op.ir_type;
-        Operand lope = left->leaf.initial_value;  // 可以确认左结点的DagNode可以拿出Operand
-        if (is_const_dag_node(right->op.left)) {
+        IR_Type rop = right->op;
+        Operand lope = left->initial_value;  // 可以确认左结点的DagNode可以拿出Operand
+        if (is_const_dag_node(right->left)) {
             LOG("C1 op1 (C2 op1 V) -> C1 op1 C2 op3 V -> (C1 op1 C2) op3 V");
-            Operand rlope = right->op.left->leaf.initial_value;  // 可以确认右结点的左结点可以拿出Operand
+            Operand rlope = right->left->initial_value;  // 可以确认右结点的左结点可以拿出Operand
             Operand const_rst = calc_const(lop, lope, rlope);  // 左和右左中序相邻, 可以直接计算
             pDagNode leaf = new_leaf(const_rst);
-            return new_dagnode(top_op[OFF(lop)][OFF(rop)], leaf, right->op.right);  // 第二个操作符为取消结合后的, 同样适用上表.
-        } else if (is_const_dag_node(right->op.right)) {
+            return new_dagnode(top_op[OFF(lop)][OFF(rop)], leaf, right->right);  // 第二个操作符为取消结合后的, 同样适用上表.
+        } else if (is_const_dag_node(right->right)) {
             LOG("C1 op1 (V op2 C2) -> C1 op1 V op3 C2 -> (C1 op3 C2) op1 V");
-            Operand rrope = right->op.right->leaf.initial_value;  // 可以确认右结点的右结点可以拿出Operand
+            Operand rrope = right->right->initial_value;  // 可以确认右结点的右结点可以拿出Operand
             Operand const_rst = calc_const(top_op[OFF(lop)][OFF(rop)], lope, rrope);  // 获得取消结合后的操作符, 并且移动到前面
             pDagNode leaf = new_leaf(const_rst);
-            return new_dagnode(lop, leaf, right->op.left);  // 操作符不需要处理
+            return new_dagnode(lop, leaf, right->left);  // 操作符不需要处理
         } else {
             LOG("左边是常量, 右边没有常量, 无法结合");
             return NULL;
         }
-    } else if (is_const_dag_node(right) && is_same_op_level(op, left->op.ir_type)) {
-        if (!is_tmp(left->op.embody)) {
+    } else if (is_const_dag_node(right) && is_same_op_level(op, left->op)) {
+        if (!is_tmp(left->embody)) {
             LOG("不能折叠非临时变量");
             return NULL;
         }
@@ -234,21 +234,21 @@ pDagNode const_associativity(IR_Type op, pDagNode left, pDagNode right)
         // 此模式相当于中序, 所以有一种情况只需要移位不需要查表
         // 但是另外一种情况要考虑结合后操作符的变化
         IR_Type rop = op;
-        IR_Type lop = left->op.ir_type;
-        Operand rope = right->leaf.initial_value;  // 可以确认右结点的DagNode可以拿出Operand
+        IR_Type lop = left->op;
+        Operand rope = right->initial_value;  // 可以确认右结点的DagNode可以拿出Operand
 
-        if (is_const_dag_node(left->op.left)) {
+        if (is_const_dag_node(left->left)) {
             LOG("(C1 op1 V) op2 C2 -> (C1 op2 C2) op1 V");
-            Operand llope = left->op.left->leaf.initial_value;
+            Operand llope = left->left->initial_value;
             Operand const_rst = calc_const(rop, llope, rope);
             pDagNode leaf = new_leaf(const_rst);
-            return new_dagnode(lop, leaf, left->op.right); 
-        } else if (is_const_dag_node(left->op.right)) {
+            return new_dagnode(lop, leaf, left->right);
+        } else if (is_const_dag_node(left->right)) {
             LOG("(V op1 C1) op2 C2 -> V op1 (C1 op3 C2)");
-            Operand lrope = left->op.right->leaf.initial_value;
+            Operand lrope = left->right->initial_value;
             Operand const_rst = calc_const(top_op[OFF(lop)][OFF(rop)], lrope, rope);
             pDagNode leaf = new_leaf(const_rst);
-            return new_dagnode(lop, left->op.left, leaf);
+            return new_dagnode(lop, left->left, leaf);
         } else {
             LOG("右边是常量, 左边没有常量, 无法结合");
             return NULL;
@@ -256,50 +256,50 @@ pDagNode const_associativity(IR_Type op, pDagNode left, pDagNode right)
     } else {
         if (exchangable(op) && (check_counter(op, left, right) || check_counter(op, right, left))) {
             LOG("(A op B) op (C anti B) -> A op C");
-            return new_dagnode(op, left->op.left, right->op.left);
-        } else if (is_same_op_level(op, IR_ADD) && is_anti_op(op, left->op.ir_type) && cmp_dag_node(right, left->op.right)) {
+            return new_dagnode(op, left->left, right->left);
+        } else if (is_same_op_level(op, IR_ADD) && is_anti_op(op, left->op) && cmp_dag_node(right, left->right)) {
             LOG("(A op B) anti B -> A");
-            return left->op.left;
-        } else if (is_same_op_level(op, IR_ADD) && is_anti_op(op, right->op.ir_type) && cmp_dag_node(left, right->op.right)) {
+            return left->left;
+        } else if (is_same_op_level(op, IR_ADD) && is_anti_op(op, right->op) && cmp_dag_node(left, right->right)) {
             LOG("A op (B anti A) -> B");
-            return right->op.left;
-        } else if (is_const_dag_node(left->op.right) && is_const_dag_node(right->op.right) &&
-                is_same_op_level(op, left->op.ir_type) && is_same_op_level(op, right->op.ir_type)) {
+            return right->left;
+        } else if (is_const_dag_node(left->right) && is_const_dag_node(right->right) &&
+                   is_same_op_level(op, left->op) && is_same_op_level(op, right->op)) {
             LOG("(A op1 C1) op2 (B op3 C2) -> (A op2 B) op1 C3");
-            pDagNode v = new_dagnode(op, left->op.left, right->op.left);
-            v->op.embody = new_operand(OPE_TEMP);
-            Operand c = calc_const(top_op[OFF(left->op.ir_type)][OFF(right->op.ir_type)],
-                                   left->op.right->leaf.initial_value, right->op.right->leaf.initial_value);
+            pDagNode v = new_dagnode(op, left->left, right->left);
+            v->embody = new_operand(OPE_TEMP);
+            Operand c = calc_const(top_op[OFF(left->op)][OFF(right->op)],
+                                   left->right->initial_value, right->right->initial_value);
 
-            return new_dagnode(left->op.ir_type, v, new_leaf(c));
+            return new_dagnode(left->op, v, new_leaf(c));
         }
 
-        if (left->op.ir_type == right->op.ir_type &&
-                is_same_op_level(left->op.ir_type, IR_MUL) &&
-                is_same_op_level(op, IR_ADD)) {
+        if (left->op == right->op &&
+            is_same_op_level(left->op, IR_MUL) &&
+            is_same_op_level(op, IR_ADD)) {
             LOG("分配率优化?");
-            IR_Type high_level_op = left->op.ir_type;
+            IR_Type high_level_op = left->op;
             bool mul = high_level_op == IR_MUL;
-            pDagNode ll = left->op.left;
-            pDagNode lr = left->op.right;
-            pDagNode rl = right->op.left;
-            pDagNode rr = right->op.right;
+            pDagNode ll = left->left;
+            pDagNode lr = left->right;
+            pDagNode rl = right->left;
+            pDagNode rr = right->right;
 
             if (cmp_dag_node(lr, rr)) {
                 pDagNode v = query_dag_node(op, ll, rl);
-                v->op.embody = new_operand(OPE_TEMP);
+                v->embody = new_operand(OPE_TEMP);
                 return new_dagnode(high_level_op, v, lr);
             } else if (mul && cmp_dag_node(ll, rl)) {
                 pDagNode v = query_dag_node(op, lr, rr);
-                v->op.embody = new_operand(OPE_TEMP);
+                v->embody = new_operand(OPE_TEMP);
                 return new_dagnode(high_level_op, v, ll);
             } else if (mul && cmp_dag_node(lr, rl)) {
                 pDagNode v = query_dag_node(op, ll, rr);
-                v->op.embody = new_operand(OPE_TEMP);
+                v->embody = new_operand(OPE_TEMP);
                 return new_dagnode(high_level_op, v, lr);
             } else if (mul && cmp_dag_node(ll, rr)) {
                 pDagNode v = query_dag_node(op, lr, rl);
-                v->op.embody = new_operand(OPE_TEMP);
+                v->embody = new_operand(OPE_TEMP);
                 return new_dagnode(high_level_op, v, ll);
             } else {
                 LOG("无法结合");
@@ -319,7 +319,7 @@ pDagNode erase_identity(IR_Type op, pDagNode left, pDagNode right)
 #define STR(x) # x
 #define FIND_IDENTITY(Left, Right, Identity)                                                                           \
     do {                                                                                                               \
-        Operand init = Left->leaf.initial_value;                                                                       \
+        Operand init = Left->initial_value;                                                                       \
         if (Left->type == DAG_LEAF && is_const(init)                                                                   \
                 && (INT_IDENTITY_CHECK(init, Identity) || FLOAT_IDENTITY_CHECK(init, Identity))) {                     \
             LOG("单位元发现: %s是%s %s is %p", STR(Left), STR(Identity), STR(Right), Right);                          \

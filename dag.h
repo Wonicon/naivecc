@@ -17,22 +17,17 @@ typedef enum {
 
 typedef struct DagNode_ {
     DagNodeType type;
-
     int ref_count;
 
-    struct {
-        // 非叶子结点
-        IR_Type ir_type;    // 操作类型
-        pDagNode left;       // 左子节点
-        pDagNode right;      // 右子节点
-        Operand embody;     // "代表"目的操作数
-        int has_gen;        // 是否生成过指令
-    } op;
+    // 非叶子结点
+    IR_Type op;     // 操作类型
+    pDagNode left;       // 左子节点
+    pDagNode right;      // 右子节点
+    Operand embody;      // "代表"目的操作数
+    int has_gen;         // 是否生成过指令
 
     // 叶子结点
-    struct {
-        Operand initial_value;
-    } leaf;
+    Operand initial_value;
 } DagNode;
 
 void init_dag();
