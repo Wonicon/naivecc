@@ -530,7 +530,9 @@ void gen_instr_from_dag(int start, int end)
 {
     for (int i = start; i < end; i++) {
         IR *p = &instr_buffer[i];
-        if (!is_tmp(p->rd) || p->type == IR_CALL) gen_from_dag_(p->rd->dep);
+        if (!(is_tmp(p->rd) || is_always_live(p->rd)) || p->type == IR_CALL) {
+            gen_from_dag_(p->rd->dep);
+        }
     }
 
     // 处理出口变量
