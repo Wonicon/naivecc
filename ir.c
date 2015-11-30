@@ -103,19 +103,28 @@ static const char *ir_format[] = {
 //
 // 单条指令打印函数
 //
-void print_single_instr(IR instr, FILE *file) {
-    print_operand(instr.rd, rd_s);
-    print_operand(instr.rs, rs_s);
-    print_operand(instr.rt, rt_s);
+const char *ir_to_s(IR *pir)
+{
+    static char buf[120];
+    print_operand(pir->rd, rd_s);
+    print_operand(pir->rs, rs_s);
+    print_operand(pir->rt, rt_s);
 
     // 约定 BEQ 和 BNE 包围所有 Branch 指令
-    if (IR_BEQ <= instr.type && instr.type <= IR_BNE) {
-        fprintf(file, ir_format[instr.type], rs_s, rt_s, rd_s);  // 交换顺序
-    } else if (instr.type == IR_DEC) {  // 规划干不过特例
-        fprintf(file, ir_format[instr.type], rd_s, rs_s, rt_s + 1);
+    if (IR_BEQ <= pir->type && pir->type <= IR_BNE) {
+        sprintf(buf, ir_format[pir->type], rs_s, rt_s, rd_s);  // 交换顺序
+    } else if (pir->type == IR_DEC) {  // 规划干不过特例
+        sprintf(buf, ir_format[pir->type], rd_s, rs_s, rt_s + 1);
     } else {
-        fprintf(file, ir_format[instr.type], rd_s, rs_s, rt_s);
+        sprintf(buf, ir_format[pir->type], rd_s, rs_s, rt_s);
     }
+
+    return buf;
+}
+
+void print_single_instr(IR instr, FILE *file)
+{
+    fprintf(file, "%s", ir_to_s(&instr));
 
     if (instr.type != IR_NOP) {
         fprintf(file, "\n");
@@ -420,10 +429,7 @@ void optimize_liveness(int start, int end) {
 
 static void gen_dag_from_instr(IR *pIR)
 {
-#ifdef DEBUG
-    LOG("转换:");
-    print_single_instr(*pIR, stdout);
-#endif
+    LOG("转换: %s", ir_to_s(pIR));
     Operand rs = pIR->rs;
     Operand rt = pIR->rt;
     Operand rd = pIR->rd;
@@ -443,7 +449,7 @@ static void gen_dag_from_instr(IR *pIR)
     // 依赖结点最后会被更新, 就是另外一个搜索依据了.
     if (rd && !can_jump(pIR)) {
         addope(rd);
-        if (rd->dep) {
+        if (rd->dep && rd->dep->type == DAG_OP) {
             LOG("取消引用");
             rd->dep->ref_count--;
         }
@@ -451,7 +457,11 @@ static void gen_dag_from_instr(IR *pIR)
             LOG("赋值语句, 传递依赖");
             rd->dep = rs->dep;
         } else {
-            rd->dep = query_dag_node(pIR->type, rs ? rs->dep : NULL, rt ? rt->dep : NULL);
+            if (pIR->type == IR_CALL || pIR->type == IR_READ) {
+                rd->dep = new_dagnode(pIR->type, rs ? rs->dep : NULL, rt ? rt->dep : NULL);
+            } else {
+                rd->dep = query_dag_node(pIR->type, rs ? rs->dep : NULL, rt ? rt->dep : NULL);
+            }
             if (rd->dep->op.embody == NULL) {
                 rd->dep->op.embody = rd;
             } else {
@@ -544,7 +554,7 @@ void gen_instr_from_dag(int start, int end)
         if (p->depend->ref_count > 0 || p->type == IR_CALL) {
             Operand dst = gen_single_instr_from_dag(p->depend);
             if (p->type == IR_ASSIGN && p->rd != dst) {
-                new_dag_ir(IR_ASSIGN, dst, NULL, p->rd);
+                new_dag_ir(IR_ASSIGN, p->rs, NULL, p->rd);
             }
         }
     }
