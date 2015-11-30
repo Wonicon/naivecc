@@ -430,9 +430,11 @@ void optimize_liveness(int start, int end) {
 static void gen_dag_from_instr(IR *pIR)
 {
     LOG("转换: %s", ir_to_s(pIR));
+
     Operand rs = pIR->rs;
     Operand rt = pIR->rt;
     Operand rd = pIR->rd;
+
     if (rs && !rs->dep) {
         LOG("rs新建叶子");
         rs->dep = new_leaf(rs);
@@ -553,8 +555,8 @@ void gen_instr_from_dag(int start, int end)
         IR *p = &instr_buffer[i];
         if (p->depend->ref_count > 0 || p->type == IR_CALL) {
             Operand dst = gen_single_instr_from_dag(p->depend);
-            if (p->type == IR_ASSIGN && p->rd != dst) {
-                new_dag_ir(IR_ASSIGN, p->rs, NULL, p->rd);
+            if (p->rd && is_always_live(p->rd)  && p->rd != dst) {
+                new_dag_ir(IR_ASSIGN, dst, NULL, p->rd);
             }
         }
     }
