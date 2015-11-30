@@ -118,6 +118,9 @@ pDagNode query_dag_node(IR_Type ir_type, pDagNode left, pDagNode right)
     }
 
     assert(p->type != DAG_OP || (IR_NOP <= p->op.ir_type && p->op.ir_type <= IR_WRITE));
+
+    if (p->op.left) p->op.left->ref_count++;
+    if (p->op.right) p->op.right->ref_count++;
     return p;
 }
 
@@ -251,7 +254,6 @@ pDagNode const_associativity(IR_Type op, pDagNode left, pDagNode right)
             return NULL;
         }
     } else {
-        LOG("左右都不是常量");
         if (exchangable(op) && (check_counter(op, left, right) || check_counter(op, right, left))) {
             LOG("(A op B) op (C anti B) -> A op C");
             return new_dagnode(op, left->op.left, right->op.left);

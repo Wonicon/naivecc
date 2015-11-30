@@ -18,6 +18,8 @@ typedef enum {
 typedef struct DagNode_ {
     DagNodeType type;
 
+    int ref_count;
+
     struct {
         // 非叶子结点
         IR_Type ir_type;    // 操作类型

@@ -420,8 +420,10 @@ void optimize_liveness(int start, int end) {
 
 static void gen_dag_from_instr(IR *pIR)
 {
+#ifdef DEBUG
     LOG("转换:");
     print_single_instr(*pIR, stdout);
+#endif
     Operand rs = pIR->rs;
     Operand rt = pIR->rt;
     Operand rd = pIR->rd;
@@ -439,8 +441,12 @@ static void gen_dag_from_instr(IR *pIR)
     // 虽然 rd 对应的操作数可能会与 rs / rt 相同
     // 但是我们用于搜索的依据的是 rs / rt 的依赖结点, 如果操作数相同,
     // 依赖结点最后会被更新, 就是另外一个搜索依据了.
-    if (rd) {
+    if (rd && !can_jump(pIR)) {
         addope(rd);
+        if (rd->dep) {
+            LOG("取消引用");
+            rd->dep->ref_count--;
+        }
         if (pIR->type == IR_ASSIGN && rs) {
             LOG("赋值语句, 传递依赖");
             rd->dep = rs->dep;
@@ -453,12 +459,14 @@ static void gen_dag_from_instr(IR *pIR)
             }
         }
         pIR->depend = rd->dep;
+        if (is_always_live(rd) || pIR->type == IR_CALL || pIR->type == IR_READ) {
+            rd->dep->ref_count++;
+        }
     } else {
-        // *= 没有目的操作数, 但是不能直接使用源操作数的依赖
-        // 新操作数只对该条指令有效, 不会有全局的副作用
-        pIR->rd = new_operand(OPE_NOT_USED);
-        pIR->rd->dep = new_dagnode(pIR->type, rs ? rs->dep : NULL, rt ? rt->dep : NULL);
-        pIR->rd->dep->op.embody = pIR->rd;
+        // 没有目标操作数的指令必须被生成
+        pIR->depend = new_dagnode(pIR->type, rs ? rs->dep : NULL, rt ? rt->dep : NULL);
+        pIR->depend->op.embody = pIR->rd;
+        pIR->depend->ref_count = 1;
     }
 }
 
@@ -512,14 +520,16 @@ void inline_replace(IR buf[], int nr)
     }
 }
 
-Operand gen_from_dag_(pDagNode dag)
+Operand gen_single_instr_from_dag(pDagNode dag)
 {
     if (dag == NULL) {
         return NULL;
-    } else if (dag->type == DAG_LEAF) {
+    }
+
+    if (dag->type == DAG_LEAF) {
         return dag->leaf.initial_value;  // 叶结点用于返回初始值
     } else if (dag->type == DAG_OP && !dag->op.has_gen) {
-        new_dag_ir(dag->op.ir_type, gen_from_dag_(dag->op.left), gen_from_dag_(dag->op.right), dag->op.embody);
+        new_dag_ir(dag->op.ir_type, gen_single_instr_from_dag(dag->op.left), gen_single_instr_from_dag(dag->op.right), dag->op.embody);
         dag->op.has_gen = 1;  // 防止重复生成
         return dag->op.embody;  // 使用统一的代表操作数, 提供后续优化机会
     } else {
@@ -531,36 +541,13 @@ void gen_instr_from_dag(int start, int end)
 {
     for (int i = start; i < end; i++) {
         IR *p = &instr_buffer[i];
-        if (p->type == IR_DEREF_L || p->type == IR_CALL) {
-        }
-        if (!(is_tmp(p->rd)) || p->type == IR_CALL) {
-            gen_from_dag_(p->rd->dep);
-        }
-    }
-
-    // 处理出口变量
-    int idx = 0;
-    Operand ope;
-    IR last = ir_from_dag[nr_ir_from_dag - 1];
-    if (last.type != IR_RET) {
-        // 不需要在最后是return的情况下保留变量终值, 因为不需要了
-        // 至于引用类型, 由于是纯操作数的 *= 转化来的, 肯定会顺序生成.
-        if (can_jump(&last)) {
-            nr_ir_from_dag = nr_ir_from_dag - 1;
-        }
-        while ((ope = getope(idx++))) {
-            if (is_always_live(ope) && gen_from_dag_(ope->dep) != ope) {
-                LOG("有木有");
-                new_instr_(ir_from_dag + nr_ir_from_dag, IR_ASSIGN, gen_from_dag_(ope->dep), NULL, ope);
-                nr_ir_from_dag++;
+        if (p->depend->ref_count > 0 || p->type == IR_CALL) {
+            Operand dst = gen_single_instr_from_dag(p->depend);
+            if (p->type == IR_ASSIGN && p->rd != dst) {
+                new_dag_ir(IR_ASSIGN, dst, NULL, p->rd);
             }
         }
-
-        if (can_jump(&last)) {
-            ir_from_dag[nr_ir_from_dag++] = last;
-        }
     }
-
 
     // 清理操作数
     for (int i = start; i < end; i++) {
