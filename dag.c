@@ -2,11 +2,6 @@
 // Created by whz on 15-11-24.
 //
 
-
-//
-// TODO 充满了内存泄漏
-//
-
 #include "dag.h"
 #include "operand.h"
 #include <stdlib.h>
@@ -15,16 +10,99 @@
 
 #define MAX 2048
 DagNode dag_buf[MAX];
-int nr_dag_node = 0;
+int dagnode_count = 0;
+
+// 依赖关系的二元组
+typedef struct DependPair {
+    pDagNode dagnode;
+    Operand operand;
+} DependPair;
+
+DependPair depend_buf[MAX * 2];
+int depend_count = 0;
 
 void init_dag()
 {
-    nr_dag_node = 0;
+    dagnode_count = 0;
+    depend_count = 0;
+}
+
+bool pair_eq(int index, pDagNode dagnode, Operand operand)
+{
+    return depend_buf[index].dagnode == dagnode && depend_buf[index].operand == operand;
+}
+
+// 将操作数依赖到结点上
+void add_depend(pDagNode dagnode, Operand operand)
+{
+#ifdef DEBUG
+    for (int i = 0; i < depend_count; i++) {
+        if (pair_eq(i, dagnode, operand)) {
+            LOG("依赖关系冲突!");
+            assert(0);
+        }
+    }
+#endif
+    depend_buf[depend_count].dagnode = dagnode;
+    depend_buf[depend_count].operand = operand;
+}
+
+// 删除operand对应的依赖关系
+void delete_depend(Operand operand)
+{
+    bool flag = false;
+    for (int i = 0; i < depend_count; i++) {
+        if (depend_buf[i].operand == operand) {
+#ifdef DEBUG
+            // 检查多依赖
+            assert(flag != false);
+#endif
+            for (int j = i; j < depend_count - 1; j++) {
+                depend_buf[j] = depend_buf[j + 1];
+            }
+            flag = true;
+#ifndef DEBUG
+            break;
+#endif
+        }
+    }
+}
+
+// 查询依赖的operand
+Operand query_operand_depending_on(pDagNode dagnode)
+{
+    for (int i = 0; i < depend_count; i++) {
+        if (depend_buf[i].dagnode == dagnode) {
+            return depend_buf[i].operand;
+        }
+    }
+    // 照理来说所有的DAG关系建立在临时变量的基础上, 临时变量是单赋值的, 所以不应该查询失败
+    LOG("查询失败");
+#ifdef DEBUG
+    assert(0);
+#endif
+    return NULL;
+}
+
+// 查询dagnode依赖
+pDagNode query_dagnode_depended_on(Operand operand)
+{
+    for (int i = 0; i < depend_count; i++) {
+        if (depend_buf[i].operand == operand) {
+            return depend_buf[i].dagnode;
+        }
+    }
+    // 照理来说所有的DAG关系建立在临时变量的基础上, 临时变量是单赋值的, 所以不应该查询失败
+    LOG("查询失败");
+#ifdef DEBUG
+    assert(0);
+#endif
+    return NULL;
 }
 
 pDagNode new_leaf(Operand ope)
 {
-    pDagNode p = &dag_buf[nr_dag_node++];
+    pDagNode p = &dag_buf[dagnode_count++];
     memset(p, 0, sizeof(*p));
     p->type = DAG_LEAF;
     p->initial_value = ope;
@@ -33,7 +111,7 @@ pDagNode new_leaf(Operand ope)
 
 pDagNode new_dagnode(IR_Type ir_type, pDagNode left, pDagNode right)
 {
-    pDagNode p = &dag_buf[nr_dag_node++];
+    pDagNode p = &dag_buf[dagnode_count++];
     memset(p, 0, sizeof(*p));
     p->op = ir_type;
     p->left = left;
@@ -101,7 +179,7 @@ pDagNode const_associativity(IR_Type op, pDagNode left, pDagNode right);
 pDagNode query_dag_node(IR_Type ir_type, pDagNode left, pDagNode right)
 {
     pDagNode p = new_dagnode(ir_type, left, right);
-    for (int i = nr_dag_node - 2; i >= 0; i--) {  // 回避新建的该结点
+    for (int i = dagnode_count - 2; i >= 0; i--) {  // 回避新建的该结点
         if (cmp_dag_node(&dag_buf[i], p)) {
             LOG("在第%d个DAG结点发现公共子表达式", i);
             return &dag_buf[i];

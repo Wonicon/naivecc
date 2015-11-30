@@ -52,7 +52,7 @@ struct {
 IR ir_from_dag[MAX_LINE];
 int nr_ir_from_dag = 0;
 extern DagNode dag_buf[];
-extern int nr_dag_node;
+extern int dagnode_count;
 
 //
 // 中间代码构造函数
