@@ -454,6 +454,7 @@ static void gen_dag_from_instr(IR *pIR)
         if (rd->dep && rd->dep->type == DAG_OP) {
             LOG("取消引用");
             rd->dep->ref_count--;
+            delete_depend(rd);
         }
         if (pIR->type == IR_ASSIGN && rs) {
             LOG("赋值语句, 传递依赖");
@@ -464,12 +465,8 @@ static void gen_dag_from_instr(IR *pIR)
             } else {
                 rd->dep = query_dag_node(pIR->type, rs ? rs->dep : NULL, rt ? rt->dep : NULL);
             }
-            if (rd->dep->embody == NULL) {
-                rd->dep->embody = rd;
-            } else {
-                LOG("已经有代表操作数");
-            }
         }
+        add_depend(rd->dep, rd);
         pIR->depend = rd->dep;
         if (is_always_live(rd) || pIR->type == IR_CALL || pIR->type == IR_READ) {
             rd->dep->ref_count++;
@@ -477,6 +474,14 @@ static void gen_dag_from_instr(IR *pIR)
     } else {
         // 没有目标操作数的指令必须被生成
         pIR->depend = new_dagnode(pIR->type, rs ? rs->dep : NULL, rt ? rt->dep : NULL);
+        if (can_jump(pIR)) {
+#ifdef DEBUG
+            char s[120];
+            print_operand(pIR->rd, s);
+            LOG("加入%s", s);
+#endif
+            add_depend(pIR->depend, pIR->rd);
+        }
         pIR->depend->embody = pIR->rd;
         pIR->depend->ref_count = 1;
     }
@@ -541,22 +546,37 @@ Operand gen_single_instr_from_dag(pDagNode dag)
     if (dag->type == DAG_LEAF) {
         return dag->initial_value;  // 叶结点用于返回初始值
     } else if (dag->type == DAG_OP && !dag->has_gen) {
+        dag->embody = query_operand_depending_on(dag);
         new_dag_ir(dag->op, gen_single_instr_from_dag(dag->left), gen_single_instr_from_dag(dag->right), dag->embody);
         dag->has_gen = 1;  // 防止重复生成
         return dag->embody;  // 使用统一的代表操作数, 提供后续优化机会
     } else {
+        dag->embody = query_operand_depending_on(dag);
         return dag->embody;
     }
 }
 
+void bp() {}
 void gen_instr_from_dag(int start, int end)
 {
     for (int i = start; i < end; i++) {
         IR *p = &instr_buffer[i];
         if (p->depend->ref_count > 0 || p->type == IR_CALL) {
-            Operand dst = gen_single_instr_from_dag(p->depend);
+            pDagNode dag;
+            if (p->rd) {
+                dag = query_dagnode_depended_on(p->rd);
+            } else {
+                dag = p->depend;
+            }
+            Operand dst = gen_single_instr_from_dag(dag);
             if (p->rd && is_always_live(p->rd)  && p->rd != dst) {
                 new_dag_ir(IR_ASSIGN, dst, NULL, p->rd);
+                if (p->depend != query_dagnode_depended_on(p->rd)) {
+                    LOG("引用已经改变, 不生成: %s", ir_to_s(&ir_from_dag[nr_ir_from_dag - 1]));
+                    nr_ir_from_dag--;
+                } else {
+                    LOG("弥补变量赋值 No.%d : %s", nr_ir_from_dag, ir_to_s(&ir_from_dag[nr_ir_from_dag - 1]));
+                }
             }
         }
     }

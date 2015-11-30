@@ -34,5 +34,9 @@ void init_dag();
 pDagNode new_leaf(Operand ope);
 pDagNode new_dagnode(IR_Type ir_type, pDagNode left, pDagNode right);
 pDagNode query_dag_node(IR_Type ir_type, pDagNode left, pDagNode right);
+void add_depend(pDagNode dagnode, Operand operand);
+void delete_depend(Operand operand);
+Operand query_operand_depending_on(pDagNode dagnode);
+pDagNode query_dagnode_depended_on(Operand operand);
 void print_dag();
 #endif // __DAG_H__

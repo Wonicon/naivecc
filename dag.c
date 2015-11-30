@@ -55,9 +55,10 @@ void delete_depend(Operand operand)
     bool flag = false;
     for (int i = 0; i < depend_count; i++) {
         if (depend_buf[i].operand == operand) {
+            LOG("hit %d", i);
 #ifdef DEBUG
             // 检查多依赖
-            assert(flag != false);
+            assert(flag == false);
 #endif
             for (int j = i; j < depend_count - 1; j++) {
                 depend_buf[j] = depend_buf[j + 1];
@@ -81,9 +82,6 @@ Operand query_operand_depending_on(pDagNode dagnode)
     }
     // 照理来说所有的DAG关系建立在临时变量的基础上, 临时变量是单赋值的, 所以不应该查询失败
     LOG("查询失败");
-#ifdef DEBUG
-    assert(0);
-#endif
     return NULL;
 }
 
@@ -95,11 +93,7 @@ pDagNode query_dagnode_depended_on(Operand operand)
             return depend_buf[i].dagnode;
         }
     }
-    // 照理来说所有的DAG关系建立在临时变量的基础上, 临时变量是单赋值的, 所以不应该查询失败
     LOG("查询失败");
-#ifdef DEBUG
-    assert(0);
-#endif
     return NULL;
 }
 
