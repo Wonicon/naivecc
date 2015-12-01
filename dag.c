@@ -31,7 +31,7 @@ void init_dag()
 
 bool pair_eq(int index, pDagNode dagnode, Operand operand)
 {
-    return depend_buf[index].dagnode == dagnode && depend_buf[index].operand == operand;
+    return depend_buf[index].dagnode == dagnode && cmp_operand(depend_buf[index].operand, operand);
 }
 
 // 将操作数依赖到结点上
@@ -41,8 +41,8 @@ void add_depend(pDagNode dagnode, Operand operand)
     TEST(depend_count < DEP_SIZE, "依赖表超限");
     for (int i = 0; i < depend_count; i++) {
         if (pair_eq(i, dagnode, operand)) {
-            LOG("依赖关系冲突!");
-            assert(0);
+            WARN("冗余依赖关系, 常发生在常数操作数指针不同时");
+            return;
         }
     }
 #endif
@@ -97,7 +97,7 @@ pDagNode query_dagnode_depended_on(Operand operand)
 {
     LOG("查询%s的DAG依赖", print_operand(operand));
     for (int i = 0; i < depend_count; i++) {
-        if (depend_buf[i].operand == operand) {
+        if (cmp_operand(depend_buf[i].operand, operand)) {
             LOG("找到依赖 %p", depend_buf[i].dagnode);
             return depend_buf[i].dagnode;
         }
@@ -149,14 +149,21 @@ int cmp_dag_node(pDagNode first, pDagNode second)
             return false;
         }
 
+        IR_Type op = first->op;
+
         // 解引用不能被优化
         // 优化的结果会导致非代表元用代表元来赋值, 而地址值可能在别的变量中用于寻址赋值,
         // 所以代表元里存储的不一定是新的值.
-        if (first->op == IR_DEREF_R) {
+        if (op == IR_DEREF_R) {
             return false;
         }
 
-        if (cmp_dag_node(first->left, second->left) && cmp_dag_node(first->right, second->right)) {
+        bool left_eq = cmp_dag_node(first->left, second->left);
+        bool right_eq = true;
+        if (op != IR_DEREF_L && op != IR_ADDR) {
+            right_eq = cmp_dag_node(first->right, second->right);
+        }
+        if (left_eq && right_eq) {
             return true;
         }
 
@@ -166,18 +173,9 @@ int cmp_dag_node(pDagNode first, pDagNode second)
         }
 
         return false;
+
     } else if (first->type== DAG_LEAF) {
-        Operand left = first->initial_value;
-        Operand right = second->initial_value;
-        if (left->type == right->type) {
-            switch (left->type) {
-                case OPE_INTEGER: return left->integer == right->integer;
-                case OPE_FLOAT: return left->real == right->real;
-                default: return left == right;
-            }
-        } else {
-            return false;
-        }
+        return cmp_operand(first->initial_value, second->initial_value);
     }
     return false;
 }
