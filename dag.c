@@ -273,6 +273,7 @@ pDagNode const_associativity(IR_Type op, pDagNode left, pDagNode right)
     } else if (is_const_dag_node(left) && is_const_dag_node(right)) {
         LOG("左右皆为常量");
         Operand result = calc_const(op, left->initial_value, right->initial_value);
+        dagnode_count--;  // 删除刚才生成的表达式结点
         return new_leaf(result);
     } else if (is_const_dag_node(left) && is_same_op_level(op, right->op)) {
         if (!is_tmp(right->embody)) {
@@ -288,12 +289,14 @@ pDagNode const_associativity(IR_Type op, pDagNode left, pDagNode right)
             LOG("C1 op1 (C2 op1 V) -> C1 op1 C2 op3 V -> (C1 op1 C2) op3 V");
             Operand rlope = right->left->initial_value;  // 可以确认右结点的左结点可以拿出Operand
             Operand const_rst = calc_const(lop, lope, rlope);  // 左和右左中序相邻, 可以直接计算
+            dagnode_count--;  // 删除刚才生成的表达式结点
             pDagNode leaf = new_leaf(const_rst);
             return new_dagnode(top_op[OFF(lop)][OFF(rop)], leaf, right->right);  // 第二个操作符为取消结合后的, 同样适用上表.
         } else if (is_const_dag_node(right->right)) {
             LOG("C1 op1 (V op2 C2) -> C1 op1 V op3 C2 -> (C1 op3 C2) op1 V");
             Operand rrope = right->right->initial_value;  // 可以确认右结点的右结点可以拿出Operand
             Operand const_rst = calc_const(top_op[OFF(lop)][OFF(rop)], lope, rrope);  // 获得取消结合后的操作符, 并且移动到前面
+            dagnode_count--;  // 删除刚才生成的表达式结点
             pDagNode leaf = new_leaf(const_rst);
             return new_dagnode(lop, leaf, right->left);  // 操作符不需要处理
         } else {
@@ -316,12 +319,14 @@ pDagNode const_associativity(IR_Type op, pDagNode left, pDagNode right)
             LOG("(C1 op1 V) op2 C2 -> (C1 op2 C2) op1 V");
             Operand llope = left->left->initial_value;
             Operand const_rst = calc_const(rop, llope, rope);
+            dagnode_count--;  // 删除刚才生成的表达式结点
             pDagNode leaf = new_leaf(const_rst);
             return new_dagnode(lop, leaf, left->right);
         } else if (is_const_dag_node(left->right)) {
             LOG("(V op1 C1) op2 C2 -> V op1 (C1 op3 C2)");
             Operand lrope = left->right->initial_value;
             Operand const_rst = calc_const(top_op[OFF(lop)][OFF(rop)], lrope, rope);
+            dagnode_count--;  // 删除刚才生成的表达式结点
             pDagNode leaf = new_leaf(const_rst);
             return new_dagnode(lop, left->left, leaf);
         } else {
@@ -331,16 +336,19 @@ pDagNode const_associativity(IR_Type op, pDagNode left, pDagNode right)
     } else {
         if (exchangable(op) && (check_counter(op, left, right) || check_counter(op, right, left))) {
             LOG("(A op B) op (C anti B) -> A op C");
+            dagnode_count--;  // 删除刚才生成的表达式结点
             return new_dagnode(op, left->left, right->left);
         } else if (is_same_op_level(op, IR_ADD) && is_anti_op(op, left->op) && cmp_dag_node(right, left->right)) {
             LOG("(A op B) anti B -> A");
             return left->left;
         } else if (is_same_op_level(op, IR_ADD) && is_anti_op(op, right->op) && cmp_dag_node(left, right->right)) {
             LOG("A op (B anti A) -> B");
+            dagnode_count--;  // 删除刚才生成的表达式结点
             return right->left;
         } else if (is_const_dag_node(left->right) && is_const_dag_node(right->right) &&
                    is_same_op_level(op, left->op) && is_same_op_level(op, right->op)) {
             LOG("(A op1 C1) op2 (B op3 C2) -> (A op2 B) op1 C3");
+            dagnode_count--;  // 删除刚才生成的表达式结点
             pDagNode v = new_dagnode(op, left->left, right->left);
             v->embody = new_operand(OPE_TEMP);
             Operand c = calc_const(top_op[OFF(left->op)][OFF(right->op)],
@@ -361,18 +369,22 @@ pDagNode const_associativity(IR_Type op, pDagNode left, pDagNode right)
             pDagNode rr = right->right;
 
             if (cmp_dag_node(lr, rr)) {
+                dagnode_count--;  // 删除刚才生成的表达式结点
                 pDagNode v = query_dag_node(op, ll, rl);
                 v->embody = new_operand(OPE_TEMP);
                 return new_dagnode(high_level_op, v, lr);
             } else if (mul && cmp_dag_node(ll, rl)) {
+                dagnode_count--;  // 删除刚才生成的表达式结点
                 pDagNode v = query_dag_node(op, lr, rr);
                 v->embody = new_operand(OPE_TEMP);
                 return new_dagnode(high_level_op, v, ll);
             } else if (mul && cmp_dag_node(lr, rl)) {
+                dagnode_count--;  // 删除刚才生成的表达式结点
                 pDagNode v = query_dag_node(op, ll, rr);
                 v->embody = new_operand(OPE_TEMP);
                 return new_dagnode(high_level_op, v, lr);
             } else if (mul && cmp_dag_node(ll, rr)) {
+                dagnode_count--;  // 删除刚才生成的表达式结点
                 pDagNode v = query_dag_node(op, lr, rl);
                 v->embody = new_operand(OPE_TEMP);
                 return new_dagnode(high_level_op, v, ll);
@@ -397,7 +409,8 @@ pDagNode erase_identity(IR_Type op, pDagNode left, pDagNode right)
         Operand init = Left->initial_value;                                                                            \
         if (Left->type == DAG_LEAF && is_const(init)                                                                   \
                 && (INT_IDENTITY_CHECK(init, Identity) || FLOAT_IDENTITY_CHECK(init, Identity))) {                     \
-            LOG("单位元发现: %s是%s %s is %p", STR(Left), STR(Identity), STR(Right), Right);                           \
+            LOG("单位元发现: %s是%s %s is %p", STR(Left), STR(Identity), STR(Right), Right);                          \
+            dagnode_count--;                                                                                           \
             return Right;                                                                                              \
         }                                                                                                              \
     } while (0)
@@ -407,8 +420,9 @@ pDagNode erase_identity(IR_Type op, pDagNode left, pDagNode right)
         Operand init = Left->initial_value;                                                                            \
         if (Left->type == DAG_LEAF && is_const(init)                                                                   \
                 && (INT_IDENTITY_CHECK(init, Identity) || FLOAT_IDENTITY_CHECK(init, Identity))) {                     \
-            LOG("零元发现: %s是%s %s is %p", STR(Left), STR(Identity), STR(Right), Right);                             \
-            return Left;                                                                                              \
+            LOG("零元发现: %s是%s %s is %p", STR(Left), STR(Identity), STR(Right), Right);                            \
+            dagnode_count--;                                                                                           \
+            return Left;                                                                                               \
         }                                                                                                              \
     } while (0)
 
