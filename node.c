@@ -8,6 +8,7 @@
 
 extern int is_check_return;
 
+bool semantic_error = false;
 
 //
 // node constructor, wrapping some initialization
@@ -92,8 +93,8 @@ typedef struct {
 
 static var_t default_attr = {NULL, 0, NULL};
 
-#define SEMA_ERROR_MSG(type, lineno, fmt, ...) \
-fprintf(stderr, "Error type %d at Line %d: " fmt "\n", type, lineno, ## __VA_ARGS__)
+#define SEMA_ERROR_MSG(type, lineno, fmt, ...) do { semantic_error = true; \
+fprintf(stderr, "Error type %d at Line %d: " fmt "\n", type, lineno, ## __VA_ARGS__); } while(0)
 
 //
 // Some pre-declaration

@@ -16,6 +16,7 @@ extern int yydebug;
 
 extern int is_lex_error;
 extern int is_syn_error;
+extern bool semantic_error;
 
 int is_greedy = 0;
 int is_check_return = 0;
@@ -74,8 +75,10 @@ int main(int argc, char *argv[])
         print_symtab();
         printf("======================================================\n");
 #endif
-        simplify();
-        translate();
+        if (!semantic_error) {
+            simplify();
+            translate();
+        }
     }
 
     free_ast();
