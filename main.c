@@ -72,7 +72,7 @@ int main(int argc, char *argv[])
         semantic_analysis();
 
 #ifdef DEBUG
-       // print_symtab();
+        print_symtab();
         printf("======================================================\n");
 #endif
         if (!semantic_error) {

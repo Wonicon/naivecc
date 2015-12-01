@@ -45,8 +45,10 @@ int insert(const char *sym, Type *type, int line, int scope) {
         LOG("The slot %d is empty, insert %s here", index, sym);
         assert(dest == symtab[index]);
         dest = symtab[index] = NEW(sym_ent_t);
+        memset(dest, 0, sizeof(*dest));
     } else {
         dest = pre->link = NEW(sym_ent_t);
+        memset(dest, 0, sizeof(*dest));
     }  // NOTE we should modify the pointer stored in the hash table, but not only `dest'
 
     dest->symbol = sym;
@@ -88,7 +90,7 @@ void print_symtab() {
             continue;
         }
         sym_ent_t *ent = symtab[i];
-        for (int k = 0; ent != NULL; i++, ent = ent->link) {
+        for (int k = 0; ent != NULL; k++, ent = ent->link) {
             printf("Slot %d, list %d: symbol '%s'\n", i, k, ent->symbol);
             printf("  Type: ");
             print_type(ent->type);
