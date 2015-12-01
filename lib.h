@@ -20,7 +20,7 @@ typedef int bool;
   #define LOG(s, ...) fprintf(stderr, LOG_COLOR "[%s] " s END "\n", __func__, ## __VA_ARGS__)
   #define PANIC(s, ...) do { fprintf(stderr, PANIC_COLOR "[%s] " s END "\n", __func__, ## __VA_ARGS__); assert(0); } while (0)
   #define WARN(s, ...) do { fprintf(stderr, WARN_COLOR "[%s] " s END "\n", __func__, ## __VA_ARGS__); } while (0)
-  #define TEST(expr, s, ...) do { if (!(expr)) PANIC(s, __VA_ARGS__); } while (0)
+  #define TEST(expr, s, ...) do { if (!(expr)) PANIC(s, ## __VA_ARGS__); } while (0)
 #else   // ifndef DEBUG
   #define LOG(s, ...)
   #define PANIC(s, ...)

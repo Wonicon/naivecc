@@ -8,7 +8,9 @@
 #include <string.h>
 #include <assert.h>
 
-#define MAX 2048
+#define MAX (4096)
+#define DEP_SIZE (MAX * 2)
+
 DagNode dag_buf[MAX];
 int dagnode_count = 0;
 
@@ -18,7 +20,7 @@ typedef struct DependPair {
     Operand operand;
 } DependPair;
 
-DependPair depend_buf[MAX * 2];
+DependPair depend_buf[DEP_SIZE];
 int depend_count = 0;
 
 void init_dag()
@@ -36,7 +38,7 @@ bool pair_eq(int index, pDagNode dagnode, Operand operand)
 void add_depend(pDagNode dagnode, Operand operand)
 {
 #ifdef DEBUG
-    assert(depend_count < MAX * 2);
+    TEST(depend_count < DEP_SIZE, "依赖表超限");
     for (int i = 0; i < depend_count; i++) {
         if (pair_eq(i, dagnode, operand)) {
             LOG("依赖关系冲突!");
@@ -108,6 +110,7 @@ pDagNode new_leaf(Operand ope)
 {
     pDagNode p = query_dagnode_depended_on(ope);
     if (p == NULL) {
+        TEST(dagnode_count < MAX, "DAG超限");
         p = &dag_buf[dagnode_count++];
         memset(p, 0, sizeof(*p));
         p->type = DAG_LEAF;
@@ -118,6 +121,7 @@ pDagNode new_leaf(Operand ope)
 
 pDagNode new_dagnode(IR_Type ir_type, pDagNode left, pDagNode right)
 {
+    TEST(dagnode_count < MAX, "DAG超限");
     pDagNode p = &dag_buf[dagnode_count++];
     memset(p, 0, sizeof(*p));
     p->op = ir_type;

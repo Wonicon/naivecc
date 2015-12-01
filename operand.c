@@ -7,10 +7,11 @@
 #include <string.h>
 #include <stdlib.h>
 
+#define OPE_TAB_SZ 4096
 
 // 操作数缓冲区, 用于当前基本块的分析
 typedef struct {
-    Operand buf[4096];
+    Operand buf[OPE_TAB_SZ];
     int count;
 } OpeTable;
 
@@ -30,6 +31,7 @@ void init_opetable()
 // 像 *= 这样只是用来获取依赖的目标操作数就不会被加入
 void addope(Operand ope)
 {
+    TEST(opetab.count < OPE_TAB_SZ, "OPE表超限");
     for (int i = 0; i < opetab.count; i++) {
         if (opetab.buf[i] == ope) {
             return;
