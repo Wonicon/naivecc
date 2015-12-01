@@ -394,13 +394,24 @@ pDagNode erase_identity(IR_Type op, pDagNode left, pDagNode right)
 #define STR(x) # x
 #define FIND_IDENTITY(Left, Right, Identity)                                                                           \
     do {                                                                                                               \
-        Operand init = Left->initial_value;                                                                       \
+        Operand init = Left->initial_value;                                                                            \
         if (Left->type == DAG_LEAF && is_const(init)                                                                   \
                 && (INT_IDENTITY_CHECK(init, Identity) || FLOAT_IDENTITY_CHECK(init, Identity))) {                     \
-            LOG("单位元发现: %s是%s %s is %p", STR(Left), STR(Identity), STR(Right), Right);                          \
-            return Right;                                                                                               \
+            LOG("单位元发现: %s是%s %s is %p", STR(Left), STR(Identity), STR(Right), Right);                           \
+            return Right;                                                                                              \
         }                                                                                                              \
     } while (0)
+
+#define FIND_ZERO(Left, Right, Identity)                                                                               \
+    do {                                                                                                               \
+        Operand init = Left->initial_value;                                                                            \
+        if (Left->type == DAG_LEAF && is_const(init)                                                                   \
+                && (INT_IDENTITY_CHECK(init, Identity) || FLOAT_IDENTITY_CHECK(init, Identity))) {                     \
+            LOG("零元发现: %s是%s %s is %p", STR(Left), STR(Identity), STR(Right), Right);                             \
+            return Left;                                                                                              \
+        }                                                                                                              \
+    } while (0)
+
     // 模式匹配 单位元发现
     // 利用falldown实现交换律
     switch (op) {
@@ -410,6 +421,8 @@ pDagNode erase_identity(IR_Type op, pDagNode left, pDagNode right)
             FIND_IDENTITY(right, left, 0);
             break;
         case IR_MUL:
+            FIND_ZERO(left, right, 0);
+            FIND_ZERO(right, left, 0);
             FIND_IDENTITY(left, right, 1);
         case IR_DIV:
             FIND_IDENTITY(right, left, 1);
@@ -421,4 +434,5 @@ pDagNode erase_identity(IR_Type op, pDagNode left, pDagNode right)
 #undef INT_IDENTITY_CHECK
 #undef FLOAT_IDENTITY_CHECK
 #undef FIND_IDENTITY
+#undef FIND_ZERO
 }

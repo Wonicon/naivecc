@@ -152,7 +152,7 @@ void print_instr(FILE *file)
     }
 #endif
 
-    inline_replace(ir_from_dag, nr_ir_from_dag);
+    //inline_replace(ir_from_dag, nr_ir_from_dag);
 
     for (int i = 0; i < nr_ir_from_dag; i++) {
         print_single_instr(ir_from_dag[i], fp);
