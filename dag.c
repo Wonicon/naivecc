@@ -179,6 +179,7 @@ pDagNode query_dag_node(IR_Type ir_type, pDagNode left, pDagNode right)
     for (int i = dagnode_count - 2; i >= 0; i--) {  // 回避新建的该结点
         if (cmp_dag_node(&dag_buf[i], p)) {
             LOG("在第%d个DAG结点发现公共子表达式", i);
+            dagnode_count--;
             return &dag_buf[i];
         }
     }
