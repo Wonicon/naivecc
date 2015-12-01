@@ -144,6 +144,8 @@ typedef struct {
     };
 } IR;
 
+#define NAME_LEN 120
+
 #include "node.h"
 #include <stdio.h>
 

@@ -9,8 +9,6 @@
 #include <string.h>
 #include <assert.h>
 
-#define NAME_LEN 120
-
 typedef struct Block_ *Block;
 
 typedef struct Block_ {
@@ -106,9 +104,9 @@ static const char *ir_format[] = {
 const char *ir_to_s(IR *pir)
 {
     static char buf[120];
-    print_operand(pir->rd, rd_s);
-    print_operand(pir->rs, rs_s);
-    print_operand(pir->rt, rt_s);
+    strcpy(rd_s, print_operand(pir->rd));
+    strcpy(rs_s, print_operand(pir->rs));
+    strcpy(rt_s, print_operand(pir->rt));
 
     // 约定 BEQ 和 BNE 包围所有 Branch 指令
     if (IR_BEQ <= pir->type && pir->type <= IR_BNE) {
@@ -477,11 +475,7 @@ static void gen_dag_from_instr(IR *pIR)
         // 没有目标操作数的指令必须被生成
         pIR->depend = new_dagnode(pIR->type, rs ? rs->dep : NULL, rt ? rt->dep : NULL);
         if (can_jump(pIR)) {
-#ifdef DEBUG
-            char s[120];
-            print_operand(pIR->rd, s);
-            LOG("加入%s", s);
-#endif
+            LOG("加入%s", print_operand(pIR->rd));
             add_depend(pIR->depend, pIR->rd);
         }
         pIR->depend->embody = pIR->rd;
@@ -563,16 +557,12 @@ Operand gen_single_instr_from_dag(pDagNode dag)
     }
 }
 
-void bp() {}
 void gen_instr_from_dag(int start, int end)
 {
     for (int i = start; i < end; i++) {
         IR *p = &instr_buffer[i];
         if (p->depend->ref_count > 0 || p->type == IR_CALL) {
             pDagNode dag;
-            if (p->type == IR_CALL) {
-                bp();
-            }
             if (p->rd) {
                 dag = query_dagnode_depended_on(p->rd);
             } else {

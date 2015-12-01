@@ -19,19 +19,8 @@ bool is_tmp(Operand ope);
 
 // 常规接口
 Operand new_operand(Ope_Type type);
-void print_operand(Operand ope, char *str);
+const char *print_operand(Operand ope);
 Operand calc_const(IR_Type op, Operand left, Operand right);
 Operand get_neg(Operand ope);
 
-// 调试
-#ifdef DEBUG
-#define LOG_OPE(operand)                \
-    do {                                \
-        char strbuf[32];                \
-        print_operand(operand, strbuf); \
-        LOG("%s", strbuf);              \
-    } while (0)
-#else
-#define LOG_OPE(operand)
-#endif
 #endif //__OPERAND_H__

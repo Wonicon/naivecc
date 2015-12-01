@@ -35,7 +35,7 @@ void addope(Operand ope)
             return;
         }
     }
-    LOG_OPE(ope);
+    LOG("加入%s", print_operand(ope));
     opetab.buf[opetab.count++] = ope;
 }
 
@@ -109,25 +109,52 @@ Operand new_operand(Ope_Type type) {
 // 打印操作数, 为了变量和标签工厂函数可以简单实现, 以及方便比较,
 // 变量和标签都存储为整型, 在打印操作数的时候加上统一前缀变成合法的变量名
 // NOP指令答应为空字符串, 希望将来可以自动过滤.
-void print_operand(Operand ope, char *str) {
+const char *print_operand(Operand ope) {
+    static char str[NAME_LEN];
+
     if (ope == NULL) {
         sprintf(str, "%s", "");
-        return;
+    } else {
+        switch (ope->type) {
+            case OPE_VAR:
+                sprintf(str, "v%d", ope->index);
+                break;
+            case OPE_REF:
+                sprintf(str, "r%d", ope->index);
+                break;
+            case OPE_BOOL:
+                sprintf(str, "b%d", ope->index);
+                break;
+            case OPE_FUNC:
+                sprintf(str, "%s", ope->name);
+                break;
+            case OPE_TEMP:
+                sprintf(str, "t%d", ope->index);
+                break;
+            case OPE_ADDR:
+                sprintf(str, "a%d", ope->index);
+                break;
+            case OPE_DEREF:
+                sprintf(str, "*a%d", ope->index);
+                break;
+            case OPE_FLOAT:
+                sprintf(str, "#%f", ope->real);
+                break;
+            case OPE_LABEL:
+                sprintf(str, "L%d", ope->label);
+                break;
+            case OPE_INTEGER:
+                sprintf(str, "#%d", ope->integer);
+                break;
+            case OPE_REFADDR:
+                sprintf(str, "&r%d", ope->index);
+                break;
+            default:
+                sprintf(str, "%s", "");
+        }
     }
-    switch (ope->type) {
-        case OPE_VAR:     sprintf(str, "v%d",  ope->index);    break;
-        case OPE_REF:     sprintf(str, "r%d",  ope->index);    break;
-        case OPE_BOOL:    sprintf(str, "b%d",  ope->index);    break;
-        case OPE_FUNC:    sprintf(str, "%s",   ope->name);     break;
-        case OPE_TEMP:    sprintf(str, "t%d",  ope->index);    break;
-        case OPE_ADDR:    sprintf(str, "a%d",  ope->index);    break;
-        case OPE_DEREF:   sprintf(str, "*a%d", ope->index);    break;
-        case OPE_FLOAT:   sprintf(str, "#%f",  ope->real);     break;
-        case OPE_LABEL:   sprintf(str, "L%d",  ope->label);    break;
-        case OPE_INTEGER: sprintf(str, "#%d",  ope->integer);  break;
-        case OPE_REFADDR: sprintf(str, "&r%d", ope->index);    break;
-        default:          sprintf(str, "%s",   "");
-    }
+
+    return str;
 }
 
 // 常量判断
