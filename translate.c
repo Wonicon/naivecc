@@ -764,6 +764,14 @@ int translate_exp_is_assign(Node assign_exp) {
 
     try_deref(rexp);  // 如果 rexp 直接是 array[...] 则会直接返回地址
 
+    if (assign_exp->dst) {
+        LOG("表达式连续赋值");
+        LOG("左边: %s", print_operand(assign_exp->dst));
+        LOG("右边: %s", print_operand(lexp->dst));
+        free(assign_exp->dst);
+        assign_exp->dst = lexp->dst;
+    }
+
     // TODO 更准确地判断赋值左右的等价性
     // TODO 这里可能会发生访问违例
     if (lexp->dst->type == rexp->dst->type && lexp->dst->index == rexp->dst->index) {
