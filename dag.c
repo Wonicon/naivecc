@@ -44,6 +44,7 @@ void add_depend(pDagNode dagnode, Operand operand)
         }
     }
 #endif
+    LOG("添加依赖: %p <-> %s", dagnode, print_operand(operand));
     depend_buf[depend_count].dagnode = dagnode;
     depend_buf[depend_count].operand = operand;
     depend_count++;
