@@ -22,5 +22,5 @@ Operand new_operand(Ope_Type type);
 const char *print_operand(Operand ope);
 Operand calc_const(IR_Type op, Operand left, Operand right);
 Operand get_neg(Operand ope);
-
+bool cmp_operand(Operand first, Operand second);
 #endif //__OPERAND_H__

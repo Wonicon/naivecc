@@ -242,3 +242,18 @@ Operand get_neg(Operand ope)
         assert(0);
     }
 }
+
+bool cmp_operand(Operand first, Operand second)
+{
+    if (first == second) {
+        return true;
+    } else if (is_const(first) && is_const(second) && first->type == second->type) {
+        switch (first->type) {
+            case OPE_INTEGER: return first->integer == second->integer;
+            case OPE_FLOAT: return first->real == second->real;
+            default: PANIC("Unexpected");
+        }
+    } else {
+        return false;
+    }
+}
