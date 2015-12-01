@@ -8,6 +8,7 @@ typedef int bool;
 #define false (0)
 
 #define DEBUG
+#define INLINE_REPLACE
 #define concat(x, y) x ## y
 
 #define END         "\e[0m"

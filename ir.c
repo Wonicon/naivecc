@@ -9,6 +9,14 @@
 #include <string.h>
 #include <assert.h>
 
+#ifdef INLINE_REPLACE
+bool inline_deref = true;
+bool inline_addr = true;
+#else
+bool inline_deref = false;
+bool inline_addr = false;
+#endif
+
 typedef struct Block_ *Block;
 
 typedef struct Block_ {
@@ -152,7 +160,9 @@ void print_instr(FILE *file)
     }
 #endif
 
-    //inline_replace(ir_from_dag, nr_ir_from_dag);
+    if (inline_deref && inline_addr) {
+        inline_replace(ir_from_dag, nr_ir_from_dag);
+    }
 
     for (int i = 0; i < nr_ir_from_dag; i++) {
         print_single_instr(ir_from_dag[i], fp);

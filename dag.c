@@ -76,34 +76,43 @@ void delete_depend(Operand operand)
 // 查询依赖的operand
 Operand query_operand_depending_on(pDagNode dagnode)
 {
+    if (dagnode == NULL) {
+        WARN("查询空DAG结点");
+    }
     for (int i = 0; i < depend_count; i++) {
         if (depend_buf[i].dagnode == dagnode) {
+            LOG("%p找到操作数%s", dagnode, print_operand(depend_buf[i].operand));
             return depend_buf[i].operand;
         }
     }
     // 照理来说所有的DAG关系建立在临时变量的基础上, 临时变量是单赋值的, 所以不应该查询失败
-    LOG("查询失败");
+    WARN("%p没有找到操作数", dagnode);
     return NULL;
 }
 
 // 查询dagnode依赖
 pDagNode query_dagnode_depended_on(Operand operand)
 {
+    LOG("查询%s的DAG依赖", print_operand(operand));
     for (int i = 0; i < depend_count; i++) {
         if (depend_buf[i].operand == operand) {
+            LOG("找到依赖 %p", depend_buf[i].dagnode);
             return depend_buf[i].dagnode;
         }
     }
-    LOG("查询失败");
+    LOG("没有%s的依赖", print_operand(operand));
     return NULL;
 }
 
 pDagNode new_leaf(Operand ope)
 {
-    pDagNode p = &dag_buf[dagnode_count++];
-    memset(p, 0, sizeof(*p));
-    p->type = DAG_LEAF;
-    p->initial_value = ope;
+    pDagNode p = query_dagnode_depended_on(ope);
+    if (p == NULL) {
+        p = &dag_buf[dagnode_count++];
+        memset(p, 0, sizeof(*p));
+        p->type = DAG_LEAF;
+        p->initial_value = ope;
+    }
     return p;
 }
 
@@ -121,6 +130,7 @@ pDagNode new_dagnode(IR_Type ir_type, pDagNode left, pDagNode right)
 int cmp_dag_node(pDagNode first, pDagNode second)
 {
     if (first == NULL && second == NULL) {
+        WARN("比较了两个全空的DAG结点, 检查下上文");
         return true;
     } else if (first == NULL || second == NULL) {
         return false;
@@ -276,7 +286,9 @@ pDagNode const_associativity(IR_Type op, pDagNode left, pDagNode right)
         LOG("左右皆为常量");
         Operand result = calc_const(op, left->initial_value, right->initial_value);
         dagnode_count--;  // 删除刚才生成的表达式结点
-        return new_leaf(result);
+        pDagNode leaf = new_leaf(result);
+        add_depend(leaf, result);
+        return leaf;
     } else if (is_const_dag_node(left) && is_same_op_level(op, right->op)) {
         if (!is_tmp(right->embody)) {
             LOG("不能折叠非临时变量");
@@ -293,6 +305,7 @@ pDagNode const_associativity(IR_Type op, pDagNode left, pDagNode right)
             Operand const_rst = calc_const(lop, lope, rlope);  // 左和右左中序相邻, 可以直接计算
             dagnode_count--;  // 删除刚才生成的表达式结点
             pDagNode leaf = new_leaf(const_rst);
+            add_depend(leaf, const_rst);
             return new_dagnode(top_op[OFF(lop)][OFF(rop)], leaf, right->right);  // 第二个操作符为取消结合后的, 同样适用上表.
         } else if (is_const_dag_node(right->right)) {
             LOG("C1 op1 (V op2 C2) -> C1 op1 V op3 C2 -> (C1 op3 C2) op1 V");
@@ -300,6 +313,7 @@ pDagNode const_associativity(IR_Type op, pDagNode left, pDagNode right)
             Operand const_rst = calc_const(top_op[OFF(lop)][OFF(rop)], lope, rrope);  // 获得取消结合后的操作符, 并且移动到前面
             dagnode_count--;  // 删除刚才生成的表达式结点
             pDagNode leaf = new_leaf(const_rst);
+            add_depend(leaf, const_rst);
             return new_dagnode(lop, leaf, right->left);  // 操作符不需要处理
         } else {
             LOG("左边是常量, 右边没有常量, 无法结合");
@@ -323,6 +337,7 @@ pDagNode const_associativity(IR_Type op, pDagNode left, pDagNode right)
             Operand const_rst = calc_const(rop, llope, rope);
             dagnode_count--;  // 删除刚才生成的表达式结点
             pDagNode leaf = new_leaf(const_rst);
+            add_depend(leaf, const_rst);
             return new_dagnode(lop, leaf, left->right);
         } else if (is_const_dag_node(left->right)) {
             LOG("(V op1 C1) op2 C2 -> V op1 (C1 op3 C2)");
@@ -330,6 +345,7 @@ pDagNode const_associativity(IR_Type op, pDagNode left, pDagNode right)
             Operand const_rst = calc_const(top_op[OFF(lop)][OFF(rop)], lrope, rope);
             dagnode_count--;  // 删除刚才生成的表达式结点
             pDagNode leaf = new_leaf(const_rst);
+            add_depend(leaf, const_rst);
             return new_dagnode(lop, left->left, leaf);
         } else {
             LOG("右边是常量, 左边没有常量, 无法结合");
@@ -353,10 +369,12 @@ pDagNode const_associativity(IR_Type op, pDagNode left, pDagNode right)
             dagnode_count--;  // 删除刚才生成的表达式结点
             pDagNode v = new_dagnode(op, left->left, right->left);
             v->embody = new_operand(OPE_TEMP);
+            add_depend(v, v->embody);
             Operand c = calc_const(top_op[OFF(left->op)][OFF(right->op)],
                                    left->right->initial_value, right->right->initial_value);
-
-            return new_dagnode(left->op, v, new_leaf(c));
+            pDagNode leaf = new_leaf(c);
+            add_depend(leaf, c);
+            return new_dagnode(left->op, v, leaf);
         }
 
         if (left->op == right->op &&
@@ -374,21 +392,25 @@ pDagNode const_associativity(IR_Type op, pDagNode left, pDagNode right)
                 dagnode_count--;  // 删除刚才生成的表达式结点
                 pDagNode v = query_dag_node(op, ll, rl);
                 v->embody = new_operand(OPE_TEMP);
+                add_depend(v, v->embody);
                 return new_dagnode(high_level_op, v, lr);
             } else if (mul && cmp_dag_node(ll, rl)) {
                 dagnode_count--;  // 删除刚才生成的表达式结点
                 pDagNode v = query_dag_node(op, lr, rr);
                 v->embody = new_operand(OPE_TEMP);
+                add_depend(v, v->embody);
                 return new_dagnode(high_level_op, v, ll);
             } else if (mul && cmp_dag_node(lr, rl)) {
                 dagnode_count--;  // 删除刚才生成的表达式结点
                 pDagNode v = query_dag_node(op, ll, rr);
                 v->embody = new_operand(OPE_TEMP);
+                add_depend(v, v->embody);
                 return new_dagnode(high_level_op, v, lr);
             } else if (mul && cmp_dag_node(ll, rr)) {
                 dagnode_count--;  // 删除刚才生成的表达式结点
                 pDagNode v = query_dag_node(op, lr, rl);
                 v->embody = new_operand(OPE_TEMP);
+                add_depend(v, v->embody);
                 return new_dagnode(high_level_op, v, ll);
             } else {
                 LOG("无法结合");
