@@ -542,7 +542,15 @@ Operand gen_single_instr_from_dag(pDagNode dag)
     if (dag->type == DAG_LEAF) {
         Operand old_init = dag->initial_value;
         Operand current = query_operand_depending_on(dag);
-        if (old_init != current && current != NULL) {
+        //if (old_init != current && current !=) {
+        if (old_init != current) {
+            LOG("原操作数%s已经不保有其初始值", print_operand(old_init));
+            if (current == NULL) {
+                WARN("预期外的空指针初始值操作数, 检查是否出现了自赋值");
+                current = old_init;
+            } else {
+                LOG("用保存了初始值的%s代替", print_operand(current));
+            }
             dag->initial_value = current;
         }
         return old_init;  // 叶结点用于返回初始值
