@@ -424,8 +424,7 @@ pDagNode const_associativity(IR_Type op, pDagNode left, pDagNode right)
 #undef OFF
 }
 
-pDagNode erase_identity(IR_Type op, pDagNode left, pDagNode right)
-{
+pDagNode erase_identity(IR_Type op, pDagNode left, pDagNode right) {
     // 模式匹配模板 单位元发现
 #define INT_IDENTITY_CHECK(x, y) (x->type == OPE_INTEGER && x->integer == y)
 #define FLOAT_IDENTITY_CHECK(x, y) (x->type == OPE_FLOAT && abs(x->real - y) < 1e-10)

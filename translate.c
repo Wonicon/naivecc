@@ -205,7 +205,7 @@ int translate_call(Node call) {
     } else if (!strcmp(func->val.s, "write")) {
         arg->child->dst = new_operand(OPE_TEMP);
         translate_dispatcher(arg->child);
-        try_deref(arg->child);
+        try_deref(arg->child);  // 这里的思路和return是类似的
         return new_instr(IR_WRITE, arg->child->dst, NULL, NULL);
     }
 
@@ -694,6 +694,15 @@ int translate_dec_is_vardec(Node dec) {
             vardec->sibling->dst = new_operand(OPE_TEMP);
             translate_dispatcher(vardec->sibling);
             try_deref(vardec->sibling);
+            // [优化] 当左值为变量而右值为运算指令时, 将右值的目标操作数转化为变量
+            if (sym->address->type == OPE_VAR && vardec->sibling->dst->type == OPE_TEMP) {
+                LOG("初始化: 左值为变量(编号%d), 直接赋值", sym->address->index);
+                replace_operand_global(sym->address, vardec->sibling->dst);
+                return NO_NEED_TO_GEN;
+            } else {
+                LOG("初始化: 直接的赋值");
+                return new_instr(IR_ASSIGN, vardec->sibling->dst, NULL, sym->address);
+            }
             return new_instr(IR_ASSIGN, vardec->sibling->dst, NULL, sym->address);
         }
         return NO_NEED_TO_GEN;
@@ -786,6 +795,13 @@ int translate_exp_is_assign(Node assign_exp) {
         LOG("左值为变量(编号%d), 直接赋值", lexp->dst->index);
         replace_operand_global(lexp->dst, rexp->dst);
         return NO_NEED_TO_GEN;
+        // 这里实际上保证了不会出现如下的情景:
+        //     t := *a
+        //     v := t
+        // 这个情景如果不替换, 则会非常危险, 因为 =* 只能和 t 相关联, 这样内联替换才是正确的.
+        // 因为 t 是数组访问的显式表达式产生的, 这样的显式表达式想怎么依赖就怎么依赖.
+        // 但是如果一个变量和 t 直接关联, 会后面与该变量相关的指令都会去引用 *a, 则是错误的, 因为 *a
+        // 可以在未知的情况下被改变.
     } else if (lexp->dst->type == OPE_ADDR) {   // 左边是引用
         return new_instr(IR_DEREF_L, lexp->dst, rexp->dst, NULL);
     } else {
@@ -794,10 +810,11 @@ int translate_exp_is_assign(Node assign_exp) {
     }
 }
 
-// 内联解引用, 如果算出结果是地址, 那么可以直接在指令中解引用
+// 如果算出结果是地址, 临时生成变量来接收
 void try_deref(Node exp) {
     if (exp->dst->type == OPE_ADDR) {
         Operand tmp = new_operand(OPE_TEMP);
+        LOG("子表达式返回值为地址, 用临时变量%s接受其解引用值", print_operand(tmp));
         new_instr(IR_DEREF_R, exp->dst, NULL, tmp);
         exp->dst = tmp;
     }
