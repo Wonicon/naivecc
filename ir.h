@@ -43,16 +43,6 @@ typedef struct {
     };
 } IR;
 
-typedef struct Block {
-    int blk_index;
-    int start;
-    int end;
-    int true_index;
-    int true_start;
-    int false_index;
-    int false_start;
-} Block;
-
 //
 // 中间代码模块对外接都口
 //
@@ -62,5 +52,7 @@ IR_Type get_relop(const char *sym);
 int replace_operand_global(Operand newbie, Operand old);
 bool is_const(Operand ope);
 Operand calc_const(IR_Type op, Operand left, Operand right);
+int is_branch(IR *pIR);
+bool can_jump(IR *pIR);
 
 #endif // __IR_H__

@@ -4,6 +4,7 @@
 
 #include "ir.h"
 #include "operand.h"
+#include "basic-block.h"
 #include "dag.h"
 #include <stdlib.h>
 #include <string.h>
@@ -156,6 +157,13 @@ void print_instr(FILE *file)
         optimize_in_block();
         pass--;
     }
+
+#ifdef DEBUG
+    reset_block(blk_buf, nr_blk);
+    nr_blk = block_partition(blk_buf, ir_from_dag, nr_ir_from_dag);
+    construct_cfg(blk_buf, nr_blk, ir_from_dag, nr_ir_from_dag);
+    cfg_to_dot("cfg.dot", blk_buf, nr_blk);
+#endif
 
     if (inline_deref && inline_addr) {
         inline_replace(ir_from_dag, nr_ir_from_dag);
@@ -378,38 +386,6 @@ void preprocess_ir() {
 //
 
 //
-// Leader 检查
-//   Leader 是划分 basic block 的依据, 一条指令是 leader, 当且仅当:
-//   1. 程序的第一条指令(确定?)
-//   2. 跳转类指令的目标(就是 Label)
-//   3. 跳转类指令后面的那条指令
-//
-int is_leader(int ir_idx) {
-    return ir_idx == 0 ||
-            instr_buffer[ir_idx].type == IR_LABEL ||
-            instr_buffer[ir_idx].type == IR_FUNC ||
-            can_jump(&instr_buffer[ir_idx - 1]);
-}
-
-//
-// 划分基本块
-//
-void block_partition() {
-    nr_blk = 0;
-    for (int i = 0; i < nr_instr; i++) {
-        if (is_leader(i)) {
-            blk_buf[nr_blk].start = i;
-            if (nr_blk > 0) {
-                blk_buf[nr_blk - 1].end = i;
-            }
-            nr_blk++;
-        }
-        instr_buffer[i].block = nr_blk;
-    }
-    blk_buf[nr_blk - 1].end = nr_instr;
-}
-
-//
 // 分析基本块: 活跃性分析
 // end 不可取
 //
@@ -615,7 +591,7 @@ void gen_instr_from_dag(int start, int end)
 // 打印基本块
 //
 void optimize_in_block() {
-    block_partition();
+    nr_blk = block_partition(blk_buf, instr_buffer, nr_instr);
 
     for (int i = 0; i < nr_blk; i++) {
         int beg = blk_buf[i].start;
@@ -624,7 +600,7 @@ void optimize_in_block() {
         gen_dag(instr_buffer, beg, end);
         gen_instr_from_dag(beg, end);
     }
-#ifdef DEBUG
+#if 0
     int current_block = 0;
 
     int num_buf_sz = 16;
