@@ -450,21 +450,18 @@ static void gen_dag_from_instr(IR *pIR)
     if (rs && !rs->dep) {
         LOG("rs: %s新建叶子", print_operand(rs));
         rs->dep = new_leaf(rs);
-        addope(rs);
         add_depend(rs->dep, rs);
     }
     if (rt && !rt->dep) {
         LOG("rt: %s新建叶子", print_operand(rt));
         rt->dep = new_leaf(rt);
         add_depend(rt->dep, rt);
-        addope(rt);
     }
 
     // 虽然 rd 对应的操作数可能会与 rs / rt 相同
     // 但是我们用于搜索的依据的是 rs / rt 的依赖结点, 如果操作数相同,
     // 依赖结点最后会被更新, 就是另外一个搜索依据了.
     if (rd && !can_jump(pIR)) {
-        addope(rd);
         if (rd->dep) {
             LOG("取消rd: %s的引用", print_operand(rd));
             rd->dep->ref_count--;
@@ -500,7 +497,6 @@ static void gen_dag_from_instr(IR *pIR)
 void gen_dag(IR buf[], int start, int end)
 {
     init_dag();
-    init_opetable();
     for (int i = start; i < end; i++) {
         gen_dag_from_instr(&buf[i]);
     }

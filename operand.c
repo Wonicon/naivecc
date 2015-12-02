@@ -8,48 +8,6 @@
 #include <assert.h>
 #include <string.h>
 
-// 操作数缓冲区, 用于当前基本块的分析
-typedef struct {
-    Operand buf[OPE_TAB_SZ];
-    int count;
-} OpeTable;
-
-
-// 操作数表, 每个块处理DAG时临时使用
-OpeTable opetab = { { 0 }, 0 };
-
-
-// 初始化操作数表, 防止残留在内部的非空指针造成干扰
-void init_opetable()
-{
-    memset(&opetab, 0, sizeof(opetab));
-}
-
-
-// 加入操作数指针, 只有指令中有效的操作数才会被加入
-// 像 *= 这样只是用来获取依赖的目标操作数就不会被加入
-void addope(Operand ope)
-{
-    TEST(opetab.count < OPE_TAB_SZ, "OPE表超限");
-    for (int i = 0; i < opetab.count; i++) {
-        if (opetab.buf[i] == ope) {
-            return;
-        }
-    }
-    LOG("加入%s", print_operand(ope));
-    opetab.buf[opetab.count++] = ope;
-}
-
-// 遍历用, 主要用来查看哪些出口变量还没有被赋值
-Operand getope(int idx)
-{
-    if (idx < opetab.count) {
-        return opetab.buf[idx];
-    } else {
-        return NULL;
-    }
-}
-
 // 出口变量判断
 bool is_always_live(Operand ope)
 {

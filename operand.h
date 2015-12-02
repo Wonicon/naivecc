@@ -45,11 +45,6 @@ struct Operand_ {
     pDagNode dep;       // 依赖结点
 };
 
-// 操作数表接口
-void init_opetable();
-void addope(Operand ope);
-Operand getope(int idx);
-
 // 判定接口
 bool is_always_live(Operand ope);
 bool is_const(Operand ope);
