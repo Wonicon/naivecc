@@ -31,7 +31,6 @@ static int nr_blk;
 
 // 指令缓冲区
 static IR instr_buffer[MAX_LINE];
-
 // 已经生成的指令数量
 int nr_instr;
 
@@ -39,6 +38,8 @@ int nr_instr;
 static char rs_s[NAME_LEN];
 static char rt_s[NAME_LEN];
 static char rd_s[NAME_LEN];
+
+static int pass = 1;
 
 struct {
     IR_Type relop;
@@ -148,25 +149,37 @@ void print_instr(FILE *file)
     // 相当于窥孔优化
     preprocess_ir();
 
-    print_block();
-#ifdef DEBUG
-    FILE *fp = fopen("dag.ir", "w");
-#else
-    FILE *fp = file;
-#endif
 #ifdef DEBUG
     for (int i = 0; i < nr_instr; i++) {
         print_single_instr(instr_buffer[i], file);
     }
 #endif
 
+    print_block();
+    pass--;
+    // pass
+    while (pass > 0) {
+        memcpy(instr_buffer, ir_from_dag, nr_ir_from_dag * sizeof(IR));
+        nr_instr = nr_ir_from_dag;
+        nr_ir_from_dag = 0;
+        print_block();
+        pass--;
+    }
+
     if (inline_deref && inline_addr) {
         inline_replace(ir_from_dag, nr_ir_from_dag);
     }
 
+#ifdef DEBUG
+    FILE *fp = fopen("dag.ir", "w");
+#else
+    FILE *fp = file;
+#endif
+
     for (int i = 0; i < nr_ir_from_dag; i++) {
         print_single_instr(ir_from_dag[i], fp);
     }
+
 #ifdef DEBUG
     fclose(fp);
 #endif
