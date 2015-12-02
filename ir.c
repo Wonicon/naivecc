@@ -142,7 +142,7 @@ void print_single_instr(IR instr, FILE *file)
 // 打印指令缓冲区中所有的已生成指令
 //
 void preprocess_ir();
-void print_block();
+void optimize_in_block();
 void inline_replace(IR buf[], int nr);
 void print_instr(FILE *file)
 {
@@ -155,14 +155,14 @@ void print_instr(FILE *file)
     }
 #endif
 
-    print_block();
+    optimize_in_block();
     pass--;
     // pass
     while (pass > 0) {
         memcpy(instr_buffer, ir_from_dag, nr_ir_from_dag * sizeof(IR));
         nr_instr = nr_ir_from_dag;
         nr_ir_from_dag = 0;
-        print_block();
+        optimize_in_block();
         pass--;
     }
 
@@ -457,13 +457,13 @@ static void gen_dag_from_instr(IR *pIR)
     Operand rd = pIR->rd;
 
     if (rs && !rs->dep) {
-        LOG("rs新建叶子");
+        LOG("rs: %s新建叶子", print_operand(rs));
         rs->dep = new_leaf(rs);
         addope(rs);
         add_depend(rs->dep, rs);
     }
     if (rt && !rt->dep) {
-        LOG("rt新建叶子");
+        LOG("rt: %s新建叶子", print_operand(rt));
         rt->dep = new_leaf(rt);
         add_depend(rt->dep, rt);
         addope(rt);
@@ -475,7 +475,7 @@ static void gen_dag_from_instr(IR *pIR)
     if (rd && !can_jump(pIR)) {
         addope(rd);
         if (rd->dep) {
-            LOG("取消引用");
+            LOG("取消rd: %s的引用", print_operand(rd));
             rd->dep->ref_count--;
             delete_depend(rd);
         }
@@ -523,6 +523,7 @@ int new_dag_ir(IR_Type type, Operand rs, Operand rt, Operand rd)
 
 //
 // 将 a := *b 和 a := &b 内联到指令中
+// 这会破坏操作数的依赖, 所以必须放到所有优化(包括多趟)之后
 //
 void inline_replace(IR buf[], int nr)
 {
@@ -626,7 +627,7 @@ void gen_instr_from_dag(int start, int end)
 //
 // 打印基本块
 //
-void print_block() {
+void optimize_in_block() {
     block_partition();
 
     for (int i = 0; i < nr_blk; i++) {
