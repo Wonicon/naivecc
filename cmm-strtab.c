@@ -1,4 +1,4 @@
-#include "cmm_strtab.h"
+#include "cmm-strtab.h"
 #include "lib.h"
 #include <stdlib.h>
 #include <memory.h>

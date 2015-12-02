@@ -3,11 +3,10 @@
 //
 
 #include "operand.h"
+#include <stdio.h>
+#include <stdlib.h>
 #include <assert.h>
 #include <string.h>
-#include <stdlib.h>
-
-#define OPE_TAB_SZ 4096
 
 // 操作数缓冲区, 用于当前基本块的分析
 typedef struct {

@@ -17,16 +17,7 @@ bool inline_deref = false;
 bool inline_addr = false;
 #endif
 
-typedef struct Block_ *Block;
-
-typedef struct Block_ {
-    int start;
-    int end;
-    Block *next_true;
-    Block *next_false;
-} Block_;
-
-static Block_ blk_buf[MAX_LINE];
+static Block blk_buf[MAX_LINE];
 static int nr_blk;
 
 // 指令缓冲区

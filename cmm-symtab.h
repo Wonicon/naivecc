@@ -19,7 +19,7 @@
 // check the symbol string with the string pointer stored in the structure type.
 //
 
-#include "cmm_type.h"
+#include "cmm-type.h"
 #include "ir.h"
 
 typedef struct _sym_ent_t

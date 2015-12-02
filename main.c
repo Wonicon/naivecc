@@ -1,5 +1,5 @@
-#include "cmm_strtab.h"
-#include "cmm_symtab.h"
+#include "cmm-strtab.h"
+#include "cmm-symtab.h"
 #include "node.h"
 #include <string.h>
 

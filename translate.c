@@ -3,9 +3,10 @@
 //
 
 #include "translate.h"
+#include "node.h"
 #include "ir.h"
 #include "operand.h"
-#include "cmm_symtab.h"
+#include "cmm-symtab.h"
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>

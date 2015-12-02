@@ -1,12 +1,12 @@
 #ifndef NODE_H
 #define NODE_H
 
-#include "cmm_type.h"
+#include "cmm-type.h"
 #include "yytname.h"
 #include "ast.h"
-#include "ir.h"
 
 typedef struct Node_ *Node;
+typedef struct Operand_ *Operand;
 
 struct Node_ {
     enum YYTNAME_INDEX type;

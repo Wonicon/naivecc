@@ -4,8 +4,8 @@
 
 #include "yytname.h"
 #include "node.h"
-#include "cmm_type.h"
-#include "cmm_symtab.h"
+#include "cmm-type.h"
+#include "cmm-symtab.h"
 #include "lib.h"
 #include <assert.h>
 

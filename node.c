@@ -1,6 +1,6 @@
 #include "node.h"
 #include "yytname.h"
-#include "cmm_symtab.h"
+#include "cmm-symtab.h"
 #include <stdlib.h>
 #include <assert.h>
 #include <memory.h>

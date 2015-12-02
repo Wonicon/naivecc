@@ -1,4 +1,4 @@
-#include "cmm_type.h"
+#include "cmm-type.h"
 #include <stdlib.h> /* malloc */
 #include <string.h> /* strlen */
 #include <assert.h> /* assert */

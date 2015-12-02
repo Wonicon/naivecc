@@ -4,17 +4,6 @@
 #include "lib.h"
 #include <stdio.h>
 
-typedef enum _CmmType {
-    CMM_INT,
-    CMM_FLOAT,
-    CMM_ARRAY,
-    CMM_STRUCT,
-    CMM_FUNC,
-    CMM_FIELD,
-    CMM_PARAM,
-    CMM_TYPE
-} CmmType;
-
 typedef struct _Type {
     CmmType class;
     const char *name;

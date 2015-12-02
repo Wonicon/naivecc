@@ -3,7 +3,7 @@
 
 #include "syntax.tab.h"
 #include "node.h"
-#include "cmm_strtab.h"
+#include "cmm-strtab.h"
 #include <stdio.h>
 #include <stdlib.h>
 

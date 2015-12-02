@@ -1,4 +1,4 @@
-#include "cmm_symtab.h"
+#include "cmm-symtab.h"
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
