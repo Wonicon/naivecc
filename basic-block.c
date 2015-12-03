@@ -40,7 +40,7 @@ int block_partition(Block block[], IR instr[], int n) {
             }
             count++;
         }
-        instr[i].block = count;
+        instr[i].block = count - 1;
     }
     block[count - 1].end = n;
     return count;
@@ -87,6 +87,9 @@ void construct_cfg(Block block[], int nr_block, IR instr[], int nr_instr) {
         if (idx_label < nr_instr) {
             LOG("基本块%d找到跳转目标%s", idx_blk, print_operand(label));
             blk->branch = instr[idx_label].block;
+            if (ir->type == IR_JMP) {
+                blk->follow = blk->branch;
+            }
         }
     }
 }
@@ -96,7 +99,7 @@ void cfg_to_dot(const char *filename, Block block[], int nr_block) {
     fprintf(fp, "digraph cfg {\n");
     for (int i = 0; i < nr_block; i++) {
         Block *blk = &block[i];
-        fprintf(fp, "%*sb%d [label=\"Block %d from %d to %d\"];\n", 4, "", blk->index, blk->index, blk->start, blk->end);
+        fprintf(fp, "%*sb%d [label=\"Block %d from %d to %d\"];\n", 4, "", blk->index, blk->index, blk->start + 1, blk->end);
     }
     for (int i = 0; i < nr_block; i++) {
         Block *blk = &block[i];

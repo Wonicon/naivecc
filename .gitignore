@@ -8,6 +8,9 @@
 *.vim
 *.ir
 .idea/
+*.dot
+*.png
+*.svg
 tags
 parser
 play
