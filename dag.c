@@ -150,7 +150,7 @@ int cmp_dag_node(pDagNode first, pDagNode second)
         // 解引用不能被优化
         // 优化的结果会导致非代表元用代表元来赋值, 而地址值可能在别的变量中用于寻址赋值,
         // 所以代表元里存储的不一定是新的值.
-        if (op == IR_DEREF_R) {
+        if (op == IR_DEREF_R || op == IR_FUNC || op == IR_CALL || op == IR_WRITE || op == IR_READ) {
             return false;
         }
 

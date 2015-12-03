@@ -598,12 +598,15 @@ void gen_instr_from_dag(int start, int end)
 {
     for (int i = start; i < end; i++) {
         IR *p = &instr_buffer[i];
-        if (p->depend->ref_count > 0 || p->type == IR_CALL) {
+        if (p->depend->ref_count > 0 || p->type == IR_CALL || p->type == IR_READ) {
             pDagNode dag;
-            if (p->rd) {
+            if (p->rd && (p->type != IR_CALL && p->type != IR_READ)) {
                 dag = query_dagnode_depended_on(p->rd);
             } else {
                 dag = p->depend;
+                if (!query_operand_depending_on(dag) && p->rd) {
+                    add_depend(p->depend, p->rd);
+                }
             }
             Operand dst = gen_single_instr_from_dag(dag);
             if (p->rd && is_always_live(p->rd)  && p->rd != dst) {
