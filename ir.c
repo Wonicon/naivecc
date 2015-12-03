@@ -445,12 +445,21 @@ static void gen_dag_from_instr(IR *pIR)
         }
         if (pIR->type == IR_ASSIGN && rs) {
             LOG("赋值语句, 传递依赖");
-            rd->dep = rs->dep;
+            if (is_always_live(rd) && is_tmp(rs) && rs->dep->op == IR_DEREF_R) {
+                rd->dep = new_dagnode(rs->dep->op, rs->dep->left, rs->dep->right);  // 右解引用不会被当做公共子表达式
+                TEST(0, "我就看看");
+            } else {
+                rd->dep = rs->dep;
+            }
         } else {
             if (pIR->type == IR_CALL || pIR->type == IR_READ) {
                 rd->dep = new_dagnode(pIR->type, rs ? rs->dep : NULL, rt ? rt->dep : NULL);
             } else {
                 rd->dep = query_dag_node(pIR->type, rs ? rs->dep : NULL, rt ? rt->dep : NULL);
+                if (is_always_live(rd) && query_operand_depending_on(rd->dep) && rd->dep->op == IR_DEREF_R) {
+                    WARN("夭寿, 依赖到了将被替换的变量(%s)的解引用", print_operand(rd->dep->embody));
+                    rd->dep = new_dagnode(rd->dep->op, rd->dep->left, rd->dep->right);
+                }
             }
         }
         add_depend(rd->dep, rd);
@@ -488,6 +497,17 @@ int new_dag_ir(IR_Type type, Operand rs, Operand rt, Operand rd)
 // 将 a := *b 和 a := &b 内联到指令中
 // 这会破坏操作数的依赖, 所以必须放到所有优化(包括多趟)之后
 //
+void log_ir(IR buf[], int start, int end) {
+#ifndef DEBUG
+    return;
+#else
+    printf(WARN_COLOR);
+    for (int i = start; i < end; i++) {
+        print_single_instr(ir_from_dag[i], stdout);
+    }
+    printf(END);
+#endif
+}
 void inline_replace(IR buf[], int nr)
 {
     for (int i = 0; i < nr; i++) {
@@ -496,13 +516,23 @@ void inline_replace(IR buf[], int nr)
             continue;
         }
         if (pir->type == IR_DEREF_R) {
+            LOG("发现右解引用 %s", ir_to_s(pir));
             pir->type = IR_NOP;
-            pir->rd->type = OPE_DEREF;
+            if (pir->rs->type == OPE_ADDR) {
+                pir->rd->type = OPE_DEREF;
+            } else if (pir->rs->type == OPE_REFADDR) {
+                pir->rd->type = OPE_REF;
+            } else {
+                PANIC("右解引用的操作数不是地址");
+            }
             pir->rd->index = pir->rs->index;
+            log_ir(buf, i, nr);
         } else if (pir->type == IR_ADDR) {
+            LOG("发现取地址 %s", ir_to_s(pir));
             pir->type = IR_NOP;
             pir->rd->type = OPE_REFADDR;
             pir->rd->index = pir->rs->index;
+            log_ir(buf, i, nr);
         }
     }
 
@@ -510,12 +540,24 @@ void inline_replace(IR buf[], int nr)
     for (int i = 0; i < nr; i++) {
         IR *pir = &buf[i];
         if (pir->rs && pir->rs->type == OPE_REFADDR && pir->type == IR_DEREF_L) {
+            LOG("HIT DEREF_L");
+            log_ir(buf, i, i + 1);
+            TEST(pir->rd == NULL, "DEREF_L没有目标操作数");
             pir->type = IR_ASSIGN;
             pir->rd = new_operand(OPE_NOT_USED);  // 防止对引用变量产生副作用
             pir->rd->type = OPE_REF;
             pir->rd->index = pir->rs->index;
             pir->rs = pir->rt;
             pir->rt = NULL;
+        } else if (pir->rs && pir->rs->type == OPE_REFADDR && pir->type == IR_DEREF_R) {
+            LOG("HIT DEREF_R");
+            log_ir(buf, i, i + 1);
+            TEST(pir->rt == NULL, "DEREF_L没有第二个操作数");
+            pir->type = IR_ASSIGN;
+            Operand ref = new_operand(OPE_NOT_USED);  // 防止对引用变量产生副作用
+            ref->type = OPE_REF;
+            ref->index = pir->rs->index;
+            pir->rs = ref;
         }
     }
 }
@@ -600,23 +642,4 @@ void optimize_in_block() {
         gen_dag(instr_buffer, beg, end);
         gen_instr_from_dag(beg, end);
     }
-#if 0
-    int current_block = 0;
-
-    int num_buf_sz = 16;
-    char num_buf[num_buf_sz];
-    char head[] = "####### BLOCK ";
-    char tail[] = "######################";
-    int tail_len = (int)strlen(tail);
-
-    for (int i = 0; i < nr_instr; i++) {
-        IR *pIR = &instr_buffer[i];
-        if (pIR->block != current_block) {
-            current_block = pIR->block;
-            int num_len = sprintf(num_buf, "%d ", current_block);
-            printf("%s%s%*s\n", head, num_buf, tail_len - num_len, tail);
-        }
-        print_single_instr(instr_buffer[i], stdout);
-    }
-#endif
 }

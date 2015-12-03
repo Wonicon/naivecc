@@ -784,12 +784,14 @@ int translate_exp_is_assign(Node assign_exp) {
 
     // TODO 更准确地判断赋值左右的等价性
     // TODO 这里可能会发生访问违例
+#if 0
     if (lexp->dst->type == rexp->dst->type && lexp->dst->index == rexp->dst->index) {
         LOG("等价赋值");
         free_ope(&lexp->dst);
         free_ope(&rexp->dst);
         return NO_NEED_TO_GEN;
     }
+#endif
 
     // [优化] 当左值为变量而右值为运算指令时, 将右值的目标操作数转化为变量
     if (lexp->dst->type == OPE_VAR && rexp->dst->type == OPE_TEMP) {

@@ -23,8 +23,7 @@ typedef struct DependPair {
 DependPair depend_buf[DEP_SIZE];
 int depend_count = 0;
 
-void init_dag()
-{
+void init_dag() {
     dagnode_count = 0;
     depend_count = 0;
 }
@@ -76,8 +75,7 @@ void delete_depend(Operand operand)
 }
 
 // 查询依赖的operand
-Operand query_operand_depending_on(pDagNode dagnode)
-{
+Operand query_operand_depending_on(pDagNode dagnode) {
     if (dagnode == NULL) {
         WARN("查询空DAG结点");
     }
@@ -106,8 +104,7 @@ pDagNode query_dagnode_depended_on(Operand operand)
     return NULL;
 }
 
-pDagNode new_leaf(Operand ope)
-{
+pDagNode new_leaf(Operand ope) {
     pDagNode p = query_dagnode_depended_on(ope);
     if (p == NULL) {
         TEST(dagnode_count < MAX, "DAG超限");
@@ -119,8 +116,7 @@ pDagNode new_leaf(Operand ope)
     return p;
 }
 
-pDagNode new_dagnode(IR_Type ir_type, pDagNode left, pDagNode right)
-{
+pDagNode new_dagnode(IR_Type ir_type, pDagNode left, pDagNode right) {
     TEST(dagnode_count < MAX, "DAG超限");
     pDagNode p = &dag_buf[dagnode_count++];
     memset(p, 0, sizeof(*p));
