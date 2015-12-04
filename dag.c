@@ -54,7 +54,9 @@ void add_depend(pDagNode dagnode, Operand operand)
 // 删除operand对应的依赖关系
 void delete_depend(Operand operand)
 {
+#ifdef DEBUG
     bool flag = false;
+#endif
     for (int i = 0; i < depend_count; i++) {
         if (depend_buf[i].operand == operand) {
             LOG("hit %d", i);
@@ -66,9 +68,10 @@ void delete_depend(Operand operand)
                 depend_buf[j] = depend_buf[j + 1];
             }
             depend_count--;
-            flag = true;
 #ifndef DEBUG
             break;
+#else
+            flag = true;
 #endif
         }
     }

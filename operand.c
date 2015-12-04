@@ -210,6 +210,7 @@ bool cmp_operand(Operand first, Operand second)
             case OPE_FLOAT: return first->real == second->real;
             default: PANIC("Unexpected");
         }
+        return false;
     } else {
         return false;
     }
