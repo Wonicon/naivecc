@@ -91,6 +91,10 @@ void construct_cfg(Block block[], int nr_block, IR instr[], int nr_instr) {
                 blk->follow = blk->branch;
             }
         }
+
+        if (ir->type == IR_RET) {
+            blk->follow = -1;
+        }
     }
 }
 
@@ -103,6 +107,11 @@ void cfg_to_dot(const char *filename, Block block[], int nr_block) {
     }
     for (int i = 0; i < nr_block; i++) {
         Block *blk = &block[i];
+
+        if (blk->follow == -1) {
+            continue;
+        }
+
         fprintf(fp, "%*sb%d -> b%d;\n", 4, "", blk->index, blk->follow);
         if (blk->follow != blk->branch) {
             fprintf(fp, "%*sb%d -> b%d;\n", 4, "", blk->index, blk->branch);

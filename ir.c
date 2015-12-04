@@ -72,38 +72,37 @@ int new_instr(IR_Type type, Operand rs, Operand rt, Operand rd) {
 }
 
 static const char *ir_format[] = {
-    "",                     // NOP
-    "%sLABEL %s :",         // LABEL
-    "%sFUNCTION %s :",      // FUNCTION
-    "%s := %s",             // ASSIGN
-    "%s := %s + %s",        // ADD
-    "%s := %s - %s",        // SUB
-    "%s := %s * %s",        // MUL
-    "%s := %s / %s",        // DIV
-    "%s := &%s",            // ADDR
-    "%s := *%s",            // DEREF_R
-    "%s*%s := %s",          // DEREF_L, 虽然地址在左边, 但是是参数
-    "%sGOTO %s",            // JMP
-    "IF %s == %s GOTO %s",  // BEQ
-    "IF %s < %s GOTO %s",   // BLT
-    "IF %s <= %s GOTO %s",  // BLE
-    "IF %s > %s GOTO %s",   // BGT
-    "IF %s >= %s GOTO %s",  // BGE
-    "IF %s != %s GOTO %s",  // BNE
-    "%sRETURN %s",          // RETURN
-    "%sDEC %s %s",          // DEC, 第一个 %s 过滤 rd_s
-    "%sARG %s",             // Pass argument, 第一个 %s 过滤 rd_s
-    "%s := CALL %s",        // CALL
-    "%sPARAM %s",           // DEC PARAM, 第一个 %s 过滤 rd_s
-    "READ %s",              // READ
-    "%sWRITE %s",           // WRITE, 第一个 %s 过滤 rd_s, 输出语义不用 rd
+    [IR_NOP]     = "",                     // NOP
+    [IR_LABEL]   = "%sLABEL %s :",         // LABEL
+    [IR_FUNC]    = "%sFUNCTION %s :",      // FUNCTION
+    [IR_ASSIGN]  = "%s := %s",             // ASSIGN
+    [IR_ADD]     = "%s := %s + %s",        // ADD
+    [IR_SUB]     = "%s := %s - %s",        // SUB
+    [IR_MUL]     = "%s := %s * %s",        // MUL
+    [IR_DIV]     = "%s := %s / %s",        // DIV
+    [IR_ADDR]    = "%s := &%s",            // ADDR
+    [IR_DEREF_R] = "%s := *%s",            // DEREF_R
+    [IR_DEREF_L] = "%s*%s := %s",          // DEREF_L, 虽然地址在左边, 但是是参数
+    [IR_JMP]     = "%sGOTO %s",            // JMP
+    [IR_BEQ]     = "IF %s == %s GOTO %s",  // BEQ
+    [IR_BLT]     = "IF %s < %s GOTO %s",   // BLT
+    [IR_BLE]     = "IF %s <= %s GOTO %s",  // BLE
+    [IR_BGT]     = "IF %s > %s GOTO %s",   // BGT
+    [IR_BGE]     = "IF %s >= %s GOTO %s",  // BGE
+    [IR_BNE]     = "IF %s != %s GOTO %s",  // BNE
+    [IR_RET]     = "%sRETURN %s",          // RETURN
+    [IR_DEC]     = "%sDEC %s %s",          // DEC, 第一个 %s 过滤 rd_s
+    [IR_ARG]     = "%sARG %s",             // Pass argument, 第一个 %s 过滤 rd_s
+    [IR_CALL]    = "%s := CALL %s",        // CALL
+    [IR_PRARM]   = "%sPARAM %s",           // DEC PARAM, 第一个 %s 过滤 rd_s
+    [IR_READ]    = "READ %s",              // READ
+    [IR_WRITE]   = "%sWRITE %s",           // WRITE, 第一个 %s 过滤 rd_s, 输出语义不用 rd
 };
 
 //
 // 单条指令打印函数
 //
-const char *ir_to_s(IR *pir)
-{
+const char *ir_to_s(IR *pir) {
     static char buf[120];
     strcpy(rd_s, print_operand(pir->rd));
     strcpy(rs_s, print_operand(pir->rs));
@@ -121,8 +120,7 @@ const char *ir_to_s(IR *pir)
     return buf;
 }
 
-void print_single_instr(IR instr, FILE *file)
-{
+void print_single_instr(IR instr, FILE *file) {
     fprintf(file, "%s", ir_to_s(&instr));
 
     if (instr.type != IR_NOP) {
@@ -136,8 +134,9 @@ void print_single_instr(IR instr, FILE *file)
 void preprocess_ir();
 void optimize_in_block();
 void inline_replace(IR buf[], int nr);
-void print_instr(FILE *file)
-{
+int compress_ir(IR buf[], int n);
+
+void print_instr(FILE *file) {
     // 相当于窥孔优化
     preprocess_ir();
 
@@ -158,16 +157,18 @@ void print_instr(FILE *file)
         pass--;
     }
 
+    if (inline_deref && inline_addr) {
+        inline_replace(ir_from_dag, nr_ir_from_dag);
+        nr_ir_from_dag = compress_ir(ir_from_dag, nr_ir_from_dag);
+    }
+
 #ifdef DEBUG
     reset_block(blk_buf, nr_blk);
     nr_blk = block_partition(blk_buf, ir_from_dag, nr_ir_from_dag);
     construct_cfg(blk_buf, nr_blk, ir_from_dag, nr_ir_from_dag);
     cfg_to_dot("cfg.dot", blk_buf, nr_blk);
+    system("dot cfg.dot -Tpng -o cfg.png");
 #endif
-
-    if (inline_deref && inline_addr) {
-        inline_replace(ir_from_dag, nr_ir_from_dag);
-    }
 
 #ifdef DEBUG
     FILE *fp = fopen("dag.ir", "w");
@@ -288,6 +289,21 @@ void deref_label(IR *pIR) {
 }
 
 //
+// 压缩指令, 删除NOP
+//
+int compress_ir(IR instr[], int n) {
+    for (int i = 0; i < n; i++) {
+        if (instr[i].type == IR_NOP) {
+            for (int j = i; j < n; j++) {
+                instr[j] = instr[j + 1];
+            }
+            n--;
+        }
+    }
+    return n;
+}
+
+//
 // 预处理 IR
 //
 void preprocess_ir() {
@@ -344,6 +360,7 @@ void preprocess_ir() {
     }
 
     // 第一次压缩
+#if 0
     for (int i = 0; i < nr_instr; i++) {
         if (instr_buffer[i].type == IR_NOP) {
             for (int j = i; j < nr_instr; j++) {
@@ -352,6 +369,9 @@ void preprocess_ir() {
             nr_instr--;
         }
     }
+#else
+    nr_instr = compress_ir(instr_buffer, nr_instr);
+#endif
 
     // 标签编号语义化
     pIR = &instr_buffer[0];
@@ -415,8 +435,7 @@ void optimize_liveness(int start, int end) {
     }
 }
 
-static void gen_dag_from_instr(IR *pIR)
-{
+static void gen_dag_from_instr(IR *pIR) {
     LOG("转换: %s", ir_to_s(pIR));
 
     Operand rs = pIR->rs;
@@ -479,16 +498,14 @@ static void gen_dag_from_instr(IR *pIR)
     }
 }
 
-void gen_dag(IR buf[], int start, int end)
-{
+void gen_dag(IR buf[], int start, int end) {
     init_dag();
     for (int i = start; i < end; i++) {
         gen_dag_from_instr(&buf[i]);
     }
 }
 
-int new_dag_ir(IR_Type type, Operand rs, Operand rt, Operand rd)
-{
+int new_dag_ir(IR_Type type, Operand rs, Operand rt, Operand rd) {
     new_instr_(&ir_from_dag[nr_ir_from_dag], type, rs, rt, rd);
     return nr_ir_from_dag++;
 }
@@ -508,8 +525,8 @@ void log_ir(IR buf[], int start, int end) {
     printf(END);
 #endif
 }
-void inline_replace(IR buf[], int nr)
-{
+
+void inline_replace(IR buf[], int nr) {
     for (int i = 0; i < nr; i++) {
         IR *pir = &buf[i];
         if (pir->rd && is_always_live(pir->rd)) {  // 变量不能被修改!
@@ -562,8 +579,7 @@ void inline_replace(IR buf[], int nr)
     }
 }
 
-Operand gen_single_instr_from_dag(pDagNode dag)
-{
+Operand gen_single_instr_from_dag(pDagNode dag) {
     if (dag == NULL) {
         return NULL;
     }
@@ -594,8 +610,7 @@ Operand gen_single_instr_from_dag(pDagNode dag)
     }
 }
 
-void gen_instr_from_dag(int start, int end)
-{
+void gen_instr_from_dag(int start, int end) {
     for (int i = start; i < end; i++) {
         IR *p = &instr_buffer[i];
         if (p->depend->ref_count > 0 || p->type == IR_CALL || p->type == IR_READ) {
@@ -637,7 +652,6 @@ void gen_instr_from_dag(int start, int end)
 //
 void optimize_in_block() {
     nr_blk = block_partition(blk_buf, instr_buffer, nr_instr);
-
     for (int i = 0; i < nr_blk; i++) {
         int beg = blk_buf[i].start;
         int end = blk_buf[i].end;
