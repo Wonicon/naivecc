@@ -20,34 +20,33 @@ extern bool semantic_error;
 
 int is_greedy = 0;
 int is_check_return = 0;
+int control_flow_en = 0;
 
-int main(int argc, char *argv[])
-{
-    if (argc <= 1)
-    {
+int main(int argc, char *argv[]) {
+    if (argc <= 1) {
         return 1;
     }
 
+#ifdef DEBUG
+    control_flow_en = 1;
+#endif
+
     // Handle parameters
     int i = 1;
-    if (argc >= 3)
-    {
-        for (; i < argc - 1; i++)
-        {
-            if (!strcmp(argv[i], "-g") || !strcmp(argv[i], "greedy"))
-            {
+    if (argc >= 3) {
+        for (; i < argc - 1; i++) {
+            if (!strcmp(argv[i], "-g") || !strcmp(argv[i], "greedy")) {
                 is_greedy = 1;
-            }
-            else if (!strcmp(argv[i], "--check-return"))
-            {
+            } else if (!strcmp(argv[i], "--check-return")) {
                 is_check_return = 1;
+            } else if (!strcmp(argv[i], "--print-control-flow")) {
+                control_flow_en = 1;
             }
         }
     }
 
     FILE* file = fopen(argv[i], "r");
-    if (!file)
-    {
+    if (!file) {
         perror(argv[i]);
         return 1;
     }
@@ -56,8 +55,7 @@ int main(int argc, char *argv[])
     yyrestart(file);
     //yydebug = 1;
     yyparse();
-    if (!is_syn_error)
-    {
+    if (!is_syn_error) {
         //ast();
 
         // 添加预设函数

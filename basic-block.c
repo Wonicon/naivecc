@@ -65,6 +65,17 @@ void construct_cfg(Block block[], int nr_block, IR instr[], int nr_instr) {
     for (int idx_blk = 0; idx_blk < nr_block; idx_blk++) {
         Block *blk = &block[idx_blk];
 
+        bool return_flag = false;
+        for (int i = blk->end - 1; i >= blk->start; i--) {
+            if (instr[i].type == IR_RET) {
+                blk->follow = blk->branch = -1;
+                return_flag = true;
+            }
+        }
+        if (return_flag) {
+            continue;
+        }
+
         // 默认下落, 存储的是block的下标
         blk->follow = idx_blk + 1;
         blk->branch = idx_blk + 1;
@@ -92,9 +103,6 @@ void construct_cfg(Block block[], int nr_block, IR instr[], int nr_instr) {
             }
         }
 
-        if (ir->type == IR_RET) {
-            blk->follow = -1;
-        }
     }
 }
 

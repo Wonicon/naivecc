@@ -10,6 +10,8 @@
 #include <string.h>
 #include <assert.h>
 
+extern int control_flow_en;
+
 #ifdef INLINE_REPLACE
 bool inline_deref = true;
 bool inline_addr = true;
@@ -38,12 +40,12 @@ struct {
     const char *str;
     IR_Type anti;
 } relop_dict[] = {
-        { IR_BEQ, "==", IR_BNE },
-        { IR_BLT, "<" , IR_BGE },
-        { IR_BLE, "<=", IR_BGT },
-        { IR_BGT, ">" , IR_BLE },
-        { IR_BGE, ">=", IR_BLT },
-        { IR_BNE, "!=", IR_BEQ }
+    { IR_BEQ, "==", IR_BNE },
+    { IR_BLT, "<" , IR_BGE },
+    { IR_BLE, "<=", IR_BGT },
+    { IR_BGT, ">" , IR_BLE },
+    { IR_BGE, ">=", IR_BLT },
+    { IR_BNE, "!=", IR_BEQ }
 };
 
 #define LENGTH(x) (sizeof(x) / sizeof(*x))
@@ -162,13 +164,13 @@ void print_instr(FILE *file) {
         nr_ir_from_dag = compress_ir(ir_from_dag, nr_ir_from_dag);
     }
 
-#ifdef DEBUG
-    reset_block(blk_buf, nr_blk);
-    nr_blk = block_partition(blk_buf, ir_from_dag, nr_ir_from_dag);
-    construct_cfg(blk_buf, nr_blk, ir_from_dag, nr_ir_from_dag);
-    cfg_to_dot("cfg.dot", blk_buf, nr_blk);
-    system("dot cfg.dot -Tpng -o cfg.png");
-#endif
+    if (control_flow_en) {
+        reset_block(blk_buf, nr_blk);
+        nr_blk = block_partition(blk_buf, ir_from_dag, nr_ir_from_dag);
+        construct_cfg(blk_buf, nr_blk, ir_from_dag, nr_ir_from_dag);
+        cfg_to_dot("cfg.dot", blk_buf, nr_blk);
+        system("dot cfg.dot -Tpng -o cfg.png");
+    }
 
 #ifdef DEBUG
     FILE *fp = fopen("dag.ir", "w");
@@ -269,14 +271,14 @@ search_relop_common(get_relop_symbol, str, const char *, NULL)
 
 search_relop_common(get_relop_anti, anti, IR_Type, OPE_NOT_USED)
 
-IR_Type get_relop(const char *sym) {
-    for (int i = 0; i < LENGTH(relop_dict); i++) {
-        if (!strcmp(relop_dict[i].str, sym)) {
-            return relop_dict[i].relop;
+    IR_Type get_relop(const char *sym) {
+        for (int i = 0; i < LENGTH(relop_dict); i++) {
+            if (!strcmp(relop_dict[i].str, sym)) {
+                return relop_dict[i].relop;
+            }
         }
+        return IR_NOP;
     }
-    return IR_NOP;
-}
 
 void deref_label(IR *pIR) {
     assert(pIR->type == IR_LABEL);
@@ -608,55 +610,55 @@ Operand gen_single_instr_from_dag(pDagNode dag) {
         dag->embody = query_operand_depending_on(dag);
         return dag->embody;
     }
-}
+    }
 
-void gen_instr_from_dag(int start, int end) {
-    for (int i = start; i < end; i++) {
-        IR *p = &instr_buffer[i];
-        if (p->depend->ref_count > 0 || p->type == IR_CALL || p->type == IR_READ) {
-            pDagNode dag;
-            if (p->rd && (p->type != IR_CALL && p->type != IR_READ)) {
-                dag = query_dagnode_depended_on(p->rd);
-            } else {
-                dag = p->depend;
-                if (!query_operand_depending_on(dag) && p->rd) {
-                    add_depend(p->depend, p->rd);
-                }
-            }
-            Operand dst = gen_single_instr_from_dag(dag);
-            if (p->rd && is_always_live(p->rd)  && p->rd != dst) {
-                new_dag_ir(IR_ASSIGN, dst, NULL, p->rd);
-                if (p->depend != query_dagnode_depended_on(p->rd)) {
-                    LOG("引用已经改变, 不生成: %s", ir_to_s(&ir_from_dag[nr_ir_from_dag - 1]));
-                    nr_ir_from_dag--;
+    void gen_instr_from_dag(int start, int end) {
+        for (int i = start; i < end; i++) {
+            IR *p = &instr_buffer[i];
+            if (p->depend->ref_count > 0 || p->type == IR_CALL || p->type == IR_READ) {
+                pDagNode dag;
+                if (p->rd && (p->type != IR_CALL && p->type != IR_READ)) {
+                    dag = query_dagnode_depended_on(p->rd);
                 } else {
-                    LOG("弥补变量赋值 No.%d : %s", nr_ir_from_dag, ir_to_s(&ir_from_dag[nr_ir_from_dag - 1]));
+                    dag = p->depend;
+                    if (!query_operand_depending_on(dag) && p->rd) {
+                        add_depend(p->depend, p->rd);
+                    }
+                }
+                Operand dst = gen_single_instr_from_dag(dag);
+                if (p->rd && is_always_live(p->rd)  && p->rd != dst) {
+                    new_dag_ir(IR_ASSIGN, dst, NULL, p->rd);
+                    if (p->depend != query_dagnode_depended_on(p->rd)) {
+                        LOG("引用已经改变, 不生成: %s", ir_to_s(&ir_from_dag[nr_ir_from_dag - 1]));
+                        nr_ir_from_dag--;
+                    } else {
+                        LOG("弥补变量赋值 No.%d : %s", nr_ir_from_dag, ir_to_s(&ir_from_dag[nr_ir_from_dag - 1]));
+                    }
+                }
+            }
+        }
+
+        // 清理操作数
+        for (int i = start; i < end; i++) {
+            IR *p = &instr_buffer[i];
+            for (int j = 0; j < 3; j++) {
+                if (p->operand[j]) {
+                    p->operand[j]->dep = NULL;
                 }
             }
         }
     }
 
-    // 清理操作数
-    for (int i = start; i < end; i++) {
-        IR *p = &instr_buffer[i];
-        for (int j = 0; j < 3; j++) {
-            if (p->operand[j]) {
-                p->operand[j]->dep = NULL;
-            }
+    //
+    // 打印基本块
+    //
+    void optimize_in_block() {
+        nr_blk = block_partition(blk_buf, instr_buffer, nr_instr);
+        for (int i = 0; i < nr_blk; i++) {
+            int beg = blk_buf[i].start;
+            int end = blk_buf[i].end;
+            optimize_liveness(beg, end);
+            gen_dag(instr_buffer, beg, end);
+            gen_instr_from_dag(beg, end);
         }
     }
-}
-
-//
-// 打印基本块
-//
-void optimize_in_block() {
-    nr_blk = block_partition(blk_buf, instr_buffer, nr_instr);
-    for (int i = 0; i < nr_blk; i++) {
-        int beg = blk_buf[i].start;
-        int end = blk_buf[i].end;
-        optimize_liveness(beg, end);
-        gen_dag(instr_buffer, beg, end);
-        gen_instr_from_dag(beg, end);
-    }
-}
