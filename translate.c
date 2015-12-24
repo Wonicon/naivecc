@@ -165,6 +165,7 @@ int translate_dispatcher(Node node) {
             return MULTI_INSTR;
         }
         default:
+            translate_state = UNSUPPORT;
             return FAIL_TO_GEN;
     }
 }
@@ -917,12 +918,14 @@ int translate_exp_is_const(Node nd) {
 
 // 测试用函数
 extern Node ast_tree;
+extern FILE *output_file;
 void translate() {
     translate_ast(ast_tree);
 #ifdef DEBUG
     FILE *fp = fopen("test.ir", "w");
 #else
-    FILE *fp = stdout;
+    //FILE *fp = stdout;
+    FILE *fp = output_file;
 #endif
     if (translate_state == FINE) {
         print_instr(fp);

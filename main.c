@@ -3,7 +3,7 @@
 #include "node.h"
 #include <string.h>
 
-/* from syntax.tab.c */
+// from syntax.tab.c
 int yyrestart(FILE *);
 int yyparse();
 void ast();
@@ -22,6 +22,8 @@ int is_greedy = 0;
 int is_check_return = 0;
 int control_flow_en = 0;
 
+FILE *output_file = NULL;
+
 int main(int argc, char *argv[]) {
     if (argc <= 1) {
         return 1;
@@ -31,6 +33,7 @@ int main(int argc, char *argv[]) {
     control_flow_en = 1;
 #endif
 
+#if 0
     // Handle parameters
     int i = 1;
     if (argc >= 3) {
@@ -44,10 +47,19 @@ int main(int argc, char *argv[]) {
             }
         }
     }
-
     FILE* file = fopen(argv[i], "r");
+#endif
+
+    // ./cc src.cmm out.s
+    int i = 1;
+    FILE *file = fopen(argv[i], "r");
+    output_file = fopen(argv[i + 1], "w");
     if (!file) {
         perror(argv[i]);
+        return 1;
+    } else if (!output_file) {
+        return 1;
+        perror(argv[i + 1]);
         return 1;
     }
 
