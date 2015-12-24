@@ -6,6 +6,7 @@
 #include "operand.h"
 #include "basic-block.h"
 #include "dag.h"
+#include "asm.h"
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
@@ -180,6 +181,7 @@ void print_instr(FILE *file) {
 
     for (int i = 0; i < nr_ir_from_dag; i++) {
         print_single_instr(ir_from_dag[i], fp);
+        gen_asm(ir_from_dag + i);
     }
 
 #ifdef DEBUG
@@ -616,55 +618,55 @@ Operand gen_single_instr_from_dag(pDagNode dag) {
         dag->embody = query_operand_depending_on(dag);
         return dag->embody;
     }
-    }
+}
 
-    void gen_instr_from_dag(int start, int end) {
-        for (int i = start; i < end; i++) {
-            IR *p = &instr_buffer[i];
-            if (p->depend->ref_count > 0 || p->type == IR_CALL || p->type == IR_READ) {
-                pDagNode dag;
-                if (p->rd && (p->type != IR_CALL && p->type != IR_READ)) {
-                    dag = query_dagnode_depended_on(p->rd);
+void gen_instr_from_dag(int start, int end) {
+    for (int i = start; i < end; i++) {
+        IR *p = &instr_buffer[i];
+        if (p->depend->ref_count > 0 || p->type == IR_CALL || p->type == IR_READ) {
+            pDagNode dag;
+            if (p->rd && (p->type != IR_CALL && p->type != IR_READ)) {
+                dag = query_dagnode_depended_on(p->rd);
+            } else {
+                dag = p->depend;
+                if (!query_operand_depending_on(dag) && p->rd) {
+                    add_depend(p->depend, p->rd);
+                }
+            }
+            Operand dst = gen_single_instr_from_dag(dag);
+            if (p->rd && is_always_live(p->rd)  && p->rd != dst) {
+                new_dag_ir(IR_ASSIGN, dst, NULL, p->rd);
+                if (p->depend != query_dagnode_depended_on(p->rd)) {
+                    LOG("引用已经改变, 不生成: %s", ir_to_s(&ir_from_dag[nr_ir_from_dag - 1]));
+                    nr_ir_from_dag--;
                 } else {
-                    dag = p->depend;
-                    if (!query_operand_depending_on(dag) && p->rd) {
-                        add_depend(p->depend, p->rd);
-                    }
-                }
-                Operand dst = gen_single_instr_from_dag(dag);
-                if (p->rd && is_always_live(p->rd)  && p->rd != dst) {
-                    new_dag_ir(IR_ASSIGN, dst, NULL, p->rd);
-                    if (p->depend != query_dagnode_depended_on(p->rd)) {
-                        LOG("引用已经改变, 不生成: %s", ir_to_s(&ir_from_dag[nr_ir_from_dag - 1]));
-                        nr_ir_from_dag--;
-                    } else {
-                        LOG("弥补变量赋值 No.%d : %s", nr_ir_from_dag, ir_to_s(&ir_from_dag[nr_ir_from_dag - 1]));
-                    }
-                }
-            }
-        }
-
-        // 清理操作数
-        for (int i = start; i < end; i++) {
-            IR *p = &instr_buffer[i];
-            for (int j = 0; j < 3; j++) {
-                if (p->operand[j]) {
-                    p->operand[j]->dep = NULL;
+                    LOG("弥补变量赋值 No.%d : %s", nr_ir_from_dag, ir_to_s(&ir_from_dag[nr_ir_from_dag - 1]));
                 }
             }
         }
     }
 
-    //
-    // 打印基本块
-    //
-    void optimize_in_block() {
-        nr_blk = block_partition(blk_buf, instr_buffer, nr_instr);
-        for (int i = 0; i < nr_blk; i++) {
-            int beg = blk_buf[i].start;
-            int end = blk_buf[i].end;
-            optimize_liveness(beg, end);
-            gen_dag(instr_buffer, beg, end);
-            gen_instr_from_dag(beg, end);
+    // 清理操作数
+    for (int i = start; i < end; i++) {
+        IR *p = &instr_buffer[i];
+        for (int j = 0; j < 3; j++) {
+            if (p->operand[j]) {
+                p->operand[j]->dep = NULL;
+            }
         }
     }
+}
+
+//
+// 打印基本块
+//
+void optimize_in_block() {
+    nr_blk = block_partition(blk_buf, instr_buffer, nr_instr);
+    for (int i = 0; i < nr_blk; i++) {
+        int beg = blk_buf[i].start;
+        int end = blk_buf[i].end;
+        optimize_liveness(beg, end);
+        gen_dag(instr_buffer, beg, end);
+        gen_instr_from_dag(beg, end);
+    }
+}

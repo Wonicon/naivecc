@@ -94,6 +94,7 @@ typedef int bool;
 #define DEBUG
 #define INLINE_REPLACE
 #define concat(x, y) x ## y
+#define str(x) # x
 
 #define END         "\e[0m"
 #define LOG_COLOR   "\e[38;5;046m"
@@ -117,4 +118,13 @@ typedef int bool;
 
 // Misc.
 #define NEW(type) (type *)malloc(sizeof(type))
+
+#define SWAP(x, y) ({ \
+    typeof(x) tmp = x; \
+    x = y; \
+    y = tmp; \
+})
+
+#define emit_asm(instr, format, ...) \
+    fprintf(output_file, "  %-*s" format "\n", 7, str(instr), ## __VA_ARGS__)
 #endif // LIB_H
