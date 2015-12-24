@@ -598,11 +598,17 @@ Operand gen_single_instr_from_dag(pDagNode dag) {
             } else {
                 LOG("用保存了初始值的%s代替", print_operand(current));
             }
+
             dag->initial_value = current;
         }
         return old_init;  // 叶结点用于返回初始值
     } else if (dag->type == DAG_OP && !dag->has_gen) {
         dag->embody = query_operand_depending_on(dag);
+        if (dag->embody == NULL && (dag->op == IR_ADD || dag->op == IR_MUL || dag->op == IR_SUB || dag->op == IR_DIV)) {
+            WARN("FUCK");
+            dag->embody = new_operand(OPE_TEMP);
+            add_depend(dag, dag->embody);
+        }
         new_dag_ir(dag->op, gen_single_instr_from_dag(dag->left), gen_single_instr_from_dag(dag->right), dag->embody);
         dag->has_gen = 1;  // 防止重复生成
         return dag->embody;  // 使用统一的代表操作数, 提供后续优化机会
