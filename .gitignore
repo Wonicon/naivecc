@@ -11,6 +11,8 @@
 *.dot
 *.png
 *.svg
+*.s
+*.S
 tags
 parser
 play
