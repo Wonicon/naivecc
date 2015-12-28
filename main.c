@@ -12,65 +12,38 @@ void free_ast();
 void simplify();
 void translate();
 
-extern int yydebug;
-
 extern int is_lex_error;
 extern int is_syn_error;
 extern bool semantic_error;
 
-int is_greedy = 0;
-int is_check_return = 0;
-int control_flow_en = 0;
-
-FILE *output_file = NULL;
+FILE *asm_file = NULL;
 
 int main(int argc, char *argv[]) {
     if (argc <= 1) {
         return 1;
     }
 
-#ifdef DEBUG
-    control_flow_en = 1;
-#endif
-
-#if 0
-    // Handle parameters
-    int i = 1;
-    if (argc >= 3) {
-        for (; i < argc - 1; i++) {
-            if (!strcmp(argv[i], "-g") || !strcmp(argv[i], "greedy")) {
-                is_greedy = 1;
-            } else if (!strcmp(argv[i], "--check-return")) {
-                is_check_return = 1;
-            } else if (!strcmp(argv[i], "--print-control-flow")) {
-                control_flow_en = 1;
-            }
-        }
-    }
-    FILE* file = fopen(argv[i], "r");
-#endif
-
     // ./cc src.cmm out.s
-    int i = 1;
-    FILE *file = fopen(argv[i], "r");
-    output_file = fopen(argv[i + 1], "w");
+    FILE *file;
+    file     = fopen(argv[0], "r");
+    asm_file = fopen(argv[1], "w");
+
     if (!file) {
         perror(argv[i]);
         return 1;
-    } else if (!output_file) {
-        return 1;
+    } else if (!asm_file) {
         perror(argv[i + 1]);
         return 1;
     }
 
     init_strtab();
-    yyrestart(file);
-    //yydebug = 1;
-    yyparse();
-    if (!is_syn_error) {
-        //ast();
 
-        // 添加预设函数
+    yyrestart(file);
+
+    yyparse();
+
+    if (!is_syn_error) {
+        // Add predefined functions
         Type *read = new_type(CMM_FUNC, "read", NULL, NULL);
         read->ret = BASIC_INT;
         insert("read", read, -1, 0);
@@ -85,6 +58,7 @@ int main(int argc, char *argv[]) {
         print_symtab();
         printf("======================================================\n");
 #endif
+
         if (!semantic_error) {
             simplify();
             translate();
@@ -94,3 +68,4 @@ int main(int argc, char *argv[]) {
     free_ast();
     return 0;
 }
+

@@ -92,7 +92,7 @@ typedef int bool;
 #define false (0)
 
 #define DEBUG
-#define INLINE_REPLACE
+// #define INLINE_REPLACE
 #define concat(x, y) x ## y
 #define str(x) # x
 
@@ -125,6 +125,7 @@ typedef int bool;
     y = tmp; \
 })
 
+// Common asm print format
 #define emit_asm(instr, format, ...) \
-    fprintf(output_file, "  %-*s" format "\n", 7, str(instr), ## __VA_ARGS__)
+    fprintf(asm_file, "  %-*s" format "\n", 7, str(instr), ## __VA_ARGS__)
 #endif // LIB_H

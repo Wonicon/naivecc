@@ -916,23 +916,27 @@ int translate_exp_is_const(Node nd) {
     return NO_NEED_TO_GEN;
 }
 
-// 测试用函数
 extern Node ast_tree;
-extern FILE *output_file;
+
+extern FILE *asm_file;
+
 void translate() {
     translate_ast(ast_tree);
+
 #ifdef DEBUG
     FILE *fp = fopen("test.ir", "w");
 #else
-    //FILE *fp = stdout;
-    FILE *fp = output_file;
+    FILE *fp = stdout;
 #endif
+
     if (translate_state == FINE) {
         print_instr(fp);
     } else {
-        fputs("Cannot translate: Code contains variables or parameters of structure type.\n", stderr);
+        fputs("Cannot translate: Code contains variables or parameters of structure type.", stderr);
     }
+
 #ifdef DEBUG
     fclose(fp);
 #endif
 }
+

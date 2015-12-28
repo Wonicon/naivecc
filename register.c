@@ -11,7 +11,7 @@
 #include <string.h>
 
 
-extern FILE *output_file;
+extern FILE *asm_file;
 
 
 const char *register_name[] = {

@@ -34,8 +34,6 @@ static char rs_s[NAME_LEN];
 static char rt_s[NAME_LEN];
 static char rd_s[NAME_LEN];
 
-static int pass = 1;
-
 struct {
     IR_Type relop;
     const char *str;
@@ -150,27 +148,10 @@ void print_instr(FILE *file) {
 #endif
 
     optimize_in_block();
-    pass--;
-    // pass
-    while (pass > 0) {
-        memcpy(instr_buffer, ir_from_dag, nr_ir_from_dag * sizeof(IR));
-        nr_instr = nr_ir_from_dag;
-        nr_ir_from_dag = 0;
-        optimize_in_block();
-        pass--;
-    }
 
     if (inline_deref && inline_addr) {
         inline_replace(ir_from_dag, nr_ir_from_dag);
         nr_ir_from_dag = compress_ir(ir_from_dag, nr_ir_from_dag);
-    }
-
-    if (control_flow_en) {
-        reset_block(blk_buf, nr_blk);
-        nr_blk = block_partition(blk_buf, ir_from_dag, nr_ir_from_dag);
-        construct_cfg(blk_buf, nr_blk, ir_from_dag, nr_ir_from_dag);
-        cfg_to_dot("cfg.dot", blk_buf, nr_blk);
-        system("dot cfg.dot -Tpng -o cfg.png");
     }
 
 #ifdef DEBUG
@@ -364,18 +345,7 @@ void preprocess_ir() {
     }
 
     // 第一次压缩
-#if 0
-    for (int i = 0; i < nr_instr; i++) {
-        if (instr_buffer[i].type == IR_NOP) {
-            for (int j = i; j < nr_instr; j++) {
-                instr_buffer[j] = instr_buffer[j + 1];
-            }
-            nr_instr--;
-        }
-    }
-#else
     nr_instr = compress_ir(instr_buffer, nr_instr);
-#endif
 
     // 标签编号语义化
     pIR = &instr_buffer[0];
@@ -666,7 +636,10 @@ void optimize_in_block() {
         int beg = blk_buf[i].start;
         int end = blk_buf[i].end;
         optimize_liveness(beg, end);
-        gen_dag(instr_buffer, beg, end);
-        gen_instr_from_dag(beg, end);
+
+        // Temparally avoid dangerous in-block DAG optimization
+
+        // gen_dag(instr_buffer, beg, end);
+        // gen_instr_from_dag(beg, end);
     }
 }

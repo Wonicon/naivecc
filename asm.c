@@ -12,12 +12,12 @@
 #include <assert.h>
 
 
-extern FILE *output_file;
+extern FILE *asm_file;
 
 
 void gen_asm_label(IR *ir)
 {
-    fprintf(output_file, "%s:\n", print_operand(ir->rs));
+    fprintf(asm_file, "%s:\n", print_operand(ir->rs));
 }
 
 

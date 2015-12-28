@@ -749,8 +749,8 @@ void analyze_extdef(Node extdef) {
         case YY_FunDec:
             func_name = analyze_fundec(spec->sibling, type);
             return_type = analyze_compst(spec->sibling->sibling, type, 0);
-            if (is_check_return && return_type == NULL) {
-                fprintf(stderr, "Unreturned branch in function \"%s\"!\n", func_name);
+            if (return_type == NULL) {
+               fprintf(stderr, "Unreturned branch in function \"%s\"!\n", func_name);
             }
             break;
         case YY_SEMI:

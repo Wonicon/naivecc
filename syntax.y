@@ -11,7 +11,6 @@
 
 int is_lex_error = 0;
 int is_syn_error = 0;
-extern int is_greedy;
 
 #define YYDEBUG 1
 #include "lex.yy.c"
@@ -65,9 +64,9 @@ static union YYSTYPE *YYVSP = NULL;
 #define _str(x) # x
 //#define ERR
 #ifdef ERR
-#define LOGERR(x) do { printf("Hit " _str(x) "\n"); is_lex_error = 0; if (is_greedy) yyerrok; } while (0)
+#define LOGERR(x) do { printf("Hit " _str(x) "\n"); is_lex_error = 0; } while (0)
 #else // !ERR
-#define LOGERR(x) is_lex_error = 0; if (is_greedy) yyerrok
+#define LOGERR(x) (is_lex_error = 0)
 #endif
 
 //
@@ -227,7 +226,6 @@ DefList         : Def DefList { LINK(DefList, 2); }
                 ;
 
 Def             : Specifier DecList SEMI  { LINK(Def, 3); }
-                | Specifier error SEMI    { LOGERR(def: spec err semi); }
                 ;
 
 DecList         : Dec               { LINK(DecList, 1); }
@@ -241,9 +239,6 @@ Dec             : VarDec              { LINK(Dec, 1); }
 /* Expressions */
 
 Exp             : Exp ASSIGNOP Exp { LINK(Exp, 3); }
-                | Exp error ID     {LOGERR(Exp -> Exp error ID);}
-                | Exp error INT    {LOGERR(Exp -> Exp error INT);}
-                | Exp error FLOAT  {LOGERR(Exp -> Exp error FLOAT);}
                 | Exp AND Exp      { LINK(Exp, 3); }
                 | Exp OR Exp       { LINK(Exp, 3); }
                 | Exp RELOP Exp    { LINK(Exp, 3); }
