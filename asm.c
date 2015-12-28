@@ -167,6 +167,5 @@ trans_handler handler[NR_IR_TYPE] = {
 
 void gen_asm(IR *ir)
 {
-    LOG("Hello");
     handler[ir->type](ir);
 }

@@ -716,6 +716,7 @@ int translate_dec_is_vardec(Node dec) {
 
     sym_ent_t *sym = query(iterator->val.s, 0);
     sym->address = new_operand(OPE_REF);
+    sym->address->size = sym->type->type_size;
     sym->address->base_type = sym->type;
     Operand size = new_operand(OPE_INTEGER);
     size->integer = sym->type->type_size;

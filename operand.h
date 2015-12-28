@@ -29,6 +29,7 @@ struct Operand_ {
 
     // OPE_FUNC
     const char *name;  // 固有属性: 该操作数作为函数时的函数名
+    int size;          // Total variables zie for a function
 
     // OPE_REF, OPE_REF_INFO
     Type *base_type;   // 综合属性: 引用型操作数对应的类型, 关系到偏移量的计算

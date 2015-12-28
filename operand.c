@@ -23,11 +23,7 @@ bool is_always_live(Operand ope)
 
 // 操作数构造函数
 Operand new_operand(Ope_Type type) {
-    static int nr_var = 0;
-    static int nr_ref = 0;
-    static int nr_tmp = 0;
-    static int nr_bool = 0;
-    static int nr_addr = 0;
+    static int nr_ope = 0;  // Use uniform encoding for operands
     static int nr_label = 0;
 
     Operand p = (Operand)malloc(sizeof(struct Operand_));
@@ -36,21 +32,25 @@ Operand new_operand(Ope_Type type) {
     switch (type) {
         case OPE_VAR:
             p->liveness = ALIVE;
-            p->index = nr_var++;
+            p->size = 4;
+            p->index = nr_ope++;
             break;
         case OPE_REF:
             p->liveness = ALIVE;
-            p->index = nr_ref++;
+            p->index = nr_ope++;
             break;
         case OPE_BOOL:
             p->liveness = ALIVE;
-            p->index = nr_bool++;
+            p->size = 4;
+            p->index = nr_ope++;
             break;
         case OPE_TEMP:
-            p->index = nr_tmp++;
+            p->size = 4;
+            p->index = nr_ope++;
             break;
         case OPE_ADDR:
-            p->index = nr_addr++;
+            p->size = 4;
+            p->index = nr_ope++;
             break;
         case OPE_LABEL:
             p->liveness = 1;
@@ -79,7 +79,8 @@ const char *print_operand(Operand ope) {
                 sprintf(str, "v%d", ope->index);
                 break;
             case OPE_REF:
-                sprintf(str, "r%d", ope->index);
+                //sprintf(str, "r%d", ope->index);
+                sprintf(str, "r%d_%d", ope->index, ope->size);
                 break;
             case OPE_BOOL:
                 sprintf(str, "b%d", ope->index);

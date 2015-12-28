@@ -129,6 +129,57 @@ void print_single_instr(IR instr, FILE *file) {
     }
 }
 
+
+//
+// Calculate all variables' offset to the function entry
+//
+
+#define MAP_SIZE 4096
+
+int calc_offset(IR buf[], int index, int n)
+{
+    static bool exists[MAP_SIZE];
+    static IR *curr = NULL;
+
+    TEST(n <= MAP_SIZE, "exceed exists-map size");
+
+    if (index >= n) {
+        return 0;  // meaningless
+    }
+
+    if (buf[index].type == IR_FUNC) {
+        memset(exists, 0, sizeof(exists));
+        curr = &buf[index];
+        curr->rs->size = 0;
+    } else {
+        for (int i = 0; i < 3; i++) {
+            Operand ope = buf[index].operand[i];
+            if (ope == NULL) {
+                continue;
+            }
+
+            switch (ope->type) {
+            case OPE_VAR:
+            case OPE_REF:
+            case OPE_TEMP:
+            case OPE_BOOL:
+            case OPE_ADDR:
+                if (!exists[ope->index]) {
+                    curr->rs->size += ope->size;
+                    ope->address = curr->rs->size;  // Calc afterwards because the stack grows from high to low
+                }
+                break;
+            default:
+                ;
+            }
+        }
+    }
+
+    return calc_offset(buf, index + 1, n);
+}
+
+
+
 //
 // 打印指令缓冲区中所有的已生成指令
 //
@@ -141,13 +192,16 @@ void print_instr(FILE *file) {
     // 相当于窥孔优化
     preprocess_ir();
 
+    calc_offset(instr_buffer, 0, nr_instr);
+
+    optimize_in_block();
+
 #ifdef DEBUG
     for (int i = 0; i < nr_instr; i++) {
         print_single_instr(instr_buffer[i], file);
     }
 #endif
 
-    optimize_in_block();
 
     if (inline_deref && inline_addr) {
         inline_replace(ir_from_dag, nr_ir_from_dag);
