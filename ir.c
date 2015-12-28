@@ -154,20 +154,10 @@ void print_instr(FILE *file) {
         nr_ir_from_dag = compress_ir(ir_from_dag, nr_ir_from_dag);
     }
 
-#ifdef DEBUG
-    FILE *fp = fopen("dag.ir", "w");
-#else
-    FILE *fp = file;
-#endif
-
-    for (int i = 0; i < nr_ir_from_dag; i++) {
-        print_single_instr(ir_from_dag[i], fp);
-        gen_asm(ir_from_dag + i);
+    // Generate assembly code
+    for (int i = 0; i < nr_instr; i++) {
+        gen_asm(instr_buffer + i);
     }
-
-#ifdef DEBUG
-    fclose(fp);
-#endif
 }
 
 //

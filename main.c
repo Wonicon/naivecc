@@ -25,14 +25,14 @@ int main(int argc, char *argv[]) {
 
     // ./cc src.cmm out.s
     FILE *file;
-    file     = fopen(argv[0], "r");
-    asm_file = fopen(argv[1], "w");
+    file     = fopen(argv[1], "r");
+    asm_file = fopen(argv[2], "w");
 
     if (!file) {
-        perror(argv[i]);
+        perror(argv[1]);
         return 1;
     } else if (!asm_file) {
-        perror(argv[i + 1]);
+        perror(argv[2]);
         return 1;
     }
 

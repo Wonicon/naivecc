@@ -19,6 +19,7 @@ struct Operand_ {
 
     // OPE_VAR, OPE_REF, OPE_TEMP, OPE_ADDR
     int index;         // 固有属性: 指示该操作数作为变量/引用/地址时的编号(3者独立)
+    int address;       // Record the variable offset to the function entry
 
     // OPE_INT
     int integer;       // 固有属性: 该操作数作为整型常数的值
@@ -40,8 +41,8 @@ struct Operand_ {
     int label_ref_cnt; // Label 作为跳转目标的引用次数, 在删除 GOTO 或者翻转 BRANCH 后, 如果引用计数归零, 可以删除
 
     // 代码优化相关
-    int liveness;      // 标记变量的活跃性, VAR和REF型变量一直活跃. 临时和地址初始不活跃
-    int next_use;      // 标记下一条需要该操作数的指令编号
+    int liveness;
+    int next_use;
     pDagNode dep;       // 依赖结点
 };
 
