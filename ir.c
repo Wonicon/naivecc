@@ -211,7 +211,17 @@ void print_instr(FILE *file) {
         nr_ir_from_dag = compress_ir(ir_from_dag, nr_ir_from_dag);
     }
 
-    // Generate assembly code
+    ////////////////////////////////////////////////////////
+    //  Generate assembly code
+    ////////////////////////////////////////////////////////
+
+    // Predefined functions
+    FILE *predef = fopen("predefine.S", "r");
+    char linebuf[128];  // 128 is enough?
+    while (fgets(linebuf, 128, predef)) {
+        fputs(linebuf, asm_file);
+    }
+
     for (int i = 0; i < nr_blk; i++) {
         LOG("A new block");
         fprintf(asm_file, "# basic block\n");

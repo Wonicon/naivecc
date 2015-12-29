@@ -2,7 +2,7 @@
 _prompt: .asciiz "Enter an integer:"
 _ret: .asciiz "\n"
 
-.global main
+.globl main
 
 .text
 read:

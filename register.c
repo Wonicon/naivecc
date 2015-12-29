@@ -66,7 +66,7 @@ pRegVarPair reg_state = &header;
 //   2. Register with a value that is the least currently needed.
 //
 
-int reg_index = 2;
+int reg_index = 8;
 char *allocate(Operand ope)
 {
     TEST(ope, "ope is null");
@@ -151,6 +151,6 @@ void clear_reg_state()
         free(tmp);
     }
     reg_state->next = NULL;
-    reg_index = 2;
+    reg_index = 8;
 }
 

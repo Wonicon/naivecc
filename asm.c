@@ -166,6 +166,22 @@ void gen_asm_addr(IR *ir)
 }
 
 
+void gen_asm_write(IR *ir)
+{
+    char *x = ensure(ir->rs);
+    emit_asm(move, "$a0, %s", x);
+    emit_asm(jal, "write");
+}
+
+
+void gen_asm_read(IR *ir)
+{
+    char *x = allocate(ir->rd);
+    emit_asm(jal, "read");
+    emit_asm(move, "%s, $v0", x);
+}
+
+
 typedef void(*trans_handler)(IR *);
 
 trans_handler handler[NR_IR_TYPE] = {
@@ -182,6 +198,8 @@ trans_handler handler[NR_IR_TYPE] = {
     [IR_JMP]     = gen_asm_goto,
     [IR_CALL]    = gen_asm_call,
     [IR_ADDR]    = gen_asm_addr,
+    [IR_READ]    = gen_asm_read,
+    [IR_WRITE]   = gen_asm_write,
     [IR_RET]     = gen_asm_return,
     [IR_BEQ]     = gen_asm_br,
     [IR_BLE]     = gen_asm_br,
