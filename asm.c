@@ -17,7 +17,9 @@
 
 extern FILE *asm_file;
 
+
 Operand curr_func = NULL;
+
 
 void gen_asm_label(IR *ir)
 {
@@ -26,7 +28,9 @@ void gen_asm_label(IR *ir)
         // Spare stack space
         curr_func = ir->rs;
         sp_offset = curr_func->size;
-        emit_asm(addi, "$sp, $sp, %d  # only for variables, not records", -ir->rs->size);
+        int ra = curr_func->has_subroutine ? 4 : 0;
+        emit_asm(addi, "$sp, $sp, %d  # only for variables, not records", -ir->rs->size - ra);
+        emit_asm(sw, "$ra, %d($sp)", sp_offset);
     }
 }
 
@@ -130,6 +134,9 @@ void gen_asm_call(IR *ir)
 
 void gen_asm_return(IR *ir)
 {
+    if (curr_func->has_subroutine) {
+        emit_asm(lw, "$ra, %d($sp)  # retrieve return address", sp_offset);
+    }
     char *x = ensure(ir->rs);
     emit_asm(addiu, "$sp, $sp, %d  # release stack space", curr_func->size);
     emit_asm(move, "%s, $v0  # prepare return value", x);

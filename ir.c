@@ -133,11 +133,12 @@ void print_single_instr(IR instr, FILE *file) {
 
 //
 // Calculate all variables' offset to the function entry
+// Check whether the function has subroutines.
 //
 
 #define MAP_SIZE 4096
 
-int calc_offset(IR buf[], int index, int n)
+int in_func_check(IR buf[], int index, int n)
 {
     static bool exists[MAP_SIZE];
     static IR *curr = NULL;
@@ -175,9 +176,15 @@ int calc_offset(IR buf[], int index, int n)
                 ;
             }
         }
+
+        AUTO(type, buf[index].type);
+
+        if (type == IR_CALL || type == IR_READ || type == IR_WRITE) {
+            curr->rs->has_subroutine = true;
+        }
     }
 
-    return calc_offset(buf, index + 1, n);
+    return in_func_check(buf, index + 1, n);
 }
 
 
@@ -194,7 +201,7 @@ void print_instr(FILE *file) {
     // 相当于窥孔优化
     preprocess_ir();
 
-    calc_offset(instr_buffer, 0, nr_instr);
+    in_func_check(instr_buffer, 0, nr_instr);
 
     optimize_in_block();
 

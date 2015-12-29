@@ -44,6 +44,7 @@ struct Operand_ {
     // 代码优化相关
     int liveness;
     int next_use;
+    bool has_subroutine;
     pDagNode dep;       // 依赖结点
 };
 
