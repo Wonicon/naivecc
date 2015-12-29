@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
 
 extern FILE *asm_file;
@@ -43,6 +44,7 @@ pRegVarPair reg_state = &header;
 
 char *allocate(Operand ope)
 {
+    TEST(ope, "ope is null");
     static int index = 1;
     pRegVarPair p = malloc(sizeof(RegVarPair));
     memset(p, 0, sizeof(RegVarPair));
@@ -60,6 +62,7 @@ char *allocate(Operand ope)
 
 char *ensure(Operand ope)
 {
+    TEST(ope, "ope is null");
     for (pRegVarPair p = reg_state->next; p != NULL; p = p->next) {
         if (cmp_operand(ope, p->ope)) {
             // Just leak the memory
@@ -73,11 +76,8 @@ char *ensure(Operand ope)
     if (is_const(ope)) {
         emit_asm(li, "%s, %s", result, print_operand(ope) + 1); // Jump '#' required by ir
     } else {
-        // TODO make offset meaningful
-        // TODO use $sp?
-        // TODO mimic a fake stack
-        int offset = 0;
-        emit_asm(lw, "%s, %d($sp)", result, offset);
+        // TODO make offset accurate
+        emit_asm(lw, "%s, %d($sp)", result, ope->address);
     }
     return result;
 }
