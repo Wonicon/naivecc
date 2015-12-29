@@ -34,7 +34,7 @@ void gen_asm_label(IR *ir)
 void gen_asm_assign(IR *ir)
 {
     char *src = ensure(ir->rs);
-    char *dst = ensure(ir->rd);
+    char *dst = allocate(ir->rd);
     emit_asm(move, "%s, %s", src, dst);
 }
 
