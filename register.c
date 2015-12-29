@@ -63,14 +63,14 @@ pRegVarPair reg_state = &header;
 //   2. Register with a value that is the least currently needed.
 //
 
+int reg_index = 2;
 char *allocate(Operand ope)
 {
     TEST(ope, "ope is null");
-    static int index = 1;
     pRegVarPair p = malloc(sizeof(RegVarPair));
     memset(p, 0, sizeof(RegVarPair));
     p->ope = ope;
-    p->reg_index = index++;
+    p->reg_index = reg_index++;
     p->is_dst = true;
     p->prev = reg_state;
     p->next = reg_state->next;
@@ -149,5 +149,6 @@ void clear_reg_state()
         free(tmp);
     }
     reg_state->next = NULL;
+    reg_index = 2;
 }
 
