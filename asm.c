@@ -18,6 +18,10 @@ extern FILE *asm_file;
 void gen_asm_label(IR *ir)
 {
     fprintf(asm_file, "%s:\n", print_operand(ir->rs));
+    if (ir->type == IR_FUNC) {
+        // Spare stack space
+        emit_asm(addi, "$sp, $sp, %d  # only for variables, not records", -ir->rs->size);
+    }
 }
 
 
@@ -142,27 +146,41 @@ void gen_asm_br(IR *ir)
 }
 
 
+void gen_asm_dec(IR *ir)
+{
+    return;
+}
+
+
+void gen_asm_addr(IR *ir)
+{
+    char *x = allocate(ir->rd);
+    emit_asm(addiu, "%s, $sp, %d", x, ir->rs->address);
+}
+
+
 typedef void(*trans_handler)(IR *);
 
 trans_handler handler[NR_IR_TYPE] = {
-        [IR_FUNC] = gen_asm_label,
-        [IR_ASSIGN] = gen_asm_assign,
-        [IR_ADD] = gen_asm_add,
-        [IR_SUB] = gen_asm_sub,
-        [IR_MUL] = gen_asm_mul,
-        [IR_DIV] = gen_asm_div,
-        [IR_DEREF_L] = gen_asm_load,
-        [IR_DEREF_R] = gen_asm_store,
-        [IR_JMP] = gen_asm_goto,
-        [IR_CALL] = gen_asm_call,
-        [IR_RET] = gen_asm_return,
-        [IR_BEQ] = gen_asm_br,
-        [IR_BLE] = gen_asm_br,
-        [IR_BGT] = gen_asm_br,
-        [IR_BGE] = gen_asm_br,
-        [IR_BNE] = gen_asm_br,
-        [IR_BLT] = gen_asm_br
-
+    [IR_DEC]     = gen_asm_dec,
+    [IR_FUNC]    = gen_asm_label,
+    [IR_ASSIGN]  = gen_asm_assign,
+    [IR_ADD]     = gen_asm_add,
+    [IR_SUB]     = gen_asm_sub,
+    [IR_MUL]     = gen_asm_mul,
+    [IR_DIV]     = gen_asm_div,
+    [IR_DEREF_R] = gen_asm_load,
+    [IR_DEREF_L] = gen_asm_store,
+    [IR_JMP]     = gen_asm_goto,
+    [IR_CALL]    = gen_asm_call,
+    [IR_ADDR]    = gen_asm_addr,
+    [IR_RET]     = gen_asm_return,
+    [IR_BEQ]     = gen_asm_br,
+    [IR_BLE]     = gen_asm_br,
+    [IR_BGT]     = gen_asm_br,
+    [IR_BGE]     = gen_asm_br,
+    [IR_BNE]     = gen_asm_br,
+    [IR_BLT]     = gen_asm_br
 };
 
 void gen_asm(IR *ir)
