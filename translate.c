@@ -646,7 +646,7 @@ int translate_func_head(Node func) {
             sym->address = new_operand(OPE_VAR);
         }
         // 实际的大小是在调用者那边说明
-        new_instr(IR_PRARM, sym->address, NULL, NULL);
+        new_instr(IR_PARAM, sym->address, NULL, NULL);
         param = param->sibling;
     }
     return MULTI_INSTR;

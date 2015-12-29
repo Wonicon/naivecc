@@ -20,6 +20,8 @@ extern FILE *asm_file;
 
 Operand curr_func = NULL;
 
+int nr_arg = 0;  // The number of arguments have been encounterded, referred when translating call
+
 
 void gen_asm_label(IR *ir)
 {
@@ -30,7 +32,9 @@ void gen_asm_label(IR *ir)
         sp_offset = curr_func->size;
         int ra = curr_func->has_subroutine ? 4 : 0;
         emit_asm(addi, "$sp, $sp, %d  # only for variables, not records", -ir->rs->size - ra);
-        emit_asm(sw, "$ra, %d($sp)", sp_offset);
+        if (curr_func->has_subroutine) {
+            emit_asm(sw, "$ra, %d($sp)", sp_offset);
+        }
     }
 }
 
@@ -123,12 +127,48 @@ void gen_asm_goto(IR *ir)
 }
 
 
+void gen_asm_arg(IR *ir)  // Not really emit code, but update the state.
+{
+    nr_arg++;
+}
+
+
 void gen_asm_call(IR *ir)
 {
-    emit_asm(sw, "sw $ra, 0($sp)");  // ?
+    // Open space for all arguments
+    emit_asm(addi, "$sp, $sp, %d  # Open space for all arguments", -(nr_arg * 4));
+    sp_offset += nr_arg * 4;
+
+    IR *arg = ir - nr_arg;  // IR is stored consecutively
+
+    // Only load exceeding arguments
+    for (int i = nr_arg; i > 4; i--) {
+        char *y = ensure(arg->rs);
+        emit_asm(sw, "%s, %d($sp)", y, (i - 1) * 4);
+        arg++;
+    }
+
+    // Register arguments
+    for (int i = (4 <= nr_arg) ? 4 : nr_arg; i >= 1; i--) {
+        char *y = ensure(arg->rs);
+        emit_asm(move, "$a%d, %s", i - 1, y);  // TODO check $ax usage
+        arg++;
+    }
+
     emit_asm(jal, "%s", ir->rs->name);
     char *x = allocate(ir->rd);
     emit_asm(move, "$v0, %s", x);
+
+    emit_asm(addiu, "$sp, $sp, %d  # Drawback arguments' space", nr_arg * 4);
+    sp_offset -= nr_arg * 4;
+
+    nr_arg = 0;  // After translating the call, clear arg state
+}
+
+
+void gen_asm_param(IR *ir)
+{
+    // TODO
 }
 
 
@@ -203,10 +243,12 @@ trans_handler handler[NR_IR_TYPE] = {
     [IR_DEREF_R] = gen_asm_load,
     [IR_DEREF_L] = gen_asm_store,
     [IR_JMP]     = gen_asm_goto,
+    [IR_ARG]     = gen_asm_arg,
     [IR_CALL]    = gen_asm_call,
     [IR_ADDR]    = gen_asm_addr,
     [IR_READ]    = gen_asm_read,
     [IR_WRITE]   = gen_asm_write,
+    [IR_PARAM]   = gen_asm_param,
     [IR_RET]     = gen_asm_return,
     [IR_BEQ]     = gen_asm_br,
     [IR_BLE]     = gen_asm_br,

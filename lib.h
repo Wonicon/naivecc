@@ -45,7 +45,7 @@ typedef enum IR_Type {
     // 函数类指令
     IR_ARG,      // 参数压栈
     IR_CALL,
-    IR_PRARM,    // 参数声明
+    IR_PARAM,    // 参数声明
 
     // I/O类指令
     IR_READ,

@@ -96,7 +96,7 @@ static const char *ir_format[] = {
     [IR_DEC]     = "%sDEC %s %s",          // DEC, 第一个 %s 过滤 rd_s
     [IR_ARG]     = "%sARG %s",             // Pass argument, 第一个 %s 过滤 rd_s
     [IR_CALL]    = "%s := CALL %s",        // CALL
-    [IR_PRARM]   = "%sPARAM %s",           // DEC PARAM, 第一个 %s 过滤 rd_s
+    [IR_PARAM]   = "%sPARAM %s",           // DEC PARAM, 第一个 %s 过滤 rd_s
     [IR_READ]    = "READ %s",              // READ
     [IR_WRITE]   = "%sWRITE %s",           // WRITE, 第一个 %s 过滤 rd_s, 输出语义不用 rd
 };
@@ -149,11 +149,13 @@ int in_func_check(IR buf[], int index, int n)
         return 0;  // meaningless
     }
 
-    if (buf[index].type == IR_FUNC) {
+    AUTO(type, buf[index].type);
+
+    if (type == IR_FUNC) {
         memset(exists, 0, sizeof(exists));
         curr = &buf[index];
         curr->rs->size = 0;
-    } else {
+    } else if (type != IR_PARAM) {
         for (int i = 0; i < 3; i++) {
             Operand ope = buf[index].operand[i];
             if (ope == NULL) {
@@ -180,6 +182,7 @@ int in_func_check(IR buf[], int index, int n)
         AUTO(type, buf[index].type);
 
         if (type == IR_CALL || type == IR_READ || type == IR_WRITE) {
+            LOG("HIT at %d", index);
             curr->rs->has_subroutine = true;
         }
     }
