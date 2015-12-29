@@ -27,18 +27,32 @@ const char *register_name[] = {
     "$gp", "$sp", "$s8", "$ra"
 };
 
+#define NR_REG (sizeof(register_name) / sizeof(register_name[0]))
+
+#define MAX_VAR 4096
+
+// Direct map for all variables, the second dimension acts as a bit vector.
+int ADT[MAX_VAR][NR_REG];
+
+// Record the variables found in a basic block.
+struct {
+    int map[MAX_VAR];
+    int size;
+} var_record;
+
 
 typedef struct RegVarPair *pRegVarPair;
 typedef struct RegVarPair
 {
     Operand ope;
     int reg_index;
+    bool is_dst;
     pRegVarPair prev;
     pRegVarPair next;
 } RegVarPair, *pRegVarPair;
 
 
-RegVarPair header = { NULL, -1, NULL, NULL };
+RegVarPair header = { NULL, -1, false, NULL, NULL };
 pRegVarPair reg_state = &header;
 
 
@@ -57,12 +71,13 @@ char *allocate(Operand ope)
     memset(p, 0, sizeof(RegVarPair));
     p->ope = ope;
     p->reg_index = index++;
+    p->is_dst = true;
     p->prev = reg_state;
     p->next = reg_state->next;
     reg_state->next = p;
 
     char *temp = malloc(32);
-    sprintf(temp, "$t%d", p->reg_index);
+    sprintf(temp, "$%d", p->reg_index);
     return temp;
 }
 
@@ -79,13 +94,14 @@ char *ensure(Operand ope)
         if (cmp_operand(ope, p->ope)) {
             // Just leak the memory
             char *temp = malloc(32);
-            sprintf(temp, "$t%d", p->reg_index);
+            sprintf(temp, "$%d", p->reg_index);
             return temp;
             //return register_name[reg_state.buffer[i].reg_index];
         }
     }
 
     char *result = allocate(ope);  // The reg name string to be printed.
+    reg_state->next->is_dst = false;  // Force the allocated reg to be source
 
     if (is_const(ope)) {
         WARN("Allocate a register to a const number");
@@ -100,23 +116,38 @@ char *ensure(Operand ope)
 
 
 //
+// Push variables and bools onto stak
+//
+// Address and temp are live only in one basic block
+//
+
+void push_all()
+{
+    pRegVarPair curr = reg_state->next;
+    while (curr != NULL) {
+        typeof(curr->ope->type) type = curr->ope->type;
+        if (curr->is_dst && (type == OPE_VAR || type == OPE_BOOL)) {
+            emit_asm(sw, "$%d, %d($sp)  # push %s", curr->reg_index, curr->ope->address, print_operand(curr->ope));
+        }
+        curr = curr->next;
+    }
+}
+
+
+//
 // Clear the key-value map
 //
-// This function should be called at the beginning or the end of a basic block,
-// as well as all register values being pushed into the stack
+// This function should be called at the end of a basic block,
 //
 
 void clear_reg_state()
 {
     pRegVarPair curr = reg_state->next;
-
     while (curr != NULL) {
-        pRegVarPair tmp = curr;
+        typeof(curr) tmp = curr;
         curr = curr->next;
-        // Push to stack.
-        emit_asm(sw, "%s, %d($sp)", print_operand(tmp->ope), tmp->ope->address);
         free(tmp);
     }
-
     reg_state->next = NULL;
 }
+

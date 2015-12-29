@@ -176,6 +176,7 @@ trans_handler handler[NR_IR_TYPE] = {
     [IR_SUB]     = gen_asm_sub,
     [IR_MUL]     = gen_asm_mul,
     [IR_DIV]     = gen_asm_div,
+    [IR_LABEL]   = gen_asm_label,
     [IR_DEREF_R] = gen_asm_load,
     [IR_DEREF_L] = gen_asm_store,
     [IR_JMP]     = gen_asm_goto,

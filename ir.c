@@ -168,6 +168,7 @@ int calc_offset(IR buf[], int index, int n)
                 if (!exists[ope->index]) {
                     curr->rs->size += ope->size;
                     ope->address = curr->rs->size;  // Calc afterwards because the stack grows from high to low
+                    exists[ope->index] = true;
                 }
                 break;
             default:
@@ -211,19 +212,18 @@ void print_instr(FILE *file) {
     }
 
     // Generate assembly code
-    for (int i = 0, curr_blk = instr_buffer[0].block; i < nr_instr; i++) {
-        IR *ir = &instr_buffer[i];
-        if (curr_blk != ir->block) {
-            LOG("A new block");
-            fprintf(asm_file, "# basic block");
-            curr_blk = ir->block;
-            clear_reg_state();
+    for (int i = 0; i < nr_blk; i++) {
+        LOG("A new block");
+        fprintf(asm_file, "# basic block\n");
+        Block *blk = &blk_buf[i];
+        int j;
+        for (j = blk->start; j < blk->end - 1; j++) {
+            LOG("ir %d", j + 1);
+            gen_asm(instr_buffer + j);
         }
-
-        // Note: return doesn't need to push variables previously.
-
-        LOG("ir %d", i + 1);
-        gen_asm(instr_buffer + i);
+        push_all();
+        gen_asm(instr_buffer + j);
+        clear_reg_state();
     }
 }
 

@@ -12,4 +12,6 @@ char *allocate(Operand ope);
 
 void clear_reg_state();
 
+void push_all();
+
 #endif //NJU_COMPILER_2015_REGISTER_H
