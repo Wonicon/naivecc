@@ -200,6 +200,7 @@ void print_instr(FILE *file) {
     for (int i = 0; i < nr_instr; i++) {
         print_single_instr(instr_buffer[i], file);
     }
+    fclose(file);
 #endif
 
 
@@ -210,6 +211,7 @@ void print_instr(FILE *file) {
 
     // Generate assembly code
     for (int i = 0; i < nr_instr; i++) {
+        LOG("ir %d", i + 1);
         gen_asm(instr_buffer + i);
     }
 }

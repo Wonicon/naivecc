@@ -935,9 +935,5 @@ void translate() {
     } else {
         fputs("Cannot translate: Code contains variables or parameters of structure type.", stderr);
     }
-
-#ifdef DEBUG
-    fclose(fp);
-#endif
 }
 
