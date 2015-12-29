@@ -3,6 +3,7 @@
 //
 
 #include "register.h"
+#include "asm.h"
 #include "lib.h"
 #include "ir.h"
 #include "operand.h"
@@ -40,6 +41,8 @@ struct {
     int size;
 } var_record;
 
+
+int sp_offset = 0;  // Always positive, [-n]($fp) == [offset - n]($sp) where offset == $fp - $sp
 
 typedef struct RegVarPair *pRegVarPair;
 typedef struct RegVarPair
@@ -107,8 +110,7 @@ char *ensure(Operand ope)
         WARN("Allocate a register to a const number");
         emit_asm(li, "%s, %s", result, print_operand(ope) + 1); // Jump '#' required by ir
     } else {
-        // TODO make offset accurate
-        emit_asm(lw, "%s, %d($sp)", result, ope->address);
+        emit_asm(lw, "%s, %d($sp)", result, sp_offset - ope->address);
     }
 
     return result;
@@ -127,7 +129,7 @@ void push_all()
     while (curr != NULL) {
         typeof(curr->ope->type) type = curr->ope->type;
         if (curr->is_dst && (type == OPE_VAR || type == OPE_BOOL)) {
-            emit_asm(sw, "$%d, %d($sp)  # push %s", curr->reg_index, curr->ope->address, print_operand(curr->ope));
+            emit_asm(sw, "$%d, %d($sp)  # push %s", curr->reg_index, sp_offset - curr->ope->address, print_operand(curr->ope));
         }
         curr = curr->next;
     }

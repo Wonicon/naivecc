@@ -14,4 +14,6 @@ void clear_reg_state();
 
 void push_all();
 
+extern int sp_offset;
+
 #endif //NJU_COMPILER_2015_REGISTER_H

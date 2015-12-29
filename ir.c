@@ -221,8 +221,16 @@ void print_instr(FILE *file) {
             LOG("ir %d", j + 1);
             gen_asm(instr_buffer + j);
         }
-        push_all();
-        gen_asm(instr_buffer + j);
+        if (can_jump(instr_buffer + j)) {
+            push_all();  // jump instr just load data, they don't change data.
+            gen_asm(instr_buffer + j);
+        } else if (instr_buffer[j].type != IR_RET) {
+            gen_asm(instr_buffer + j);  // May change variables
+            push_all();
+        } else {
+            gen_asm(instr_buffer + j);  // Local variables do not need to store when return
+        }
+
         clear_reg_state();
     }
 }

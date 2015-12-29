@@ -17,8 +17,7 @@
 
 extern FILE *asm_file;
 
-static Operand curr_func = NULL;
-
+Operand curr_func = NULL;
 
 void gen_asm_label(IR *ir)
 {
@@ -26,6 +25,7 @@ void gen_asm_label(IR *ir)
     if (ir->type == IR_FUNC) {
         // Spare stack space
         curr_func = ir->rs;
+        sp_offset = curr_func->size;
         emit_asm(addi, "$sp, $sp, %d  # only for variables, not records", -ir->rs->size);
     }
 }
@@ -162,7 +162,7 @@ void gen_asm_dec(IR *ir)
 void gen_asm_addr(IR *ir)
 {
     char *x = allocate(ir->rd);
-    emit_asm(addiu, "%s, $sp, %d  # get %s's address", x, ir->rs->address, print_operand(ir->rs));
+    emit_asm(addiu, "%s, $sp, %d  # get %s's address", x, sp_offset - ir->rs->address, print_operand(ir->rs));
 }
 
 
