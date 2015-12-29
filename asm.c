@@ -1,6 +1,9 @@
 //
 // Created by whz on 15-12-24.
 //
+// The module to translate intermediate representation to assembly code
+// Architecture: MIPS32
+//
 
 #include "asm.h"
 #include "register.h"
@@ -14,12 +17,15 @@
 
 extern FILE *asm_file;
 
+static Operand curr_func = NULL;
+
 
 void gen_asm_label(IR *ir)
 {
     fprintf(asm_file, "%s:\n", print_operand(ir->rs));
     if (ir->type == IR_FUNC) {
         // Spare stack space
+        curr_func = ir->rs;
         emit_asm(addi, "$sp, $sp, %d  # only for variables, not records", -ir->rs->size);
     }
 }
@@ -125,7 +131,8 @@ void gen_asm_call(IR *ir)
 void gen_asm_return(IR *ir)
 {
     char *x = ensure(ir->rs);
-    emit_asm(move, "%s, $v0", x);
+    emit_asm(addiu, "$sp, $sp, %d  # release stack space", curr_func->size);
+    emit_asm(move, "%s, $v0  # prepare return value", x);
     emit_asm(jr, "$ra");
 }
 
@@ -155,7 +162,7 @@ void gen_asm_dec(IR *ir)
 void gen_asm_addr(IR *ir)
 {
     char *x = allocate(ir->rd);
-    emit_asm(addiu, "%s, $sp, %d", x, ir->rs->address);
+    emit_asm(addiu, "%s, $sp, %d  # get %s's address", x, ir->rs->address, print_operand(ir->rs));
 }
 
 

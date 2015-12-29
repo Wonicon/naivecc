@@ -7,11 +7,12 @@
 #include "basic-block.h"
 #include "dag.h"
 #include "asm.h"
+#include "register.h"
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
 
-extern int control_flow_en;
+extern FILE *asm_file;  // Stream to store assembly code.
 
 #ifdef INLINE_REPLACE
 bool inline_deref = true;
@@ -210,7 +211,17 @@ void print_instr(FILE *file) {
     }
 
     // Generate assembly code
-    for (int i = 0; i < nr_instr; i++) {
+    for (int i = 0, curr_blk = instr_buffer[0].block; i < nr_instr; i++) {
+        IR *ir = &instr_buffer[i];
+        if (curr_blk != ir->block) {
+            LOG("A new block");
+            fprintf(asm_file, "# basic block");
+            curr_blk = ir->block;
+            clear_reg_state();
+        }
+
+        // Note: return doesn't need to push variables previously.
+
         LOG("ir %d", i + 1);
         gen_asm(instr_buffer + i);
     }
@@ -323,15 +334,13 @@ void deref_label(IR *pIR) {
 // 压缩指令, 删除NOP
 //
 int compress_ir(IR instr[], int n) {
-    for (int i = 0; i < n; i++) {
-        if (instr[i].type == IR_NOP) {
-            for (int j = i; j < n; j++) {
-                instr[j] = instr[j + 1];
-            }
-            n--;
+    int slow = 0;
+    for (int fast = 0; fast < n; fast++) {
+        if (instr[fast].type != IR_NOP) {
+            instr[slow++] = instr[fast];
         }
     }
-    return n;
+    return slow;
 }
 
 //

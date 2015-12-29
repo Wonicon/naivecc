@@ -87,6 +87,7 @@ typedef enum {
 
 char *cmm_strdup(const char *src);
 
+
 typedef int bool;
 #define true (1)
 #define false (0)

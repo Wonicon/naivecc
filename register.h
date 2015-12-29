@@ -10,4 +10,6 @@
 char *ensure(Operand ope);
 char *allocate(Operand ope);
 
+void clear_reg_state();
+
 #endif //NJU_COMPILER_2015_REGISTER_H
