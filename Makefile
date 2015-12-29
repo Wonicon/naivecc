@@ -33,9 +33,11 @@ syntax-c: $(YFILE)
 -include $(patsubst %.o, %.d, $(OBJS))
 
 # 定义的一些伪目标
-.PHONY: clean test
-test:
-	./parser ../Test/test1.cmm
+.PHONY: clean test gdb
+test: parser
+	./parser test.cmm test.S
+gdb: parser
+	gdb parser -ex "set args test.cmm test.S"
 clean:
 	rm -f parser lex.yy.c syntax.tab.c syntax.tab.h syntax.output
 	rm -f $(OBJS) $(OBJS:.o=.d)
