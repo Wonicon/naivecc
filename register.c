@@ -154,6 +154,7 @@ int allocate(Operand ope)
         PANIC("Unexpected operand type when allocating registers");
     }
 
+    LOG("Allocate %s to register %s", print_operand(ope), reg_to_s(reg));
     ope_in_reg[reg] = ope;
 
     return reg;
@@ -171,6 +172,7 @@ int ensure(Operand ope)
 
     for (int i = 0; i < NR_REG; i++) {
         if (ope_in_reg[i] && cmp_operand(ope, ope_in_reg[i])) {
+            LOG("Find %s at %s", print_operand(ope), reg_to_s(i));
             return i;
         }
     }
@@ -196,9 +198,11 @@ int ensure(Operand ope)
 
 void push_all()
 {
-    for (int i = S0; i <= S7; i++) {
+    for (int i = 0; i < NR_REG; i++) {
         AUTO(ope, ope_in_reg[i]);
-        if (ope != NULL && dirty[i]) {
+        if (ope != NULL && dirty[i] && (ope->next_use != MAX_LINE || ope->liveness)) {
+            // Use next_use to avoid store dead temporary variables.
+            // Use liveness to promise that user-defined variables are backed up.
             emit_asm(sw, "%s, %d($sp)  # push %s", reg_s[i], sp_offset - ope->address, print_operand(ope));
         }
     }

@@ -302,6 +302,7 @@ trans_handler handler[NR_IR_TYPE] = {
 
 void gen_asm(IR *ir)
 {
+    fprintf(asm_file, "# %s\n", ir_to_s(ir));
     handler[ir->type](ir);
 }
 

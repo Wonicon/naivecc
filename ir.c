@@ -243,7 +243,9 @@ void print_instr(FILE *file) {
 
     for (int i = 0; i < nr_blk; i++) {
 
-        fprintf(asm_file, "# basic block\n");
+        fprintf(asm_file, "#########################\n");
+        fprintf(asm_file, "###    basic block    ###\n");
+        fprintf(asm_file, "#########################\n");
 
         Block *blk = &blk_buf[i];
 

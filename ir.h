@@ -55,4 +55,5 @@ Operand calc_const(IR_Type op, Operand left, Operand right);
 int is_branch(IR *pIR);
 bool can_jump(IR *pIR);
 
+const char *ir_to_s(IR *);
 #endif // __IR_H__
