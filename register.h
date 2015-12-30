@@ -7,12 +7,16 @@
 
 #include "operand.h"
 
-char *ensure(Operand ope);
-char *allocate(Operand ope);
+const char *ensure(Operand ope);
+const char *allocate(Operand ope);
 
 void clear_reg_state();
 
 void push_all();
+
+void clear_reg_state_in_function();
+
+void pass_arg(Operand ope);
 
 extern int sp_offset;
 

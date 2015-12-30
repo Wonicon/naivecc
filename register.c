@@ -16,20 +16,39 @@
 extern FILE *asm_file;
 
 
-const char *register_name[] = {
-    "$zero",
-    "$at",
-    "$v0", "$v1",
-    "$a0", "$a1", "$a2", "$a3",
-    "$t0", "$t1", "$t2", "$t3", "$t4", "$t5", "%t6", "$t7",
-    "$s0", "$s1", "$s2", "$s3", "$s4", "$s5", "$s6", "$s7",
-    "$t8", "$t9",
-    "$k0", "$k1",
-    "$gp", "$sp", "$s8", "$ra"
+enum reg {
+    ZERO,
+    AT,
+    V0, V1,
+    A0, A1, A2, A3,
+    T0, T1, T2, T3, T4, T5, T6, T7,
+    S0, S1, S2, S3, S4, S5, S6, S7,
+    T8, T9,
+    K0, k1,
+    GP,
+    SP,
+    S8,
+    RA
 };
 
 
-#define NR_REG (sizeof(register_name) / sizeof(register_name[0]))
+const char *reg_s[] = {
+    "$zero",                                                  // $0
+    "$at",                                                    // $1
+    "$v0", "$v1",                                             // $2  ~ $3
+    "$a0", "$a1", "$a2", "$a3",                               // $4  ~ $7
+    "$t0", "$t1", "$t2", "$t3", "$t4", "$t5", "$t6", "$t7",   // $8  ~ $15
+    "$s0", "$s1", "$s2", "$s3", "$s4", "$s5", "$s6", "$s7",   // $16 ~ $23
+    "$t8", "$t9",                                             // $24 ~ $25
+    "$k0", "$k1",                                             // $26 ~ $27
+    "$gp",                                                    // $28
+    "$sp",                                                    // $29
+    "$s8",                                                    // $30
+    "$ra"                                                     // $31
+};
+
+
+#define NR_REG (sizeof(reg_s) / sizeof(reg_s[0]))
 
 
 #define MAX_VAR 4096
@@ -38,19 +57,43 @@ const char *register_name[] = {
 int sp_offset = 0;  // Always positive, [-n]($fp) == [offset - n]($sp) where offset == $fp - $sp
 
 
-typedef struct RegVarPair *pRegVarPair;
-typedef struct RegVarPair
+Operand ope_in_reg[NR_REG];  // Record which register stores which operand, null if none.
+
+
+int arg_reg_idx = A0;
+
+
+int get_reg(int start, int end)  // [start, end]
 {
-    Operand ope;
-    int reg_index;
-    bool is_dst;
-    pRegVarPair prev;
-    pRegVarPair next;
-} RegVarPair, *pRegVarPair;
+    int victim = MAX_LINE;           // The one to be replaced
+    int victim_next_use = -1;  // The limit of instruction buffer
 
+    int i;  // Need to use the break index
 
-RegVarPair header = { NULL, -1, false, NULL, NULL };
-pRegVarPair reg_state = &header;
+    for (i = start; i <= end; i++) {
+        AUTO(ope, ope_in_reg[i]);
+
+        if (ope == NULL) {
+            // An empty register or register store useless value
+            break;
+        } else if (victim_next_use < ope->next_use) {
+            victim = i;
+            victim_next_use = ope->next_use;
+        }
+    }
+
+    if (i <= end) {  // Find empty register
+        return i;
+    } else {
+        TEST(start <= victim && victim <= end && ope_in_reg[victim], "Victim should be updated");
+        AUTO(vic, ope_in_reg[victim]);
+        if (vic->next_use != MAX_LINE) {
+            emit_asm(sw, "%s, %d($sp)  # Back up victim", reg_s[victim], ope_in_reg[victim]->address);
+        }
+        ope_in_reg[victim] = NULL;
+        return victim;
+    }
+}
 
 
 //
@@ -61,22 +104,30 @@ pRegVarPair reg_state = &header;
 //   2. Register with a value that is the least currently needed.
 //
 
-int reg_index = 8;
-char *allocate(Operand ope)
+const char *allocate(Operand ope)
 {
-    TEST(ope, "ope is null");
-    pRegVarPair p = malloc(sizeof(RegVarPair));
-    memset(p, 0, sizeof(RegVarPair));
-    p->ope = ope;
-    p->reg_index = reg_index++;
-    p->is_dst = true;
-    p->prev = reg_state;
-    p->next = reg_state->next;
-    reg_state->next = p;
+    TEST(ope, "Operand is null");
 
-    char *temp = malloc(32);
-    sprintf(temp, "$%d", p->reg_index);
-    return temp;
+    int reg;
+    
+    // Select a suitable register group
+    switch (ope->type) {
+    case OPE_VAR:
+    case OPE_BOOL:
+        reg = get_reg(S0, S7);
+        break;
+    case OPE_TEMP:
+    case OPE_ADDR:
+    case OPE_INTEGER:
+        reg = get_reg(T0, T7);
+        break;
+    default:
+        PANIC("Unexpected operand type when allocating registers");
+    }
+
+    ope_in_reg[reg] = ope;
+
+    return reg_s[reg];
 }
 
 
@@ -85,22 +136,17 @@ char *allocate(Operand ope)
 // otherwise emit a load instruction
 //
 
-char *ensure(Operand ope)
+const char *ensure(Operand ope)
 {
-    TEST(ope, "ope is null");
+    TEST(ope, "Operand is null");
 
-    for (AUTO(p, reg_state->next); p != NULL; p = p->next) {
-        if (cmp_operand(ope, p->ope)) {
-            // Just leak the memory
-            char *temp = malloc(32);
-            sprintf(temp, "$%d", p->reg_index);
-            return temp;
-            //return register_name[reg_state.buffer[i].reg_index];
+    for (int i = 0; i < NR_REG; i++) {
+        if (ope_in_reg[i] && cmp_operand(ope, ope_in_reg[i])) {
+            return reg_s[i];
         }
     }
 
-    char *result = allocate(ope);  // The reg name string to be printed.
-    reg_state->next->is_dst = false;  // Force the allocated reg to be source
+    const char *result = allocate(ope);  // The reg name string to be printed.
 
     if (is_const(ope)) {
         emit_asm(li, "%s, %s", result, print_operand(ope) + 1); // Jump '#' required by ir
@@ -121,14 +167,12 @@ char *ensure(Operand ope)
 
 void push_all()
 {
-    pRegVarPair curr = reg_state->next;
-    while (curr != NULL) {
-        AUTO(type, curr->ope->type);
-        if (curr->is_dst && (type == OPE_VAR || type == OPE_BOOL)) {
-            emit_asm(sw, "$%d, %d($sp)  # push %s",
-                    curr->reg_index, sp_offset - curr->ope->address, print_operand(curr->ope));
+            LOG("HELLO");
+    for (int i = S0; i <= S7; i++) {
+        AUTO(ope, ope_in_reg[i]);
+        if (ope != NULL) {
+            emit_asm(sw, "%s, %d($sp)  # push %s", reg_s[i], sp_offset - ope->address, print_operand(ope));
         }
-        curr = curr->next;
     }
 }
 
@@ -141,13 +185,61 @@ void push_all()
 
 void clear_reg_state()
 {
-    pRegVarPair curr = reg_state->next;
-    while (curr != NULL) {
-        typeof(curr) tmp = curr;
-        curr = curr->next;
-        free(tmp);
+    for (int i = ZERO; i < A0; i++) {
+        ope_in_reg[i] = NULL;
     }
-    reg_state->next = NULL;
-    reg_index = 8;
+
+    for (int i = T0; i < RA; i++) {
+        ope_in_reg[i] = NULL;
+    }
 }
 
+
+//
+// Clear register for a function
+//
+
+void clear_reg_state_in_function()
+{
+    memset(ope_in_reg, 0, sizeof(ope_in_reg));
+    arg_reg_idx = A0;
+}
+
+
+//
+// Store the first 4 arguments
+//
+
+#if 0
+void pass_arg(Operand ope)
+{
+    if (arg_reg_idx <= A3) {
+        ope_in_reg[arg_reg_idx++] = ope;
+    }
+}
+#endif
+
+
+//
+// Flush arguments in $a0 ~ $a3
+//
+
+void flush_arg(Operand ope)
+{
+    for (int i = A0; i <= A3; i++) {
+        AUTO(arg, ope_in_reg[i]);
+        if (arg != NULL) {
+            TEST(arg->is_param, "A0 ~ A3 should only be param");
+            emit_asm(sw, "%s, %d($sp)", reg_s[i], arg->address);
+        }
+    }
+}
+
+
+//
+// Retrieve the first 4 arguments
+//
+
+void retrieve_arg(Operand ope)
+{
+}

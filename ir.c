@@ -184,7 +184,6 @@ int in_func_check(IR buf[], int index, int n)
         AUTO(type, buf[index].type);
 
         if (type == IR_CALL || type == IR_READ || type == IR_WRITE) {
-            LOG("HIT at %d", index);
             curr->rs->has_subroutine = true;
         }
     } else {
@@ -241,7 +240,6 @@ void print_instr(FILE *file) {
 
     // Handle each basic block
     for (int i = 0; i < nr_blk; i++) {
-        LOG("A new block");
         fprintf(asm_file, "# basic block\n");
         Block *blk = &blk_buf[i];
         int j;
@@ -483,7 +481,30 @@ void preprocess_ir() {
 // 分析基本块: 活跃性分析
 // end 不可取
 //
+void bp() {};
 void optimize_liveness(int start, int end) {
+    // Init
+    for (int i = end - 1; i >= start; i--) {
+        AUTO(ir, &instr_buffer[i]);
+
+        for (int k = 0; k < NR_OPE; k++) {
+            AUTO(ope, ir->operand[k]);
+
+            if (ope == NULL) {
+                continue;
+            }
+
+            if (ope->type == OPE_VAR || ope->type == OPE_BOOL) {
+                ope->liveness = ALIVE;
+            } else {
+                ope->liveness = DISALIVE;
+            }
+
+            ope->next_use = MAX_LINE;
+        }
+    }
+
+    // Iteration
     for (int i = end - 1; i >= start; i--) {
         IR *ir = &instr_buffer[i];
 

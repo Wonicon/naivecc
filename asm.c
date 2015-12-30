@@ -20,6 +20,7 @@ extern FILE *asm_file;
 
 Operand curr_func = NULL;
 
+
 int nr_arg = 0;  // The number of arguments have been encounterded, referred when translating call
 
 
@@ -41,11 +42,13 @@ void gen_asm_func(IR *ir)
     emit_asm(addi, "$sp, $sp, %d  # only for variables, not records", -ir->rs->size - ra);
 
     if (curr_func->has_subroutine) {
+#if 0
         // Save self register arguments
         // If a call extists, then $ra MUST have been saved onto stack.
         for (int i = curr_func->nr_arg; i > 0; i--) {
             emit_asm(sw, "$a%d, %d($sp)  # Spill to back arguments", i, sp_offset + i * 4);  // Jump $ra
         }
+#endif
 
         emit_asm(sw, "$ra, %d($sp)  # Save return address", sp_offset);
     }
@@ -54,8 +57,8 @@ void gen_asm_func(IR *ir)
 
 void gen_asm_assign(IR *ir)
 {
-    char *src = ensure(ir->rs);
-    char *dst = allocate(ir->rd);
+    const char *src = ensure(ir->rs);
+    const char *dst = allocate(ir->rd);
     emit_asm(move, "%s, %s", dst, src);
 }
 
@@ -63,8 +66,8 @@ void gen_asm_assign(IR *ir)
 // ir->rt should be OPE_INTEGER
 static inline void gen_asm_addi(Operand dst, Operand src, int imm)
 {
-    char *first = ensure(src);
-    char *dest = allocate(dst);
+    const char *first = ensure(src);
+    const char *dest = allocate(dst);
     emit_asm(addi, "%s, %s, %d", dest, first, imm);
 }
 
@@ -76,9 +79,9 @@ void gen_asm_add(IR *ir)
     } else if (ir->rs->type == OPE_INTEGER) {
         gen_asm_addi(ir->rd, ir->rt, ir->rs->integer);
     } else {
-        char *first = ensure(ir->rs);
-        char *second = ensure(ir->rt);
-        char *dst = allocate(ir->rd);
+        const char *first = ensure(ir->rs);
+        const char *second = ensure(ir->rt);
+        const char *dst = allocate(ir->rd);
         emit_asm(add, "%s, %s, %s", dst, first, second);
     }
 }
@@ -91,9 +94,9 @@ void gen_asm_sub(IR *ir)
     } else if (ir->rs->type == OPE_INTEGER) {
         gen_asm_addi(ir->rd, ir->rt, -ir->rs->integer);
     } else {
-        char *first = ensure(ir->rs);
-        char *second = ensure(ir->rt);
-        char *dst = allocate(ir->rd);
+        const char *first = ensure(ir->rs);
+        const char *second = ensure(ir->rt);
+        const char *dst = allocate(ir->rd);
         emit_asm(sub, "%s, %s, %s", dst, first, second);
     }
 }
@@ -101,18 +104,18 @@ void gen_asm_sub(IR *ir)
 
 void gen_asm_mul(IR *ir)
 {
-    char *y = ensure(ir->rs);
-    char *z = ensure(ir->rt);
-    char *x = allocate(ir->rd);
+    const char *y = ensure(ir->rs);
+    const char *z = ensure(ir->rt);
+    const char *x = allocate(ir->rd);
     emit_asm(mul, "%s, %s, %s", x, y, z);
 }
 
 
 void gen_asm_div(IR *ir)
 {
-    char *y = ensure(ir->rs);
-    char *z = ensure(ir->rt);
-    char *x = allocate(ir->rd);
+    const char *y = ensure(ir->rs);
+    const char *z = ensure(ir->rt);
+    const char *x = allocate(ir->rd);
     emit_asm(div, "%s, %s", y, z);
     emit_asm(mflo, "%s", x);
 }
@@ -120,16 +123,16 @@ void gen_asm_div(IR *ir)
 
 void gen_asm_load(IR *ir)
 {
-    char *y = ensure(ir->rs);
-    char *x = allocate(ir->rd);
+    const char *y = ensure(ir->rs);
+    const char *x = allocate(ir->rd);
     emit_asm(lw, "%s, 0(%s)", x, y);
 }
 
 
 void gen_asm_store(IR *ir)
 {
-    char *y = ensure(ir->rt);
-    char *x = ensure(ir->rs);
+    const char *y = ensure(ir->rt);
+    const char *x = ensure(ir->rs);
     emit_asm(sw, "%s, 0(%s)", y, x);
 }
 
@@ -152,25 +155,33 @@ void gen_asm_call(IR *ir)
     emit_asm(addi, "$sp, $sp, %d  # Open space for all arguments", -(nr_arg * 4));
     sp_offset += nr_arg * 4;
 
-    IR *arg = ir - nr_arg;  // IR is stored consecutively
+    IR *arg = ir;  // IR is stored consecutively
 
-    // Only load exceeding arguments
-    for (int i = nr_arg; i > 4; i--) {
-        char *y = ensure(arg->rs);
+    // Only store exceeding arguments
+    for (int i = 1; i <= nr_arg; i++) {
+        do {
+            arg--;
+        } while (arg->type != IR_ARG);
+
+        const char *y = ensure(arg->rs);
         emit_asm(sw, "%s, %d($sp)", y, (i - 1) * 4);
-        arg++;
     }
 
+#if 0
     // Register arguments
     for (int i = (4 <= nr_arg) ? 4 : nr_arg; i >= 1; i--) {
-        char *y = ensure(arg->rs);
+        const char *y = ensure(arg->rs);
         emit_asm(move, "$a%d, %s", i - 1, y);
         arg++;
     }
+#endif
 
     emit_asm(jal, "%s", ir->rs->name);
-    char *x = allocate(ir->rd);
-    emit_asm(move, "$v0, %s", x);
+
+    const char *x = allocate(ir->rd);
+    if (ir->rd->next_use != MAX_LINE || ir->rd->liveness) {
+        emit_asm(move, "$v0, %s", x);
+    }
 
     emit_asm(addiu, "$sp, $sp, %d  # Drawback arguments' space", nr_arg * 4);
     sp_offset -= nr_arg * 4;
@@ -190,6 +201,7 @@ void gen_asm_param(IR *ir)
     if (curr_func->has_subroutine) {
         ir->rs->address -= 4;
     }
+    //pass_arg(ir->rs);
 }
 
 
@@ -198,17 +210,19 @@ void gen_asm_return(IR *ir)
     if (curr_func->has_subroutine) {
         emit_asm(lw, "$ra, %d($sp)  # retrieve return address", sp_offset);
     }
-    char *x = ensure(ir->rs);
-    emit_asm(addiu, "$sp, $sp, %d  # release stack space", curr_func->size);
-    emit_asm(move, "%s, $v0  # prepare return value", x);
+    const char *x = ensure(ir->rs);
+
+    int size = curr_func->has_subroutine ? curr_func->size + 4 : curr_func->size;
+    emit_asm(addiu, "$sp, $sp, %d  # release stack space", size);
+    emit_asm(move, "$v0, %s  # prepare return value", x);
     emit_asm(jr, "$ra");
 }
 
 
 void gen_asm_br(IR *ir)
 {
-    char *x = ensure(ir->rs);
-    char *y = ensure(ir->rt);
+    const char *x = ensure(ir->rs);
+    const char *y = ensure(ir->rt);
     switch (ir->type) {
         case IR_BEQ: emit_asm(beq, "%s, %s, %s", x, y, print_operand(ir->rd)); break;
         case IR_BNE: emit_asm(bne, "%s, %s, %s", x, y, print_operand(ir->rd)); break;
@@ -229,14 +243,14 @@ void gen_asm_dec(IR *ir)
 
 void gen_asm_addr(IR *ir)
 {
-    char *x = allocate(ir->rd);
+    const char *x = allocate(ir->rd);
     emit_asm(addiu, "%s, $sp, %d  # get %s's address", x, sp_offset - ir->rs->address, print_operand(ir->rs));
 }
 
 
 void gen_asm_write(IR *ir)
 {
-    char *x = ensure(ir->rs);
+    const char *x = ensure(ir->rs);
     emit_asm(move, "$a0, %s", x);
     emit_asm(jal, "write");
 }
@@ -244,7 +258,7 @@ void gen_asm_write(IR *ir)
 
 void gen_asm_read(IR *ir)
 {
-    char *x = allocate(ir->rd);
+    const char *x = allocate(ir->rd);
     emit_asm(jal, "read");
     emit_asm(move, "%s, $v0", x);
 }
@@ -283,3 +297,4 @@ void gen_asm(IR *ir)
 {
     handler[ir->type](ir);
 }
+
