@@ -51,6 +51,8 @@ const char *reg_s[] = {
 #define NR_REG (sizeof(reg_s) / sizeof(reg_s[0]))
 
 
+#define NR_SAVE ((int)(S7 - S0))
+
 #define MAX_VAR 4096
 
 
@@ -60,7 +62,19 @@ int sp_offset = 0;  // Always positive, [-n]($fp) == [offset - n]($sp) where off
 Operand ope_in_reg[NR_REG];  // Record which register stores which operand, null if none.
 
 
-int arg_reg_idx = A0;
+int dirty[NR_REG];  // True if $sx is written
+
+
+void set_dirty(int index)
+{
+    dirty[index] = 1;
+}
+
+
+const char *reg_to_s(int index)
+{
+    return reg_s[index];
+}
 
 
 int get_reg(int start, int end)  // [start, end]
@@ -117,7 +131,7 @@ void remove_value(Operand ope)
 }
 
 
-const char *allocate(Operand ope)
+int allocate(Operand ope)
 {
     TEST(ope, "Operand is null");
 
@@ -142,7 +156,7 @@ const char *allocate(Operand ope)
 
     ope_in_reg[reg] = ope;
 
-    return reg_s[reg];
+    return reg;
 }
 
 
@@ -151,23 +165,23 @@ const char *allocate(Operand ope)
 // otherwise emit a load instruction
 //
 
-const char *ensure(Operand ope)
+int ensure(Operand ope)
 {
     TEST(ope, "Operand is null");
 
     for (int i = 0; i < NR_REG; i++) {
         if (ope_in_reg[i] && cmp_operand(ope, ope_in_reg[i])) {
-            return reg_s[i];
+            return i;
         }
     }
 
-    const char *result = allocate(ope);  // The reg name string to be printed.
+    int result = allocate(ope);  // The reg name string to be printed.
 
     if (is_const(ope)) {
-        emit_asm(li, "%s, %s", result, print_operand(ope) + 1); // Jump '#' required by ir
+        emit_asm(li, "%s, %d", reg_s[result], ope->integer); // Jump '#' required by ir
     } else {
         emit_asm(lw, "%s, %d($sp)  # sp_offset %d addr %d",
-                result, sp_offset - ope->address, sp_offset, ope->address);
+                reg_s[result], sp_offset - ope->address, sp_offset, ope->address);
     }
 
     return result;
@@ -184,7 +198,7 @@ void push_all()
 {
     for (int i = S0; i <= S7; i++) {
         AUTO(ope, ope_in_reg[i]);
-        if (ope != NULL) {
+        if (ope != NULL && dirty[i]) {
             emit_asm(sw, "%s, %d($sp)  # push %s", reg_s[i], sp_offset - ope->address, print_operand(ope));
         }
     }
@@ -192,68 +206,14 @@ void push_all()
 
 
 //
-// Clear the key-value map
+// Clear the operands' value stored in registers
 //
-// This function should be called at the end of a basic block,
+// This function should be called at the end of a basic block.
 //
 
 void clear_reg_state()
 {
-    for (int i = ZERO; i < A0; i++) {
-        ope_in_reg[i] = NULL;
-    }
-
-    for (int i = T0; i < RA; i++) {
-        ope_in_reg[i] = NULL;
-    }
-}
-
-
-//
-// Clear register for a function
-//
-
-void clear_reg_state_in_function()
-{
     memset(ope_in_reg, 0, sizeof(ope_in_reg));
-    arg_reg_idx = A0;
+    memset(dirty, 0, sizeof(dirty));
 }
 
-
-//
-// Store the first 4 arguments
-//
-
-#if 0
-void pass_arg(Operand ope)
-{
-    if (arg_reg_idx <= A3) {
-        ope_in_reg[arg_reg_idx++] = ope;
-    }
-}
-#endif
-
-
-//
-// Flush arguments in $a0 ~ $a3
-//
-
-void flush_arg(Operand ope)
-{
-    for (int i = A0; i <= A3; i++) {
-        AUTO(arg, ope_in_reg[i]);
-        if (arg != NULL) {
-            TEST(arg->is_param, "A0 ~ A3 should only be param");
-            emit_asm(sw, "%s, %d($sp)", reg_s[i], arg->address);
-        }
-    }
-}
-
-
-//
-// Retrieve the first 4 arguments
-//
-
-void retrieve_arg(Operand ope)
-{
-}

@@ -1,6 +1,7 @@
 #include "cmm-strtab.h"
 #include "cmm-symtab.h"
 #include "node.h"
+#include "asm.h"
 #include <string.h>
 
 // from syntax.tab.c
@@ -16,7 +17,6 @@ extern int is_lex_error;
 extern int is_syn_error;
 extern bool semantic_error;
 
-FILE *asm_file = NULL;
 
 int main(int argc, char *argv[]) {
     if (argc <= 1) {

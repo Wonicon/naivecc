@@ -7,17 +7,16 @@
 
 #include "operand.h"
 
-const char *ensure(Operand ope);
-const char *allocate(Operand ope);
+int ensure(Operand ope);
+
+int allocate(Operand ope);
 
 void clear_reg_state();
 
 void push_all();
 
-void clear_reg_state_in_function();
+void set_dirty(int index);
 
-void pass_arg(Operand ope);
-
-extern int sp_offset;
+const char *reg_to_s(int index);
 
 #endif //NJU_COMPILER_2015_REGISTER_H
