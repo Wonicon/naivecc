@@ -88,6 +88,9 @@ int get_reg(int start, int end)  // [start, end]
         TEST(start <= victim && victim <= end && ope_in_reg[victim], "Victim should be updated");
         AUTO(vic, ope_in_reg[victim]);
         if (vic->next_use != MAX_LINE) {
+            if (vic->type == OPE_TEMP || vic->type == OPE_ADDR) {
+                WARN("Back up temporary variable");
+            }
             emit_asm(sw, "%s, %d($sp)  # Back up victim", reg_s[victim], ope_in_reg[victim]->address);
         }
         ope_in_reg[victim] = NULL;
@@ -179,7 +182,6 @@ const char *ensure(Operand ope)
 
 void push_all()
 {
-            LOG("HELLO");
     for (int i = S0; i <= S7; i++) {
         AUTO(ope, ope_in_reg[i]);
         if (ope != NULL) {
