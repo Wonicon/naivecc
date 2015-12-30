@@ -248,12 +248,13 @@ void print_instr(FILE *file) {
 
             AUTO(ir, instr_buffer + j);
 
+            gen_asm(ir);
+
             // Update operand information
             if (ir->rs) ir->rs->liveness = ir->rs_info.liveness, ir->rs->next_use = ir->rs_info.next_use;
             if (ir->rt) ir->rt->liveness = ir->rt_info.liveness, ir->rt->next_use = ir->rt_info.next_use;
             if (ir->rd) ir->rd->liveness = ir->rd_info.liveness, ir->rd->next_use = ir->rd_info.next_use;
 
-            gen_asm(ir);
         }
         if (can_jump(instr_buffer + j)) {
             push_all();  // jump instr just load data, they don't change data.

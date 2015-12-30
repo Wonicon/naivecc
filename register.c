@@ -104,12 +104,24 @@ int get_reg(int start, int end)  // [start, end]
 //   2. Register with a value that is the least currently needed.
 //
 
+void remove_value(Operand ope)
+{
+    for (int i = 0; i <= NR_REG; i++) {
+        if (ope_in_reg[i] == ope) {
+            ope_in_reg[i] = NULL;
+        }
+    }
+}
+
+
 const char *allocate(Operand ope)
 {
     TEST(ope, "Operand is null");
 
     int reg;
     
+    remove_value(ope);  // Must remove ope's value stored in register, otherwise `ensure' will return old one.
+
     // Select a suitable register group
     switch (ope->type) {
     case OPE_VAR:
