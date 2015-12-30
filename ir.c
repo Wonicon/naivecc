@@ -232,6 +232,7 @@ void print_instr(FILE *file) {
     ////////////////////////////////////////////////////////
 
     // Predefined functions
+
     FILE *predef = fopen("predefine.S", "r");
     char linebuf[128];  // 128 is enough?
     while (fgets(linebuf, 128, predef)) {
@@ -239,23 +240,47 @@ void print_instr(FILE *file) {
     }
 
     // Handle each basic block
+
     for (int i = 0; i < nr_blk; i++) {
+
         fprintf(asm_file, "# basic block\n");
+
         Block *blk = &blk_buf[i];
+
         int j;
         for (j = blk->start; j < blk->end - 1; j++) {
             LOG("ir %d", j + 1);
 
             AUTO(ir, instr_buffer + j);
 
+            // Update destination's liveness information
+            //
+            // We may use the destination's next_use field to judge whether it is worth generating.
+            // But we should not update the next_use information for the source.
+            //
+            // Given the case that this instruction is the last one use its rs, indexed by X.
+            // The previous next_use information for rs indicates that rs's next referrence is at X.
+            // And X stores the updated next_use information indicating that rs is no longer needed.
+            //
+            // If X uses another source operand which need loading into register, it is highly possible
+            // that the currently used source register will be overrided, leading to a wrong result.
+            //
+            // A more effective solution is dividing the gen_asm into two parts. The 1st part just ensures
+            // source operands having been loaded into registers. Then update the next use information.
+            // Therefore the destination can still be judged and can use the source operands' register as well
+
+            if (ir->rd) ir->rd->liveness = ir->rd_info.liveness, ir->rd->next_use = ir->rd_info.next_use;
+
             gen_asm(ir);
 
             // Update operand information
             if (ir->rs) ir->rs->liveness = ir->rs_info.liveness, ir->rs->next_use = ir->rs_info.next_use;
             if (ir->rt) ir->rt->liveness = ir->rt_info.liveness, ir->rt->next_use = ir->rt_info.next_use;
-            if (ir->rd) ir->rd->liveness = ir->rd_info.liveness, ir->rd->next_use = ir->rd_info.next_use;
 
         }
+
+        // Handle the last IR. We should choose a proper time to spill the value into memory.
+
         if (can_jump(instr_buffer + j)) {
             push_all();  // jump instr just load data, they don't change data.
             gen_asm(instr_buffer + j);
