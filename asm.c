@@ -124,6 +124,7 @@ void gen_asm_load(IR *ir)
 {
     int y = ensure(ir->rs);
     int x = allocate(ir->rd);
+    set_dirty(x);
     emit_asm(lw, "%s, 0(%s)", reg_to_s(x), reg_to_s(y));
 }
 
