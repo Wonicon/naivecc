@@ -26,21 +26,28 @@ int nr_arg = 0;  // The number of arguments have been encounterded, referred whe
 void gen_asm_label(IR *ir)
 {
     fprintf(asm_file, "%s:\n", print_operand(ir->rs));
-    if (ir->type == IR_FUNC) {
-        // Spare stack space
-        curr_func = ir->rs;
-        sp_offset = curr_func->size;
-        int ra = curr_func->has_subroutine ? 4 : 0;
-        emit_asm(addi, "$sp, $sp, %d  # only for variables, not records", -ir->rs->size - ra);
-        if (curr_func->has_subroutine) {
-            // Save self register arguments
-            // If a call extists, then $ra MUST have been saved onto stack.
-            for (int i = curr_func->nr_arg; i > 0; i--) {
-                emit_asm(sw, "$a%d, %d($sp)  # Spill to back arguments", i, sp_offset + i * 4);  // Jump $ra
-            }
+}
 
-            emit_asm(sw, "$ra, %d($sp)  # Save return address", sp_offset);
+
+void gen_asm_func(IR *ir)
+{
+    fprintf(asm_file, "%s:\n", print_operand(ir->rs));
+    // Spare stack space
+    curr_func = ir->rs;
+    sp_offset = curr_func->size;
+
+    int ra = curr_func->has_subroutine ? 4 : 0;
+
+    emit_asm(addi, "$sp, $sp, %d  # only for variables, not records", -ir->rs->size - ra);
+
+    if (curr_func->has_subroutine) {
+        // Save self register arguments
+        // If a call extists, then $ra MUST have been saved onto stack.
+        for (int i = curr_func->nr_arg; i > 0; i--) {
+            emit_asm(sw, "$a%d, %d($sp)  # Spill to back arguments", i, sp_offset + i * 4);  // Jump $ra
         }
+
+        emit_asm(sw, "$ra, %d($sp)  # Save return address", sp_offset);
     }
 }
 
@@ -157,7 +164,7 @@ void gen_asm_call(IR *ir)
     // Register arguments
     for (int i = (4 <= nr_arg) ? 4 : nr_arg; i >= 1; i--) {
         char *y = ensure(arg->rs);
-        emit_asm(move, "$a%d, %s", i - 1, y);  // TODO check $ax usage
+        emit_asm(move, "$a%d, %s", i - 1, y);
         arg++;
     }
 
@@ -172,9 +179,17 @@ void gen_asm_call(IR *ir)
 }
 
 
+//
+// Update parameter's address
+// Now we know whether the function has saved return address
+// So we can fix the address of parameters.
+//
+
 void gen_asm_param(IR *ir)
 {
-    // TODO
+    if (curr_func->has_subroutine) {
+        ir->rs->address -= 4;
+    }
 }
 
 
@@ -239,7 +254,7 @@ typedef void(*trans_handler)(IR *);
 
 trans_handler handler[NR_IR_TYPE] = {
     [IR_DEC]     = gen_asm_dec,
-    [IR_FUNC]    = gen_asm_label,
+    [IR_FUNC]    = gen_asm_func,
     [IR_ASSIGN]  = gen_asm_assign,
     [IR_ADD]     = gen_asm_add,
     [IR_SUB]     = gen_asm_sub,

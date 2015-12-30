@@ -31,6 +31,8 @@ struct Operand_ {
     const char *name;  // 固有属性: 该操作数作为函数时的函数名
     int size;          // Total variables zie for a function
     int nr_arg;        // The number of arguments
+    bool has_subroutine;
+    bool is_param;
 
     // OPE_REF, OPE_REF_INFO
     Type *base_type;   // 综合属性: 引用型操作数对应的类型, 关系到偏移量的计算
@@ -45,7 +47,6 @@ struct Operand_ {
     // 代码优化相关
     int liveness;
     int next_use;
-    bool has_subroutine;
     pDagNode dep;       // 依赖结点
 };
 

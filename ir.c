@@ -142,6 +142,7 @@ int in_func_check(IR buf[], int index, int n)
 {
     static bool exists[MAP_SIZE];
     static IR *curr = NULL;
+    static int param_size;
 
     TEST(n <= MAP_SIZE, "exceed exists-map size");
 
@@ -155,6 +156,7 @@ int in_func_check(IR buf[], int index, int n)
         memset(exists, 0, sizeof(exists));
         curr = &buf[index];
         curr->rs->size = 0;
+        param_size = 0;
     } else if (type != IR_PARAM) {
         for (int i = 0; i < 3; i++) {
             Operand ope = buf[index].operand[i];
@@ -187,6 +189,10 @@ int in_func_check(IR buf[], int index, int n)
         }
     } else {
         curr->rs->nr_arg++;
+        buf[index].rs->is_param = true;
+        buf[index].rs->address = - param_size;
+        param_size += 4;
+        exists[buf[index].rs->index] = true;
     }
 
     return in_func_check(buf, index + 1, n);
@@ -233,6 +239,7 @@ void print_instr(FILE *file) {
         fputs(linebuf, asm_file);
     }
 
+    // Handle each basic block
     for (int i = 0; i < nr_blk; i++) {
         LOG("A new block");
         fprintf(asm_file, "# basic block\n");
@@ -240,7 +247,15 @@ void print_instr(FILE *file) {
         int j;
         for (j = blk->start; j < blk->end - 1; j++) {
             LOG("ir %d", j + 1);
-            gen_asm(instr_buffer + j);
+
+            AUTO(ir, instr_buffer + j);
+
+            // Update operand information
+            if (ir->rs) ir->rs->liveness = ir->rs_info.liveness, ir->rs->next_use = ir->rs_info.next_use;
+            if (ir->rt) ir->rt->liveness = ir->rt_info.liveness, ir->rt->next_use = ir->rt_info.next_use;
+            if (ir->rd) ir->rd->liveness = ir->rd_info.liveness, ir->rd->next_use = ir->rd_info.next_use;
+
+            gen_asm(ir);
         }
         if (can_jump(instr_buffer + j)) {
             push_all();  // jump instr just load data, they don't change data.
@@ -255,6 +270,7 @@ void print_instr(FILE *file) {
         clear_reg_state();
     }
 }
+
 
 //
 // 预处理工具 - 全局替换操作数, 无论其出现在哪个位置

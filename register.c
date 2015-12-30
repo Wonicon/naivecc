@@ -28,21 +28,15 @@ const char *register_name[] = {
     "$gp", "$sp", "$s8", "$ra"
 };
 
+
 #define NR_REG (sizeof(register_name) / sizeof(register_name[0]))
+
 
 #define MAX_VAR 4096
 
-// Direct map for all variables, the second dimension acts as a bit vector.
-int ADT[MAX_VAR][NR_REG];
-
-// Record the variables found in a basic block.
-struct {
-    int map[MAX_VAR];
-    int size;
-} var_record;
-
 
 int sp_offset = 0;  // Always positive, [-n]($fp) == [offset - n]($sp) where offset == $fp - $sp
+
 
 typedef struct RegVarPair *pRegVarPair;
 typedef struct RegVarPair
@@ -61,7 +55,8 @@ pRegVarPair reg_state = &header;
 
 //
 // Allocate a register to the given register.
-// Registers are preferred by the follow priority:
+//
+// Registers are selected by the follow priority:
 //   1. Empty register
 //   2. Register with a value that is the least currently needed.
 //
@@ -93,7 +88,8 @@ char *allocate(Operand ope)
 char *ensure(Operand ope)
 {
     TEST(ope, "ope is null");
-    for (pRegVarPair p = reg_state->next; p != NULL; p = p->next) {
+
+    for (AUTO(p, reg_state->next); p != NULL; p = p->next) {
         if (cmp_operand(ope, p->ope)) {
             // Just leak the memory
             char *temp = malloc(32);
@@ -107,10 +103,10 @@ char *ensure(Operand ope)
     reg_state->next->is_dst = false;  // Force the allocated reg to be source
 
     if (is_const(ope)) {
-        WARN("Allocate a register to a const number");
         emit_asm(li, "%s, %s", result, print_operand(ope) + 1); // Jump '#' required by ir
     } else {
-        emit_asm(lw, "%s, %d($sp)", result, sp_offset - ope->address);
+        emit_asm(lw, "%s, %d($sp)  # sp_offset %d addr %d",
+                result, sp_offset - ope->address, sp_offset, ope->address);
     }
 
     return result;
@@ -127,9 +123,10 @@ void push_all()
 {
     pRegVarPair curr = reg_state->next;
     while (curr != NULL) {
-        typeof(curr->ope->type) type = curr->ope->type;
+        AUTO(type, curr->ope->type);
         if (curr->is_dst && (type == OPE_VAR || type == OPE_BOOL)) {
-            emit_asm(sw, "$%d, %d($sp)  # push %s", curr->reg_index, sp_offset - curr->ope->address, print_operand(curr->ope));
+            emit_asm(sw, "$%d, %d($sp)  # push %s",
+                    curr->reg_index, sp_offset - curr->ope->address, print_operand(curr->ope));
         }
         curr = curr->next;
     }
