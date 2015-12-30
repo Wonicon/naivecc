@@ -13,6 +13,7 @@
 *.svg
 *.s
 *.S
+*.py
 tags
 parser
 play
