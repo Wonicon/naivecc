@@ -85,10 +85,10 @@ void gen_asm_add(IR *ir)
 
 void gen_asm_sub(IR *ir)
 {
+    // Note, sub cannot exchange!
+
     if (ir->rt->type == OPE_INTEGER) {
         gen_asm_addi(ir->rd, ir->rs, -ir->rt->integer);
-    } else if (ir->rs->type == OPE_INTEGER) {
-        gen_asm_addi(ir->rd, ir->rt, -ir->rs->integer);
     } else {
         int first = ensure(ir->rs);
         int second = ensure(ir->rt);
