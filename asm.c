@@ -157,30 +157,21 @@ void gen_asm_call(IR *ir)
 
     IR *arg = ir;  // IR is stored consecutively
 
-    // Only store exceeding arguments
+    // Push all arguments onto stack, which is more like x86 ;-)
     for (int i = 1; i <= nr_arg; i++) {
-        do {
-            arg--;
-        } while (arg->type != IR_ARG);
+
+        do arg--; while (arg->type != IR_ARG);
 
         const char *y = ensure(arg->rs);
         emit_asm(sw, "%s, %d($sp)", y, (i - 1) * 4);
-    }
 
-#if 0
-    // Register arguments
-    for (int i = (4 <= nr_arg) ? 4 : nr_arg; i >= 1; i--) {
-        const char *y = ensure(arg->rs);
-        emit_asm(move, "$a%d, %s", i - 1, y);
-        arg++;
     }
-#endif
 
     emit_asm(jal, "%s", ir->rs->name);
 
     const char *x = allocate(ir->rd);
     if (ir->rd->next_use != MAX_LINE || ir->rd->liveness) {
-        emit_asm(move, "$v0, %s", x);
+        emit_asm(move, "%s, $v0", x);
     }
 
     emit_asm(addiu, "$sp, $sp, %d  # Drawback arguments' space", nr_arg * 4);
