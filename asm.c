@@ -33,7 +33,13 @@ void gen_asm_label(IR *ir)
         int ra = curr_func->has_subroutine ? 4 : 0;
         emit_asm(addi, "$sp, $sp, %d  # only for variables, not records", -ir->rs->size - ra);
         if (curr_func->has_subroutine) {
-            emit_asm(sw, "$ra, %d($sp)", sp_offset);
+            // Save self register arguments
+            // If a call extists, then $ra MUST have been saved onto stack.
+            for (int i = curr_func->nr_arg; i > 0; i--) {
+                emit_asm(sw, "$a%d, %d($sp)  # Spill to back arguments", i, sp_offset + i * 4);  // Jump $ra
+            }
+
+            emit_asm(sw, "$ra, %d($sp)  # Save return address", sp_offset);
         }
     }
 }

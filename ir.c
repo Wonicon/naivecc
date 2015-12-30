@@ -185,11 +185,12 @@ int in_func_check(IR buf[], int index, int n)
             LOG("HIT at %d", index);
             curr->rs->has_subroutine = true;
         }
+    } else {
+        curr->rs->nr_arg++;
     }
 
     return in_func_check(buf, index + 1, n);
 }
-
 
 
 //
