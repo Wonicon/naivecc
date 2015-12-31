@@ -85,7 +85,7 @@ int get_reg(int start, int end)  // [start, end]
     int i;  // Need to use the break index
 
     for (i = start; i <= end; i++) {
-        AUTO(ope, ope_in_reg[i]);
+        Operand ope = ope_in_reg[i];
 
         if (ope == NULL) {
             // An empty register or register store useless value
@@ -100,12 +100,12 @@ int get_reg(int start, int end)  // [start, end]
         return i;
     } else {
         TEST(start <= victim && victim <= end && ope_in_reg[victim], "Victim should be updated");
-        AUTO(vic, ope_in_reg[victim]);
-        if (vic->next_use != MAX_LINE) {
+        Operand vic = ope_in_reg[victim];
+        if (vic->next_use != MAX_LINE || vic->liveness) {
             if (vic->type == OPE_TEMP || vic->type == OPE_ADDR) {
                 WARN("Back up temporary variable");
             }
-            emit_asm(sw, "%s, %d($sp)  # Back up victim", reg_s[victim], ope_in_reg[victim]->address);
+            emit_asm(sw, "%s, %d($sp)  # Back up victim", reg_s[victim], sp_offset - ope_in_reg[victim]->address);
         }
         ope_in_reg[victim] = NULL;
         return victim;
@@ -199,7 +199,7 @@ int ensure(Operand ope)
 void push_all()
 {
     for (int i = 0; i < NR_REG; i++) {
-        AUTO(ope, ope_in_reg[i]);
+        Operand ope = ope_in_reg[i];
         if (ope != NULL && dirty[i] && (ope->next_use != MAX_LINE || ope->liveness)) {
             // Use next_use to avoid store dead temporary variables.
             // Use liveness to promise that user-defined variables are backed up.

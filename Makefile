@@ -2,7 +2,7 @@
 # ************ 遇到不明白的地方请google以及阅读手册 *************
 
 # 编译器设定和编译选项
-CC = gcc
+CC = gcc-4.6
 FLEX = flex
 BISON = bison
 CFLAGS = -std=gnu99 -Wall -Werror -ggdb
@@ -36,8 +36,11 @@ syntax-c: $(YFILE)
 .PHONY: clean test gdb
 test: parser
 	./parser test.cmm test.S
+	spim -file test.S
+
 gdb: parser
 	gdb parser -ex "set args test.cmm test.S"
+
 clean:
 	rm -f parser lex.yy.c syntax.tab.c syntax.tab.h syntax.output
 	rm -f $(OBJS) $(OBJS:.o=.d)

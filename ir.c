@@ -150,7 +150,7 @@ int in_func_check(IR buf[], int index, int n)
         return 0;  // meaningless
     }
 
-    AUTO(type, buf[index].type);
+    IR_Type type = buf[index].type;
 
     if (type == IR_FUNC) {
         memset(exists, 0, sizeof(exists));
@@ -181,7 +181,7 @@ int in_func_check(IR buf[], int index, int n)
             }
         }
 
-        AUTO(type, buf[index].type);
+        IR_Type type = buf[index].type;
 
         if (type == IR_CALL || type == IR_READ || type == IR_WRITE) {
             curr->rs->has_subroutine = true;
@@ -253,7 +253,7 @@ void print_instr(FILE *file) {
         for (j = blk->start; j < blk->end - 1; j++) {
             LOG("ir %d", j + 1);
 
-            AUTO(ir, instr_buffer + j);
+            IR *ir = instr_buffer + j;
 
             // Update destination's liveness information
             //
@@ -509,14 +509,14 @@ void preprocess_ir() {
 // 分析基本块: 活跃性分析
 // end 不可取
 //
-void bp() {};
+
 void optimize_liveness(int start, int end) {
     // Init
     for (int i = end - 1; i >= start; i--) {
-        AUTO(ir, &instr_buffer[i]);
+        IR *ir = &instr_buffer[i];
 
         for (int k = 0; k < NR_OPE; k++) {
-            AUTO(ope, ir->operand[k]);
+            Operand ope = ir->operand[k];
 
             if (ope == NULL) {
                 continue;

@@ -126,6 +126,5 @@ typedef int bool;
     y = tmp; \
 })
 
-#define AUTO(x, y) typeof((y)) x = (y)
 #endif // LIB_H
 
