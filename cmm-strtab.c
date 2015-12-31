@@ -1,6 +1,8 @@
 #include "cmm-strtab.h"
 #include "lib.h"
+#include <stdio.h>
 #include <stdlib.h>
+#include <assert.h>
 #include <memory.h>
 
 
@@ -35,7 +37,7 @@ const char *register_str(const char *str) {
     } else {
         // Extend the capacity
         strtab_capacity = strtab_capacity + strtab_capacity / 2;
-        strtab = (const char **)realloc(strtab, strtab_capacity);
+        strtab = (const char **)realloc(strtab, strtab_capacity * sizeof(char *));
     }
 
     const char *s = cmm_strdup(str);
