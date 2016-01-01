@@ -87,8 +87,7 @@ int get_reg(int start, int end)  // [start, end]
     for (i = start; i <= end; i++) {
         Operand ope = ope_in_reg[i];
 
-        if (ope == NULL) {
-            // An empty register or register store useless value
+        if (ope == NULL) {  // An empty register
             break;
         } else if (victim_next_use < ope->next_use) {
             victim = i;
