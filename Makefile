@@ -1,14 +1,8 @@
-# GNU make手册：http://www.gnu.org/software/make/manual/make.html
-# ************ 遇到不明白的地方请google以及阅读手册 *************
-
-# 编译器设定和编译选项
-CC = gcc-4.6
+CC = gcc
 FLEX = flex
 BISON = bison
-CFLAGS = -std=gnu99 -Wall -Werror -ggdb
-# CFLAGS = -std=c99
+CFLAGS = -std=gnu99 -Wall -Werror -ggdb -D DEBUG
 
-# 编译目标：src目录下的所有.c文件
 CFILES = $(shell find ./ -name "*.c")
 OBJS = $(CFILES:.c=.o)
 LFILE = $(shell find ./ -name "*.l")
@@ -18,8 +12,10 @@ YFC = $(shell find ./ -name "*.y" | sed s/[^/]*\\.y/syntax.tab.c/)
 LFO = $(LFC:.c=.o)
 YFO = $(YFC:.c=.o)
 
-parser: syntax $(filter-out $(LFO),$(OBJS))
-	$(CC) -ggdb -o parser $(filter-out $(LFO),$(OBJS)) -lfl -ly
+COMPILER := cmm
+
+$(COMPILER): syntax $(filter-out $(LFO),$(OBJS))
+	$(CC) -ggdb -o $@ $(filter-out $(LFO),$(OBJS)) -lfl -ly
 
 syntax: lexical syntax-c
 	$(CC) -ggdb -c $(YFC) -o $(YFO)
@@ -32,17 +28,17 @@ syntax-c: $(YFILE)
 
 -include $(patsubst %.o, %.d, $(OBJS))
 
-# 定义的一些伪目标
 .PHONY: clean test gdb
-test: parser
-	./parser test.cmm test.S
+
+test: $(COMPILER)
+	./$(COMPILER) test.cmm test.S
 	spim -file test.S
 
-gdb: parser
-	gdb parser -ex "set args test.cmm test.S"
+gdb: $(COMPILER)
+	gdb $(COMPILER) -ex "set args test.cmm test.S"
 
 clean:
-	rm -f parser lex.yy.c syntax.tab.c syntax.tab.h syntax.output
+	rm -f $(COMPILER) lex.yy.c syntax.tab.c syntax.tab.h syntax.output
 	rm -f $(OBJS) $(OBJS:.o=.d)
 	rm -f $(LFC) $(YFC) $(YFC:.c=.h)
 	rm -f *~
