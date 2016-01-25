@@ -9,9 +9,10 @@ for file in $TESTCASE; do
     ./cmm $file $ASM
     if [ $? -ne 0 ]; then
         echo "Compilation failed."
+        continue
     fi
 
-    spim -file $ASM # Only check the validation of the asm file
+    spim -file $ASM 2> /dev/null # Only check the validation of the asm file
     if [ $? -ne 0 ]; then
         echo "Compilation incorrect."
     fi
