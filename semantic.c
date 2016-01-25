@@ -95,52 +95,45 @@ var_t analyze_dec(Node dec, Type *type, int scope) {
 }
 
 
-// next comes from the deflist behind
-Type *analyze_declist(Node declist, Type *type, int scope) {
-    assert(declist->type == YY_DecList);
-    Node dec = declist->child;
+static Type *
+analyze_field_dec(Node dec, Type *type, int scope) {
+    if (dec == NULL) {
+        return NULL;
+    }
+
+    assert(dec->type == YY_Dec);
 
     // Analyze the dec first in order to have a right symbol registering sequence.
     var_t var = analyze_dec(dec, type, scope);
 
-    // Handle declist if it exists.
-    // We do assignment here ignoring whether the declist is in the struct
-    // because this behavior has no side effects. We will discard the next_field
-    // in the end of this function if we are in CompSt declist!
-    Type *next_field;
-    if (dec->sibling != NULL) {
-        // declist -> dec comma declist
-        Node sub_list = dec->sibling->sibling;
-        next_field = analyze_declist(sub_list, type, scope);
-    } else {
-        next_field = NULL;
-    }
+    // Recursively analyze field to insert the node before head in order.
+    Type *next_field_list = analyze_field_dec(dec, type, scope);
+    Type *new_field = new_type(CMM_FIELD, var.name, var.type, next_field_list);
 
-    // If the declist is not in struct, then we just return NULL.
-    if (scope == STRUCT_SCOPE) {
-        Type *field = new_type(CMM_FIELD, var.name, var.type, next_field);
-        field->lineno = var.lineno;
-        return field;
-    } else {
-        return NULL;
-    }
+    new_field->lineno = var.lineno;
+
+    return new_field;
 }
 
 
-// next comes from the deflist behind
 Type *analyze_def(Node def, int scope) {
     assert(def->type == YY_Def);
 
-    // Get body symbols
-    Node spec = def->child;
-    Node declist = spec->sibling;
-
     // Handle Specifier
+    Node spec = def->child;
     Type *type = analyze_specifier(spec);
     assert(type->type_size != 0);
 
     // Handle DecList and get a field list if we are in struct scope
-    return analyze_declist(declist, type, scope);
+    if (scope == STRUCT_SCOPE) {
+        return analyze_field_dec(spec->sibling, type, scope);
+    }
+    else {
+        for (Node dec = spec->sibling; dec != NULL; dec = dec->sibling) {
+            analyze_dec(dec, type, scope);
+        }
+        return NULL;
+    }
 }
 
 
