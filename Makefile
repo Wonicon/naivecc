@@ -31,8 +31,7 @@ syntax-c: $(YFILE)
 .PHONY: clean test gdb
 
 test: $(COMPILER)
-	./$(COMPILER) test.cmm test.S
-	spim -file test.S
+	./test.sh
 
 gdb: $(COMPILER)
 	gdb $(COMPILER) -ex "set args test.cmm test.S"
