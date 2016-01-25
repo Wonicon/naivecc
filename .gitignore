@@ -3,7 +3,6 @@
 *.swp
 *.o
 *.output
-*.cmm
 *.pyc
 *.vim
 *.ir
