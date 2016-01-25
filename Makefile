@@ -1,7 +1,7 @@
 CC = gcc
 FLEX = flex
 BISON = bison
-CFLAGS = -std=gnu99 -Wall -Werror -ggdb -D DEBUG
+CFLAGS = -std=gnu99 -Wall -Werror -ggdb #-D DEBUG
 
 CFILES = $(shell find ./ -name "*.c")
 OBJS = $(CFILES:.c=.o)

@@ -52,10 +52,11 @@ int main(int argc, char *argv[]) {
         write->param = new_type(CMM_PARAM, "o", BASIC_INT, NULL);
         insert("write", write, -1, 0);
 
+        simplify();
+
         semantic_analysis();
 
         if (!semantic_error) {
-            simplify();
             translate();
         }
     }
