@@ -476,52 +476,64 @@ Type *analyze_exp(Node exp, int scope) {
     Node id, lexp, rexp, op;
     Type *lexp_type = NULL, *rexp_type = NULL;
     sym_ent_t *query_result = NULL;
-    switch (exp->child->type) {
-        case YY_INT:
+
+    switch (exp->tag) {
+        case EXP_is_EXP:
+            return analyze_exp(exp->child, scope);
+        case EXP_is_INT:
             return BASIC_INT;
-        case YY_FLOAT:
+        case EXP_is_FLOAT:
             return BASIC_FLOAT;
+        case EXP_is_ID:
+            {
+                Node id = exp->child;
+                assert(id->type == YY_ID);
+                query_result = query(id->val.s, scope);
+                // Handle id
+                if (query_result == NULL) {
+                    SEMA_ERROR_MSG(1, id->lineno, "Undefined variable \"%s\"", id->val.s);
+                    return NULL;
+                }
+                else if (query_result->type->class == CMM_TYPE) {
+                    SEMA_ERROR_MSG(1, id->lineno, "Cannot resovle variable \"%s\"", id->val.s);
+                    return NULL;
+                }
+                else {
+                    return query_result->type;
+                }
+            }
+        case EXP_is_ID_ARG:
+            {
+                Node id = exp->child;
+                assert(id->type == YY_ID);
+                assert(id->sibling->type == YY_Args);
+                if (query_result == NULL) {
+                    SEMA_ERROR_MSG(2, id->lineno, "Undefined function \"%s\".", id->val.s);
+                    return NULL;
+                }
+                else if (query_result->type->class != CMM_FUNC) {
+                    SEMA_ERROR_MSG(11, id->lineno, "\"%s\" is not a function.", id->val.s);
+                    return query_result->type;
+                }
+                else {
+                    // Error report in the check.
+                    check_param_list(query_result->type->param, id->sibling, scope);
+                    // Return the return type anyway, because using a wrong function and giving wrong
+                    // parameters are problems of two aspects.
+                    return query_result->type->ret;
+                }
+            }
+        default:
+            return NULL;
+    }
+
+    switch (exp->child->type) {
         case YY_MINUS:
             rexp = exp->child->sibling;
             return analyze_exp(rexp, scope);
         case YY_NOT:
             rexp = exp->child->sibling;
             return analyze_exp(rexp, scope);
-        case YY_LP:
-            lexp = exp->child->sibling;
-            return analyze_exp(lexp, scope);
-        case YY_ID:
-            id = exp->child;
-            // Regardless of whether it is an id or func call, let's query it first~
-            query_result = query(id->val.s, scope);
-
-            // Handle function call
-            if (id->sibling != NULL && id->sibling->type == YY_LP) {
-                if (query_result == NULL) {
-                    SEMA_ERROR_MSG(2, id->lineno, "Undefined function \"%s\".", id->val.s);
-                    return NULL;
-                } else if (query_result->type->class != CMM_FUNC) {
-                    SEMA_ERROR_MSG(11, id->lineno, "\"%s\" is not a function.", id->val.s);
-                    return query_result->type;
-                } else {
-                    // Error report in the check.
-                    check_param_list(query_result->type->param, id->sibling->sibling, scope);
-                    // Return the return type anyway, because using a wrong function and giving wrong
-                    // parameters are problems of two aspects.
-                    return query_result->type->ret;
-                }
-            } else {
-                // Handle id
-                if (query_result == NULL) {
-                    SEMA_ERROR_MSG(1, id->lineno, "Undefined variable \"%s\"", id->val.s);
-                    return NULL;
-                } else if (query_result->type->class == CMM_TYPE) {
-                    SEMA_ERROR_MSG(1, id->lineno, "Cannot resovle variable \"%s\"", id->val.s);
-                    return NULL;
-                } else {
-                    return query_result->type;
-                }
-            }
         case YY_Exp:
             lexp = exp->child;
             op = lexp->sibling;
