@@ -68,7 +68,6 @@ var_t analyze_dec(Node dec, Type *type, int scope) {
     Node vardec = dec->child;
     var_t var = analyze_vardec(vardec, type);
 
-    // TODO is field need insert symbol?
     if (scope != STRUCT_SCOPE) {
         if (insert(var.name, var.type, dec->child->child->lineno, scope) < 0) {
             if (scope != STRUCT_SCOPE) {
@@ -83,7 +82,7 @@ var_t analyze_dec(Node dec, Type *type, int scope) {
         if (scope == STRUCT_SCOPE) {  // Field does not allow assignment
             SEMA_ERROR_MSG(15, dec->lineno, "Initialization in the structure definition is not allowed");
         } else {  // Assignment consistency check
-            Node exp = vardec->sibling->sibling;
+            Node exp = vardec->sibling;
             const Type *exp_type = analyze_exp(exp, scope);
             if (!typecmp(exp_type, type)) {
                 SEMA_ERROR_MSG(5, vardec->sibling->lineno, "Type mismatch");
@@ -425,8 +424,52 @@ static int check_param_list(const Type *param, Node args, int scope) {
     }
 }
 
-const char *expr_to_s(Node exp);
-// TODO Split this bulk function!
+
+Type *
+analyze_exp_is_binary(Node exp, int scope)
+{
+    Node left = exp->child;
+    Node right = left->sibling;
+
+    Type *left_type = analyze_exp(left, scope);
+    Type *right_type = analyze_exp(right, scope);
+
+    if (!typecmp(left_type, right_type)) {
+        // Type mismatched
+        SEMA_ERROR_MSG(7, exp->lineno, "Type mismatched for operands");
+        return NULL;
+    }
+    else if (!typecmp(left_type, BASIC_INT) && !typecmp(left_type, BASIC_FLOAT)) {
+        // Type matched, but cannot be operated
+        SEMA_ERROR_MSG(7, exp->lineno, "The type is not allowed in operation '%s'", exp->val.operator);
+        return NULL;
+    }
+    else {
+        return left_type;
+    }
+}
+
+
+Type *
+analyze_exp_is_assign(Node exp, int scope)
+{
+    Node left = exp->child;
+    Node right = left->sibling;
+
+    Type *type_l = analyze_exp(left, scope);
+    Type *type_r = analyze_exp(right, scope);
+
+    if (!typecmp(type_l, type_r)) {
+        SEMA_ERROR_MSG(5, exp->lineno, "Type mismatched for assignment.");
+    }
+    else if (!is_lval(left)) {
+        SEMA_ERROR_MSG(6, exp->lineno, "The left-hand side of an assignment must be a variable.");
+    }
+    
+    return type_l;
+}
+
+
 Type *analyze_exp(Node exp, int scope) {
     assert(exp->type == YY_Exp);
 
@@ -503,7 +546,7 @@ Type *analyze_exp(Node exp, int scope) {
                 case YY_LB:
                     rexp_type = analyze_exp(rexp, scope);
                     if (rexp_type != NULL && rexp_type->class != CMM_INT) {
-                        SEMA_ERROR_MSG(12, rexp->lineno, "%s is not a integer", expr_to_s(rexp));
+                        SEMA_ERROR_MSG(12, rexp->lineno, "expression is not a integer");
                     }
 
                     // If lexp_type is null, it means that an semantic error has occurred, then we can ignore the
@@ -511,7 +554,7 @@ Type *analyze_exp(Node exp, int scope) {
                     if (lexp_type == NULL) {
                         return NULL;
                     } else if (lexp_type->class != CMM_ARRAY) {
-                        SEMA_ERROR_MSG(10, lexp->lineno, " \"%s\" is not an array.", expr_to_s(lexp));
+                        SEMA_ERROR_MSG(10, lexp->lineno, "expression is not an array.");
                         return NULL;
                     } else {
                         return lexp_type->base;
@@ -519,29 +562,6 @@ Type *analyze_exp(Node exp, int scope) {
                 default:
                     // Normal two operands operation
                     rexp_type = analyze_exp(rexp, scope);
-                    if (!typecmp(lexp_type, rexp_type)) {
-                        // Type mismatched
-                        if (op->type == YY_ASSIGNOP) {
-                            SEMA_ERROR_MSG(5, op->lineno, "Type mismatched for assignment.");
-                            // TODO: Return int as default, is this right?
-                            return BASIC_INT;
-                        } else {
-                            SEMA_ERROR_MSG(7, op->lineno, "Type mismatched for operands");
-                            return NULL;
-                        }
-                    } else if (op->type != YY_ASSIGNOP &&
-                                (!typecmp(lexp_type, BASIC_INT)
-                                 && !typecmp(lexp_type, BASIC_FLOAT))) {
-                        // Type matched, but cannot be operated
-                        SEMA_ERROR_MSG(7, op->lineno, "The type is not allowed in operation '%s'", op->val.s);
-                        return NULL;
-                    } else if (op->type == YY_ASSIGNOP && (!is_lval(lexp))) {
-                        // Type matched, but the left operand cannot be assigned.
-                        SEMA_ERROR_MSG(6, op->lineno, "The left-hand side of an assignment must be a variable.");
-                        return NULL;
-                    } else {
-                        return lexp_type;
-                    }
             }
         default:
             LOG("HELL");
@@ -698,96 +718,3 @@ void analyze_program(Node prog) {
     }
 }
 
-
-// TODO Split this ugly function!
-void print_expr(Node nd, FILE *fp) {
-    if (nd == NULL) {
-        return;
-    }
-    if (nd->type == YY_Exp) {
-        print_expr(nd->child, fp);
-        if (nd->sibling == NULL) {
-            return;
-        }
-        Node op = nd->sibling;
-        switch (op->type) {
-            case YY_ASSIGNOP: case YY_RELOP:
-            case YY_AND: case YY_OR:
-            case YY_PLUS: case YY_MINUS:
-            case YY_STAR: case YY_DIV:
-                fprintf(fp, " %s ", op->val.s);
-                print_expr(op->sibling->child, fp);
-                return;
-            case YY_COMMA:
-                fputs(",", fp); 
-                return;
-            case YY_LB:
-                fputs("[", fp);
-                print_expr(op->sibling->child, fp);
-                fputs("]", fp);
-                return;
-            case YY_DOT:
-                fputs(".", fp);
-                fputs(op->sibling->val.s, fp);
-                return;
-            default:
-                assert(0);
-        }
-
-    } else {
-        switch (nd->type) {
-            case YY_LP:
-                fputs("(", fp);
-                print_expr(nd->sibling->child, fp);
-                fputs(")", fp);
-                return;
-            case YY_MINUS: case YY_NOT:
-                fprintf(fp, "%s", nd->val.s);
-                print_expr(nd->sibling->child, fp);
-                return;
-            case YY_INT:
-                fprintf(fp, "%d", nd->val.i);
-                return;
-            case YY_FLOAT:
-                fprintf(fp, "%f", nd->val.f);
-                return;
-            case YY_ID:
-                fputs(nd->val.s, fp);
-                if (nd->sibling != NULL) {
-                    fputs("(", fp);
-                    nd = nd->sibling->sibling;
-                    while (nd->type == YY_Args) {
-                        print_expr(nd->child, fp);
-                        if (nd->child->sibling != NULL) {
-                            nd = nd->child->sibling->sibling;
-                        } else {
-                            break;
-                        }
-                    }
-                    fputs(")", fp);
-                }
-                return;
-            default:
-                assert(0);
-        }
-    }
-}
-
-
-const char *expr_to_s(Node exp) {
-    static char *s = NULL;
-
-    assert(exp->type == YY_Exp);
-    FILE *tmp = tmpfile();
-    print_expr(exp->child, tmp);
-    int len = (int)ftell(tmp);  // long long -> int
-    if (s != NULL) {
-        free(s);
-    }
-    s = (char *)malloc((size_t)(len + 1));
-    memset(s, 0, (size_t)(len + 1));
-    rewind(tmp);
-    fgets(s, len + 1, tmp);
-    fclose(tmp);
-    return s;
-}
