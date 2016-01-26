@@ -475,7 +475,6 @@ Type *analyze_exp(Node exp, int scope) {
 
     Node id, lexp, rexp, op;
     Type *lexp_type = NULL, *rexp_type = NULL;
-    sym_ent_t *query_result = NULL;
 
     switch (exp->tag) {
         case EXP_is_EXP:
@@ -488,8 +487,9 @@ Type *analyze_exp(Node exp, int scope) {
             {
                 Node id = exp->child;
                 assert(id->type == YY_ID);
-                query_result = query(id->val.s, scope);
-                // Handle id
+
+                sym_ent_t *query_result = query(id->val.s, scope);
+
                 if (query_result == NULL) {
                     SEMA_ERROR_MSG(1, id->lineno, "Undefined variable \"%s\"", id->val.s);
                     return NULL;
@@ -507,6 +507,9 @@ Type *analyze_exp(Node exp, int scope) {
                 Node id = exp->child;
                 assert(id->type == YY_ID);
                 assert(id->sibling->type == YY_Args);
+
+                sym_ent_t *query_result = query(id->val.s, scope);
+
                 if (query_result == NULL) {
                     SEMA_ERROR_MSG(2, id->lineno, "Undefined function \"%s\".", id->val.s);
                     return NULL;
@@ -521,6 +524,27 @@ Type *analyze_exp(Node exp, int scope) {
                     // Return the return type anyway, because using a wrong function and giving wrong
                     // parameters are problems of two aspects.
                     return query_result->type->ret;
+                }
+            }
+        case EXP_is_EXP_FIELD:
+            {
+                Type *struct_type = analyze_exp(exp->child, scope);
+
+                if (struct_type->class != CMM_STRUCT) {
+                    SEMA_ERROR_MSG(13, exp->lineno, "The left identifier of '.' is not a struct");
+                    return NULL;
+                }
+                else {
+                    Node field = exp->child->sibling;
+                    Type *field_type = query_field(lexp_type, field->val.s);
+                    if (field_type == NULL) {
+                        SEMA_ERROR_MSG(14, field->lineno, "Undefined field \"%s\" in struct \"%s\".",
+                                field->val.s, struct_type->name);
+                        return NULL;
+                    }
+                    else {
+                        return field_type;
+                    }
                 }
             }
         default:
@@ -541,20 +565,6 @@ Type *analyze_exp(Node exp, int scope) {
             lexp_type = analyze_exp(lexp, scope);
             // right exp can be id directly, so be cautious.
             switch (op->type) {
-                case YY_DOT:
-                    id = rexp;
-                    if (lexp_type->class != CMM_STRUCT) {
-                        SEMA_ERROR_MSG(13, op->lineno, "The left identifier of '.' is not a struct");
-                        return NULL;
-                    } else if ((rexp_type = query_field(lexp_type, id->val.s)) == NULL) {
-                        SEMA_ERROR_MSG(14, id->lineno,
-                                       "Undefined field \"%s\" in struct \"%s\".",
-                                       id->val.s, lexp_type->name);
-                        return NULL;
-                    } else {
-                        // Commonly we return the type of the field
-                        return rexp_type;
-                    }
                 case YY_LB:
                     rexp_type = analyze_exp(rexp, scope);
                     if (rexp_type != NULL && rexp_type->class != CMM_INT) {
@@ -572,8 +582,7 @@ Type *analyze_exp(Node exp, int scope) {
                         return lexp_type->base;
                     }
                 default:
-                    // Normal two operands operation
-                    rexp_type = analyze_exp(rexp, scope);
+                    ;
             }
         default:
             LOG("HELL");
