@@ -917,12 +917,12 @@ int translate_exp_is_const(Node nd) {
     return NO_NEED_TO_GEN;
 }
 
-extern Node ast_tree;
+extern Node prog;
 
 extern FILE *asm_file;
 
 void translate() {
-    translate_ast(ast_tree);
+    translate_ast(prog);
 
 #ifdef DEBUG
     FILE *fp = fopen("test.ir", "w");
