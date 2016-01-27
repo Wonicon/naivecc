@@ -426,6 +426,13 @@ static int check_param_list(const Type *param, Node args, int scope) {
 
 
 Type *
+analyze_exp_is_unary(Node exp, int scope)
+{
+    return analyze_exp(exp->child, scope);
+}
+
+
+Type *
 analyze_exp_is_binary(Node exp, int scope)
 {
     Node left = exp->child;
@@ -470,11 +477,36 @@ analyze_exp_is_assign(Node exp, int scope)
 }
 
 
+Type *
+analyze_exp_is_exp_idx(Node exp, int scope)
+{
+    Node lexp = exp->child;
+    Node rexp = lexp->sibling;
+
+    Type *ltype = analyze_exp(lexp, scope);
+    Type *rtype = analyze_exp(rexp, scope);
+
+    if (rtype != NULL && rtype->class != CMM_INT) {
+        SEMA_ERROR_MSG(12, rexp->lineno, "expression is not a integer");
+    }
+
+    // If lexp_type is null, it means that an semantic error has occurred, then we can ignore the
+    // consecutive errors.
+    if (ltype == NULL) {
+        return NULL;
+    }
+    else if (ltype->class != CMM_ARRAY) {
+        SEMA_ERROR_MSG(10, lexp->lineno, "expression is not an array.");
+        return NULL;
+    }
+    else {
+        return ltype->base;
+    }
+}
+
+
 Type *analyze_exp(Node exp, int scope) {
     assert(exp->type == YY_Exp);
-
-    Node id, lexp, rexp, op;
-    Type *lexp_type = NULL, *rexp_type = NULL;
 
     switch (exp->tag) {
         case EXP_is_EXP:
@@ -502,6 +534,10 @@ Type *analyze_exp(Node exp, int scope) {
                     return query_result->type;
                 }
             }
+        case EXP_is_UNARY:
+            return analyze_exp_is_unary(exp, scope);
+        case EXP_is_BINARY:
+            return analyze_exp_is_binary(exp, scope);
         case EXP_is_ID_ARG:
             {
                 Node id = exp->child;
@@ -536,7 +572,7 @@ Type *analyze_exp(Node exp, int scope) {
                 }
                 else {
                     Node field = exp->child->sibling;
-                    Type *field_type = query_field(lexp_type, field->val.s);
+                    Type *field_type = query_field(struct_type, field->val.s);
                     if (field_type == NULL) {
                         SEMA_ERROR_MSG(14, field->lineno, "Undefined field \"%s\" in struct \"%s\".",
                                 field->val.s, struct_type->name);
@@ -547,46 +583,12 @@ Type *analyze_exp(Node exp, int scope) {
                     }
                 }
             }
+        case EXP_is_EXP_IDX:
+            return analyze_exp_is_exp_idx(exp, scope);
         default:
-            return NULL;
-    }
-
-    switch (exp->child->type) {
-        case YY_MINUS:
-            rexp = exp->child->sibling;
-            return analyze_exp(rexp, scope);
-        case YY_NOT:
-            rexp = exp->child->sibling;
-            return analyze_exp(rexp, scope);
-        case YY_Exp:
-            lexp = exp->child;
-            op = lexp->sibling;
-            rexp = op->sibling;
-            lexp_type = analyze_exp(lexp, scope);
-            // right exp can be id directly, so be cautious.
-            switch (op->type) {
-                case YY_LB:
-                    rexp_type = analyze_exp(rexp, scope);
-                    if (rexp_type != NULL && rexp_type->class != CMM_INT) {
-                        SEMA_ERROR_MSG(12, rexp->lineno, "expression is not a integer");
-                    }
-
-                    // If lexp_type is null, it means that an semantic error has occurred, then we can ignore the
-                    // consecutive errors.
-                    if (lexp_type == NULL) {
-                        return NULL;
-                    } else if (lexp_type->class != CMM_ARRAY) {
-                        SEMA_ERROR_MSG(10, lexp->lineno, "expression is not an array.");
-                        return NULL;
-                    } else {
-                        return lexp_type->base;
-                    }
-                default:
-                    ;
-            }
-        default:
-            LOG("HELL");
+            printf("%d\n", exp->tag);
             assert(0);
+            return NULL;
     }
 }
 
