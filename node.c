@@ -6,9 +6,6 @@
 #include <memory.h>
 
 
-extern int is_check_return;
-
-
 //
 // node constructor, wrapping some initialization
 //
@@ -18,6 +15,7 @@ Node new_node(enum YYTNAME_INDEX type) {
     p->type = type;
     return p;
 }
+
 
 //
 // release the space the node occupies

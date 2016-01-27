@@ -7,6 +7,7 @@
 #include "cmm-type.h"
 #include "cmm-symtab.h"
 #include "lib.h"
+#include "ast.h"
 #include <assert.h>
 
 int is_lex_error = 0;
@@ -16,7 +17,7 @@ int is_syn_error = 0;
 #include "lex.yy.c"
 
 #include <stdio.h>
-static Node prog;
+Node prog;
 static union YYSTYPE *YYVSP = NULL;
 
 #define S(x) # x
@@ -69,8 +70,6 @@ void midorder(Node, int);
     ExtDecList
     Specifier
     StructSpecifier
-    OptTag
-    Tag
     VarDec
     FunDec
     ParamDec
@@ -109,115 +108,109 @@ void midorder(Node, int);
 /* nonterminal start */
 /* High-level Definitions */
 
-Program         : ExtDefList { LINK_NULL(Program, 1); prog = $$; }
+Program         : ExtDefList { prog = create_tree(PROG_is_EXTDEF, $1->lineno, $1); }
                 ;
 
-ExtDefList      : ExtDef ExtDefList { LINK_NULL(ExtDefList, 2); }
+ExtDefList      : ExtDef ExtDefList { $1->sibling = $2; $$ = $1; }
                 |                   { $$ = NULL; }
                 ;
 
 
-ExtDef          : Specifier ExtDecList SEMI  { LINK(ExtDef, 3); }
-                | Specifier SEMI             { LINK(ExtDef, 2); }
-                | Specifier FunDec CompSt    { LINK(ExtDef, 3); }
+ExtDef          : Specifier ExtDecList SEMI  { $$ = create_tree(EXTDEF_is_SPEC_EXTDEC, $1->lineno, $1, $2); }
+                | Specifier SEMI             { $$ = create_tree(EXTDEF_is_SPEC, $1->lineno, $1); }
+                | Specifier FunDec CompSt    { $$ = create_tree(EXTDEF_is_SPEC_FUNC_COMPST, $1->lineno, $1, $2, $3); }
                 ;
 
-ExtDecList      : VarDec                  { LINK(ExtDecList, 1); }
-                | VarDec COMMA ExtDecList { LINK(ExtDecList, 3); }
+ExtDecList      : VarDec                  { $$ = create_tree(EXTDEC_is_VARDEC, $1->lineno, $1); }
+                | VarDec COMMA ExtDecList { $1->sibling = $3; $$ = $1; }
                 ;
 
 /* Specifiers */
 
-Specifier       : TYPE { LINK(Specifier, 1); }
-                | StructSpecifier { LINK(Specifier, 1); }
+Specifier       : TYPE            { $$ = create_tree(SPEC_is_TYPE, $1->lineno, $1); }
+                | StructSpecifier { $$ = create_tree(SPEC_is_STRUCT, $1->lineno, $1); }
                 ;
 
-StructSpecifier : STRUCT OptTag LC DefList RC { LINK_NULL(StructSpecifier, 5); }
-                | STRUCT Tag                  { LINK(StructSpecifier, 2); }
-                ;
-
-OptTag          : ID { LINK(OptTag, 1); }
-                |    { $$ = NULL; }
-                ;
-
-Tag             : ID { LINK(Tag, 1); }
+StructSpecifier : STRUCT ID LC DefList RC { $$ = create_tree(STRUCT_is_ID_DEF, $1->lineno, $2, $4); }
+                | STRUCT LC DefList RC    { $$ = create_tree(STRUCT_is_DEF, $1->lineno, $3); }
+                | STRUCT ID               { $$ = create_tree(STRUCT_is_ID, $1->lineno, $2); }
                 ;
 
 /* Declarators */
 
-VarDec          : ID               { LINK(VarDec, 1); }
-                | VarDec LB INT RB { LINK(VarDec, 4); }
+VarDec          : ID               { $$ = create_tree(VARDEC_is_ID, $1->lineno, $1); }
+                | VarDec LB INT RB { $$ = create_tree(VARDEC_is_VARDEC_SIZE, $1->lineno, $1, $3); }
                 ;
 
-FunDec          : ID LP VarList RP { LINK(FunDec, 4); }
-                | ID LP RP         { LINK(FunDec, 3); }
+FunDec          : ID LP VarList RP { $$ = create_tree(FUNC_is_ID_VAR, $1->lineno, $1, $3); }
+                | ID LP RP         { $$ = create_tree(FUNC_is_ID_VAR, $1->lineno, $1, NULL); }
                 ;
 
-ParamDec        : Specifier VarDec { LINK(ParamDec, 2); }
+ParamDec        : Specifier VarDec { $$ = create_tree(VAR_is_SPEC_VARDEC, $1->lineno, $1, $2); }
                 ;
 
-VarList         : ParamDec COMMA VarList { LINK(VarList, 3); }
-                | ParamDec               { LINK(VarList, 1); }
+VarList         : ParamDec COMMA VarList { $1->sibling = $3; $$ = $1; }
+                | ParamDec               { $$ = $1; }
                 ;
 
 /* Statements */
 
-CompSt          : LC DefList StmtList RC { LINK_NULL(CompSt, 4); }
+CompSt          : LC DefList StmtList RC { $$ = create_tree(COMPST_is_DEF_STMT, $1->lineno, $2, $3); }
                 ;
 
-StmtList        : Stmt StmtList { LINK_NULL(StmtList, 2); }
+StmtList        : Stmt StmtList { $1->sibling = $2; $$ = $1; }
                 |               { $$ = NULL; }
                 ;
 
-Stmt            : Exp SEMI                         { LINK(Stmt, 2); }
-                | CompSt                           { LINK(Stmt, 1); }
-                | RETURN Exp SEMI                  { LINK(Stmt, 3); }
-                | IF LP Exp RP Stmt %prec SUB_ELSE { LINK(Stmt, 5); }
-                | IF LP Exp RP Stmt ELSE Stmt      { LINK(Stmt, 7); }
-                | WHILE LP Exp RP Stmt             { LINK(Stmt, 5); }
+Stmt            : Exp SEMI                         { $$ = create_tree(STMT_is_EXP, $1->lineno, $1); }
+                | CompSt                           { $$ = create_tree(STMT_is_COMPST, $1->lineno, $1); }
+                | RETURN Exp SEMI                  { $$ = create_tree(STMT_is_RETURN, $1->lineno, $2); }
+                | IF LP Exp RP Stmt %prec SUB_ELSE { $$ = create_tree(STMT_is_IF, $1->lineno, $3, $5); }
+                | IF LP Exp RP Stmt ELSE Stmt      { $$ = create_tree(STMT_is_IF_ELSE, $1->lineno, $3, $5, $7); }
+                | WHILE LP Exp RP Stmt             { $$ = create_tree(STMT_is_WHILE, $1->lineno, $3, $5); }
                 ;
 
 /* Local Definitions */
 
-DefList         : Def DefList { LINK(DefList, 2); }
+DefList         : Def DefList { $1->sibling = $2; $$ = $1; }
                 |             { $$ = NULL; }
                 ;
 
-Def             : Specifier DecList SEMI  { LINK(Def, 3); }
+Def             : Specifier DecList SEMI { $$ = create_tree(DEF_is_SPEC_DEC, $1->lineno, $1, $2); }
                 ;
 
-DecList         : Dec               { LINK(DecList, 1); }
-                | Dec COMMA DecList { LINK(DecList, 3); }
+DecList         : Dec               { $$ = $1; }
+                | Dec COMMA DecList { $1->sibling = $3; $$ = $1; }
                 ;
 
-Dec             : VarDec              { LINK(Dec, 1); }
-                | VarDec ASSIGNOP Exp { LINK(Dec, 3);  }
+Dec             : VarDec              { $$ = create_tree(DEC_is_VARDEC, $1->lineno, $1); }
+                | VarDec ASSIGNOP Exp { $$ = create_tree(DEC_is_VARDEC_INITIALIZATION, $1->lineno, $1, $3); }
                 ;
 
 /* Expressions */
 
-Exp             : Exp ASSIGNOP Exp { LINK(Exp, 3); }
-                | Exp AND Exp      { LINK(Exp, 3); }
-                | Exp OR Exp       { LINK(Exp, 3); }
-                | Exp RELOP Exp    { LINK(Exp, 3); }
-                | Exp PLUS Exp     { LINK(Exp, 3); }
-                | Exp MINUS Exp    { LINK(Exp, 3); }
-                | Exp STAR Exp     { LINK(Exp, 3); }
-                | Exp DIV Exp      { LINK(Exp, 3); }
-                | Exp LB Exp RB    { LINK(Exp, 4); }
-                | Exp DOT ID       { LINK(Exp, 3); }
-                | LP Exp RP        { LINK(Exp, 3); }
-                | MINUS Exp        { LINK(Exp, 2); }  /* Conflict with Exp error ID... */
-                | NOT Exp          { LINK(Exp, 2); }
-                | ID LP Args RP    { LINK(Exp, 4); }
-                | ID LP RP         { LINK(Exp, 3); }
-                | ID               { LINK(Exp, 1); }
-                | INT              { LINK(Exp, 1); }
-                | FLOAT            { LINK(Exp, 1); }
+Exp             : Exp ASSIGNOP Exp { $$ = create_tree(EXP_is_ASSIGN, $2->lineno, $1, $3); }
+                | Exp AND Exp      { $$ = create_tree(EXP_is_AND, $2->lineno, $1, $3); }
+                | Exp OR Exp       { $$ = create_tree(EXP_is_OR, $2->lineno, $1, $3); }
+                | Exp RELOP Exp    { $$ = create_tree(EXP_is_RELOP, $2->lineno, $1, $3); }
+                | Exp PLUS Exp     { $$ = create_tree(EXP_is_BINARY, $2->lineno, $1, $3); }
+                | Exp MINUS Exp    { $$ = create_tree(EXP_is_BINARY, $2->lineno, $1, $3); }
+                | Exp STAR Exp     { $$ = create_tree(EXP_is_BINARY, $2->lineno, $1, $3); }
+                | Exp DIV Exp      { $$ = create_tree(EXP_is_BINARY, $2->lineno, $1, $3); }
+                | Exp LB Exp RB    { $$ = create_tree(EXP_is_BINARY, $2->lineno, $1, $3); }
+                | Exp DOT ID       { $$ = create_tree(EXP_is_EXP_FIELD, $2->lineno, $1, $3); }
+                | LP Exp RP        { $$ = $2; }
+                | MINUS Exp        { $$ = create_tree(EXP_is_UNARY, $1->lineno, $2); }
+                | NOT Exp          { $$ = create_tree(EXP_is_UNARY, $1->lineno, $2); }
+                | ID LP Args RP    { $$ = create_tree(EXP_is_ID_ARG, $1->lineno, $1, $3); }
+                | ID LP RP         { $$ = create_tree(EXP_is_ID_ARG, $1->lineno, $1, NULL); }
+                | ID               { $$ = create_tree(EXP_is_ID, $1->lineno, $1); }
+                | INT              { $$ = create_tree(EXP_is_INT, $1->lineno, $1); }
+                | FLOAT            { $$ = create_tree(EXP_is_FLOAT, $1->lineno, $1); }
                 ;
 
-Args            : Exp COMMA Args  { LINK(Args, 3); }
-                | Exp             { LINK(Args, 1); }
+Args            : Exp COMMA Args  { $1->sibling = $3; $$ = $1; }
+                | Exp             { $$ = $1; }
                 ;
 
 /* nonterminal end */
@@ -254,14 +247,9 @@ void ast() {
 // Analyze the parsing tree
 //
 void semantic_analysis() {
-    extern Node ast_tree;
-    analyze_program(ast_tree);
+    analyze_program(prog);
 }
 
-//
-// 简化语法分析树
-//
-Node ast_tree;
 //
 // Release the parsing tree
 //
@@ -283,3 +271,4 @@ int yyerror(const char *msg) {
     printf("Error type B at line %d: %s.\n", yylineno, msg);
     return 0;
 }
+
