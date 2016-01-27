@@ -14,6 +14,11 @@ typedef struct {
 } var_t;
 
 
+typedef void (*ast_visitor)(Node);
+static ast_visitor sema_visitors[];
+#define sema_visit(x) sema_visitors[x->tag](x)
+
+
 bool semantic_error = false;
 
 
@@ -703,8 +708,6 @@ Type *analyze_compst(Node compst, Type *inh_func_type, int scope) {
 //   ExtDef -> Specifier SEMI
 //
 void analyze_extdef(Node extdef) {
-    assert(extdef->type == YY_ExtDef);
-
     Node spec = extdef->child;
     Type *type = analyze_specifier(spec);
     Type *return_type;
@@ -729,15 +732,64 @@ void analyze_extdef(Node extdef) {
 }
 
 
-void analyze_program(Node prog) {
-    Node extdef = prog->child->child;
+static void extdef_is_spec_extdec(Node extdef)
+{
+    assert(extdef->tag == EXTDEF_is_SPEC_EXTDEC);
+    
+    Node spec = extdef->child;
+    Node extdec = spec->sibling;
+
+    sema_visit(spec);
+    sema_visit(extdec);
+}
+
+
+static void extdef_is_spec(Node extdef)
+{
+    assert(extdef->tag == EXTDEF_is_SPEC);
+
+    Node spec = extdef->child;
+
+    sema_visit(spec);
+}
+
+
+static void extdef_is_spec_func_compst(Node extdef)
+{
+    assert(extdef->tag == EXTDEF_is_SPEC_FUNC_COMPST);
+
+    Node spec = extdef->child;
+    Node func = spec->sibling;
+    Node compst = func->sibling;
+
+    sema_visit(spec);
+    sema_visit(func);
+    sema_visit(compst);
+}
+
+
+static void prog_is_extdef(Node prog)
+{
+    assert(prog->tag == PROG_is_EXTDEF);
+
+    Node extdef = prog->child;
     while (extdef != NULL) {
         analyze_extdef(extdef);
-        if (extdef->sibling != NULL) {
-            extdef = extdef->sibling->child;
-        } else {
-            break;
-        }
+        extdef = extdef->sibling;
     }
+}
+
+
+static ast_visitor sema_visitors[] = {
+    [PROG_is_EXTDEF]             = prog_is_extdef,
+    [EXTDEF_is_SPEC_EXTDEC]      = extdef_is_spec_extdec,
+    [EXTDEF_is_SPEC]             = extdef_is_spec,
+    [EXTDEF_is_SPEC_FUNC_COMPST] = extdef_is_spec_func_compst
+};
+
+
+void analyze_program(Node prog)
+{
+    sema_visit(prog);
 }
 
