@@ -740,6 +740,7 @@ static void extdef_is_spec_extdec(Node extdef)
     Node extdec = spec->sibling;
 
     sema_visit(spec);
+    extdec = spec->type;
     sema_visit(extdec);
 }
 
@@ -747,9 +748,7 @@ static void extdef_is_spec_extdec(Node extdef)
 static void extdef_is_spec(Node extdef)
 {
     assert(extdef->tag == EXTDEF_is_SPEC);
-
     Node spec = extdef->child;
-
     sema_visit(spec);
 }
 
@@ -763,7 +762,9 @@ static void extdef_is_spec_func_compst(Node extdef)
     Node compst = func->sibling;
 
     sema_visit(spec);
+    func->type = spec->type;
     sema_visit(func);
+    compst->type = spec->type;
     sema_visit(compst);
 }
 
