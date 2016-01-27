@@ -36,8 +36,6 @@ fprintf(stderr, "Error type %d at Line %d: " fmt "\n", type, lineno, ## __VA_ARG
 // Some pre-declaration
 //
 Type *analyze_specifier(const Node);       // required by analyze_[def|paramdec|extdef]
-Type *analyze_exp(Node exp, int scope);    // required by check_param_lsit, analyze_vardec
-Type *analyze_compst(Node , Type *, int);  // required by analyze_stmt
 
 
 var_t analyze_vardec(Node vardec, Type *inh_type) {
@@ -462,139 +460,132 @@ analyze_exp_is_binary(Node exp, int scope)
 }
 
 
-Type *
-analyze_exp_is_assign(Node exp, int scope)
+static void exp_is_assign(Node exp)
 {
-    Node left = exp->child;
-    Node right = left->sibling;
+    assert(exp->tag == EXP_is_ASSIGN);
 
-    Type *type_l = analyze_exp(left, scope);
-    Type *type_r = analyze_exp(right, scope);
+    Node lexp = exp->child;
+    Node rexp = lexp->sibling;
 
-    if (!typecmp(type_l, type_r)) {
+    sema_visit(lexp);
+    sema_visit(rexp);
+
+    if (!typecmp(lexp->sema.type, rexp->sema.type)) {
         SEMA_ERROR_MSG(5, exp->lineno, "Type mismatched for assignment.");
     }
-    else if (!is_lval(left)) {
+    else if (!is_lval(lexp)) {
         SEMA_ERROR_MSG(6, exp->lineno, "The left-hand side of an assignment must be a variable.");
     }
-    
-    return type_l;
+
+    exp->sema.type = lexp->sema.type;
 }
 
 
-Type *
-analyze_exp_is_exp_idx(Node exp, int scope)
+static void exp_is_exp_idx(Node exp)
 {
     Node lexp = exp->child;
     Node rexp = lexp->sibling;
 
-    Type *ltype = analyze_exp(lexp, scope);
-    Type *rtype = analyze_exp(rexp, scope);
+    sema_visit(lexp);
+    sema_visit(rexp);
 
-    if (rtype != NULL && rtype->class != CMM_INT) {
+    if (rexp->sema.type != NULL && rexp->sema.type->class != CMM_INT) {
         SEMA_ERROR_MSG(12, rexp->lineno, "expression is not a integer");
     }
 
     // If lexp_type is null, it means that an semantic error has occurred, then we can ignore the
     // consecutive errors.
-    if (ltype == NULL) {
-        return NULL;
-    }
-    else if (ltype->class != CMM_ARRAY) {
-        SEMA_ERROR_MSG(10, lexp->lineno, "expression is not an array.");
-        return NULL;
-    }
-    else {
-        return ltype->base;
+    if (exp->sema.type != NULL) {
+        if (exp->sema.type->class != CMM_ARRAY) {
+            SEMA_ERROR_MSG(10, lexp->lineno, "expression is not an array.");
+        }
+        else {
+            exp->sema.type = lexp->sema.type->base;
+        }
     }
 }
 
 
-Type *analyze_exp(Node exp, int scope) {
-    assert(exp->type == YY_Exp);
+static void exp_is_id_arg(Node exp)
+{
+    assert(exp->tag == EXP_is_ID_ARG);
 
-    switch (exp->tag) {
-        case EXP_is_EXP:
-            return analyze_exp(exp->child, scope);
-        case EXP_is_INT:
-            return BASIC_INT;
-        case EXP_is_FLOAT:
-            return BASIC_FLOAT;
-        case EXP_is_ID:
-            {
-                Node id = exp->child;
-                assert(id->type == YY_ID);
+    Node id = exp->child;
 
-                sym_ent_t *query_result = query(id->val.s, scope);
+    sym_ent_t *query_result = query(id->val.s, 1);
 
-                if (query_result == NULL) {
-                    SEMA_ERROR_MSG(1, id->lineno, "Undefined variable \"%s\"", id->val.s);
-                    return NULL;
-                }
-                else if (query_result->type->class == CMM_TYPE) {
-                    SEMA_ERROR_MSG(1, id->lineno, "Cannot resovle variable \"%s\"", id->val.s);
-                    return NULL;
-                }
-                else {
-                    return query_result->type;
-                }
-            }
-        case EXP_is_UNARY:
-            return analyze_exp_is_unary(exp, scope);
-        case EXP_is_BINARY:
-            return analyze_exp_is_binary(exp, scope);
-        case EXP_is_ID_ARG:
-            {
-                Node id = exp->child;
-                assert(id->type == YY_ID);
-                assert(id->sibling->type == YY_Args);
-
-                sym_ent_t *query_result = query(id->val.s, scope);
-
-                if (query_result == NULL) {
-                    SEMA_ERROR_MSG(2, id->lineno, "Undefined function \"%s\".", id->val.s);
-                    return NULL;
-                }
-                else if (query_result->type->class != CMM_FUNC) {
-                    SEMA_ERROR_MSG(11, id->lineno, "\"%s\" is not a function.", id->val.s);
-                    return query_result->type;
-                }
-                else {
-                    // Error report in the check.
-                    check_param_list(query_result->type->param, id->sibling, scope);
-                    // Return the return type anyway, because using a wrong function and giving wrong
-                    // parameters are problems of two aspects.
-                    return query_result->type->ret;
-                }
-            }
-        case EXP_is_EXP_FIELD:
-            {
-                Type *struct_type = analyze_exp(exp->child, scope);
-
-                if (struct_type->class != CMM_STRUCT) {
-                    SEMA_ERROR_MSG(13, exp->lineno, "The left identifier of '.' is not a struct");
-                    return NULL;
-                }
-                else {
-                    Node field = exp->child->sibling;
-                    Type *field_type = query_field(struct_type, field->val.s);
-                    if (field_type == NULL) {
-                        SEMA_ERROR_MSG(14, field->lineno, "Undefined field \"%s\" in struct \"%s\".",
-                                field->val.s, struct_type->name);
-                        return NULL;
-                    }
-                    else {
-                        return field_type;
-                    }
-                }
-            }
-        case EXP_is_EXP_IDX:
-            return analyze_exp_is_exp_idx(exp, scope);
-        default:
-            printf("%d\n", exp->tag);
-            assert(0);
-            return NULL;
+    if (query_result == NULL) {
+        SEMA_ERROR_MSG(2, id->lineno, "Undefined function \"%s\".", id->val.s);
     }
+    else if (query_result->type->class != CMM_FUNC) {
+        SEMA_ERROR_MSG(11, id->lineno, "\"%s\" is not a function.", id->val.s);
+    }
+    else {
+        // Error report in the check
+        check_param_list(query_result->type->param, id->sibling, 1);
+        // Return the return type while ignoring errors in arguments
+        exp->sema.type = query_result->type->ret;
+    }
+}
+
+
+static void exp_is_exp_field(Node exp)
+{
+    assert(exp->tag == EXP_is_EXP_FIELD);
+
+    Node struc = exp->child;
+
+    sema_visit(struc);
+
+    if (struc->sema.type->class != CMM_STRUCT) {
+        SEMA_ERROR_MSG(13, exp->lineno, "The left identifier of '.' is not a struct");
+    }
+    else {
+        Node field = struc->sibling;
+        Type *field_type = query_field(struc->sema.type, field->val.s);
+        if (field_type == NULL) {
+            SEMA_ERROR_MSG(14, field->lineno, "Undefined field \"%s\" in struct \"%s\".",
+                    field->val.s, struc->sema.type->name);
+        }
+        else {
+            exp->sema.type = field_type;
+        }
+    }
+}
+
+
+static void exp_is_id(Node exp)
+{
+    assert(exp->tag == EXP_is_ID);
+
+    Node id = exp->child;
+    sym_ent_t *query_result = query(id->val.s, 1);
+
+    if (query_result == NULL) {
+        SEMA_ERROR_MSG(1, id->lineno, "Undefined variable \"%s\"", id->val.s);
+    }
+    else if (query_result->type->class == CMM_TYPE) {
+        SEMA_ERROR_MSG(1, id->lineno, "Cannot resovle variable \"%s\"", id->val.s);
+    }
+    else {
+        exp->sema.type = query_result->type;
+    }
+}
+
+
+static void exp_is_int(Node exp)
+{
+    assert(exp->tag == EXP_is_INT);
+
+    exp->sema.type = BASIC_INT;
+}
+
+
+static void exp_is_float(Node exp)
+{
+    assert(exp->tag == EXP_is_FLOAT);
+
+    exp->sema.type = BASIC_FLOAT;
 }
 
 
@@ -621,7 +612,7 @@ static void stmt_is_while(Node stmt)
     
     sema_visit(cond);
     if (!typecmp(cond->sema.type, BASIC_INT)) {
-        SEMA_ERROR_MSG(7, exp->lineno, "The condition expression must return int");
+        SEMA_ERROR_MSG(7, cond->lineno, "The condition expression must return int");
     }
 
     loop->type = stmt->type;  // Check return type in true-branch
@@ -637,7 +628,7 @@ static void stmt_is_if(Node stmt)
     
     sema_visit(cond);
     if (!typecmp(cond->sema.type, BASIC_INT)) {
-        SEMA_ERROR_MSG(7, exp->lineno, "The condition expression must return int");
+        SEMA_ERROR_MSG(7, stmt->lineno, "The condition expression must return int");
     }
 
     behav->type = stmt->type;  // Check return type in true-branch
@@ -654,7 +645,7 @@ static void stmt_is_if_else(Node stmt)
     
     sema_visit(cond);
     if (!typecmp(cond->sema.type, BASIC_INT)) {
-        SEMA_ERROR_MSG(7, exp->lineno, "The condition expression must return int");
+        SEMA_ERROR_MSG(7, stmt->lineno, "The condition expression must return int");
     }
 
     true_branch->sema.type = stmt->sema.type;  // Check return type
@@ -753,6 +744,14 @@ static ast_visitor sema_visitors[] = {
     [STMT_is_IF]                 = stmt_is_if,
     [STMT_is_IF_ELSE]            = stmt_is_if_else,
     [STMT_is_WHILE]              = stmt_is_while,
+    [STMT_is_RETURN]             = stmt_is_return,
+    [EXP_is_INT]                 = exp_is_int,
+    [EXP_is_FLOAT]               = exp_is_float,
+    [EXP_is_ID]                  = exp_is_id,
+    [EXP_is_ASSIGN]              = exp_is_assign,
+    [EXP_is_EXP_IDX]             = exp_is_exp_idx,
+    [EXP_is_ID_ARG]              = exp_is_id_arg,
+    [EXP_is_EXP_FIELD]           = exp_is_exp_field,
 };
 
 
