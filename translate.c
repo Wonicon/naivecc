@@ -636,8 +636,8 @@ int translate_func_head(Node func) {
     while (param != NULL) {
         Node spec = param->child;
         // 无脑找变量名
-        Node id = spec->sibling->child;
-        while (id->type != YY_ID) {
+        Node id = spec->sibling;
+        while (id->tag != TERM_ID) {
             id = id->child;
         }
         sym_ent_t *sym = query(id->val.s, 0);
@@ -688,7 +688,7 @@ int translate_stmt_is_exp(Node stmt) {
 int translate_dec_is_vardec(Node dec) {
     Node vardec = dec->child;
     Node iterator = vardec->child;
-    if (iterator->type == YY_ID) {  // 普通变量声明, 分配空间就好了.
+    if (iterator->tag == TERM_ID) {  // 普通变量声明, 分配空间就好了.
         sym_ent_t *sym = query(iterator->val.s, 0);
         sym->address = new_operand(OPE_VAR);
         sym->address->base_type = sym->type;
@@ -712,7 +712,7 @@ int translate_dec_is_vardec(Node dec) {
         return NO_NEED_TO_GEN;
     }
 
-    while (iterator->type != YY_ID) {
+    while (iterator->tag != TERM_ID) {
         iterator = iterator->child;
     }
 
@@ -844,7 +844,6 @@ void try_deref(Node exp) {
 //
 int translate_exp_is_id(Node exp) {
     Node id = exp->child;
-    assert(id->type == YY_ID);
 
     sym_ent_t *sym = query(id->val.s, 0);
 

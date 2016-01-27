@@ -2,7 +2,6 @@
 #define NODE_H
 
 #include "cmm-type.h"
-#include "yytname.h"
 
 typedef struct Node_ *Node;
 typedef struct Operand_ *Operand;
@@ -54,7 +53,6 @@ enum ProductionTag {
 
 
 struct Node_ {
-    enum YYTNAME_INDEX type;
     enum ProductionTag tag;
     int lineno;
     union {
@@ -84,7 +82,7 @@ struct Node_ {
 };
 
 
-Node new_node(enum YYTNAME_INDEX type);
+Node new_node();
 void free_node(Node nd);
 void puts_tree(Node nd);
 void analyze_program(Node program);

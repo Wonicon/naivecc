@@ -516,7 +516,7 @@ static void stmt_is_while(Node stmt)
         SEMA_ERROR_MSG(7, cond->lineno, "The condition expression must return int");
     }
 
-    loop->type = stmt->type;  // Check return type in true-branch
+    loop->sema.type = stmt->sema.type;  // Check return type in true-branch
     sema_visit(loop);
 }
 
@@ -531,7 +531,7 @@ static void stmt_is_if(Node stmt)
         SEMA_ERROR_MSG(7, stmt->lineno, "The condition expression must return int");
     }
 
-    behav->type = stmt->type;  // Check return type in true-branch
+    behav->sema.type = stmt->sema.type;  // Check return type in true-branch
     sema_visit(behav);
 }
 

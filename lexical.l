@@ -100,7 +100,11 @@ WS [[:blank:]]
 {IF}        HANDLE(IF)
 {ELSE}      HANDLE(ELSE)
 {WHILE}     HANDLE(WHILE)
-{ID}        HANDLE(ID)
+{ID}        {
+    lex_handle(ID);
+    yylval.nd->tag = TERM_ID;
+    return ID;
+            }
 {FLOAT}     {
     yylval.nd = new_node(FLOAT - FLOAT + 3);
     yylval.nd->lineno = yylineno;
@@ -189,7 +193,7 @@ int check_hex(char *yytext, int yyleng, int yylineno) {
 Type lex_handle(Type type) {
     // Currently FLOAT is the first token defined in syntax.y
     // In lexical phase we don't pay attention to non-terminals
-    yylval.nd = new_node(type - FLOAT + 3);
+    yylval.nd = new_node();
     yylval.nd->lineno = yylineno;
     yylval.nd->val.s = register_str(yytext);
     token_on_line++;
@@ -199,3 +203,4 @@ Type lex_handle(Type type) {
 void ErrorMsg(char *desc, char *lexeme, int lineno) {
     printf("Error type A at Line %d: %s '%s'\n", lineno, desc, lexeme);
 }
+
