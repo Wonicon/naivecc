@@ -192,16 +192,16 @@ Dec             : VarDec              { $$ = create_tree(DEC_is_VARDEC, $1->line
 Exp             : Exp ASSIGNOP Exp { $$ = create_tree(EXP_is_ASSIGN, $2->lineno, $1, $3); }
                 | Exp AND Exp      { $$ = create_tree(EXP_is_AND, $2->lineno, $1, $3); }
                 | Exp OR Exp       { $$ = create_tree(EXP_is_OR, $2->lineno, $1, $3); }
-                | Exp RELOP Exp    { $$ = create_tree(EXP_is_RELOP, $2->lineno, $1, $3); }
-                | Exp PLUS Exp     { $$ = create_tree(EXP_is_BINARY, $2->lineno, $1, $3); }
-                | Exp MINUS Exp    { $$ = create_tree(EXP_is_BINARY, $2->lineno, $1, $3); }
-                | Exp STAR Exp     { $$ = create_tree(EXP_is_BINARY, $2->lineno, $1, $3); }
-                | Exp DIV Exp      { $$ = create_tree(EXP_is_BINARY, $2->lineno, $1, $3); }
-                | Exp LB Exp RB    { $$ = create_tree(EXP_is_BINARY, $2->lineno, $1, $3); }
+                | Exp RELOP Exp    { $$ = create_tree(EXP_is_RELOP, $2->lineno, $1, $3); $$->val.operator = $2->val.s; }
+                | Exp PLUS Exp     { $$ = create_tree(EXP_is_BINARY, $2->lineno, $1, $3); $$->val.operator = $2->val.s;}
+                | Exp MINUS Exp    { $$ = create_tree(EXP_is_BINARY, $2->lineno, $1, $3); $$->val.operator = $2->val.s;}
+                | Exp STAR Exp     { $$ = create_tree(EXP_is_BINARY, $2->lineno, $1, $3); $$->val.operator = $2->val.s;}
+                | Exp DIV Exp      { $$ = create_tree(EXP_is_BINARY, $2->lineno, $1, $3); $$->val.operator = $2->val.s;}
+                | Exp LB Exp RB    { $$ = create_tree(EXP_is_BINARY, $2->lineno, $1, $3); $$->val.operator = $2->val.s;}
                 | Exp DOT ID       { $$ = create_tree(EXP_is_EXP_FIELD, $2->lineno, $1, $3); }
                 | LP Exp RP        { $$ = $2; }
-                | MINUS Exp        { $$ = create_tree(EXP_is_UNARY, $1->lineno, $2); }
-                | NOT Exp          { $$ = create_tree(EXP_is_UNARY, $1->lineno, $2); }
+                | MINUS Exp        { $$ = create_tree(EXP_is_UNARY, $1->lineno, $2); $$->val.operator = $1->val.s;}
+                | NOT Exp          { $$ = create_tree(EXP_is_UNARY, $1->lineno, $2); $$->val.operator = $1->val.s;}
                 | ID LP Args RP    { $$ = create_tree(EXP_is_ID_ARG, $1->lineno, $1, $3); }
                 | ID LP RP         { $$ = create_tree(EXP_is_ID_ARG, $1->lineno, $1, NULL); }
                 | ID               { $$ = create_tree(EXP_is_ID, $1->lineno, $1); }

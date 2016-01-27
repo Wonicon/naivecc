@@ -51,8 +51,10 @@ static int body_size[] = {
 };
 
 
+void bp() {}
 Node create_tree(enum ProductionTag tag, int lineno, ...)
 {
+    if (tag == COMPST_is_DEF_STMT) bp();
     int n_body_symbol = body_size[tag];
 
     if (n_body_symbol <= 0) {
@@ -62,16 +64,17 @@ Node create_tree(enum ProductionTag tag, int lineno, ...)
     Node root = malloc(sizeof(*root));
     memset(root, 0, sizeof(*root));
     root->tag = tag;
+    root->lineno = lineno;
 
     va_list nodes;
     va_start(nodes, lineno);
         
-    root->child = va_arg(nodes, Node);
-
-    Node curr = root->child;
+    Node *curr = &(root->child);
     for (; n_body_symbol > 1; n_body_symbol--) {
-        curr->sibling = va_arg(nodes, Node);
-        curr = curr->sibling;
+        Node arg = va_arg(nodes, Node);
+        if (arg == NULL) continue;
+        *curr = arg;
+        while (*curr != NULL) curr = &((*curr)->sibling);
     }
 
     return root;

@@ -103,7 +103,7 @@ static void analyze_field_dec(Node dec)
 }
 
 
-static void analyze_def(Node def)
+static void def_is_spec_dec(Node def)
 {
     // Handle Specifier
     Node spec = def->child;
@@ -129,58 +129,43 @@ static void analyze_def(Node def)
 }
 
 
-static void analyze_struct_spec(const Node struct_spec) {
-    assert(struct_spec->type == YY_StructSpecifier);
-
-    Node body = struct_spec->child->sibling;  // Jump tag 'struct'
-
-    //
-    // Check whether this is a struct definition or declaration
-    //
-    if (body->type == YY_Tag) {
-        //
-        // Declaration
-        //
-        Node id = body->child;
-        sym_ent_t *ent = query(id->val.s, STRUCT_SCOPE);
-        if (ent == NULL || ent->type->class != CMM_TYPE || ent->type->meta->class != CMM_STRUCT) {
-            // The symbol is not found
-            SEMA_ERROR_MSG(17, body->lineno, "Undefined struct name '%s'", body->child->val.s);
-            // Return a fake structure type, if the symbol can be store in the symbol table or lists,
-            // everything will be OK. But if the symbol has name collision and is finally discarded,
-            // then a memroy leak will occur.
-            return new_type(CMM_STRUCT, id->val.s, NULL, NULL);
-        } else {
-            // ent is meta type
-            // the real type is inside.
-            return ent->type->meta;
-        }
+static void struct_is_id(Node struc)
+{
+    Node id = struc->child;
+    sym_ent_t *ent = query(id->val.s, STRUCT_SCOPE);
+    if (ent == NULL || ent->type->class != CMM_TYPE || ent->type->meta->class != CMM_STRUCT) {
+        SEMA_ERROR_MSG(17, id->lineno, "Undefined struct name '%s'", id->val.s);
     }
-
-    //
-    // Definition
-    //
-    const char *name = NULL;
-    if (body->type == YY_LC){
-        // Construct a new struct type with empty name
-        name = "";
-        body = body->sibling;
-    } else {
-        // Get name
-        name = body->child->val.s;
-        body = body->sibling->sibling;
+    else {
+        // ent->type is a meta type
+        struc->sema.type = ent->type->meta;
     }
+}
 
-    assert(body->type == YY_DefList);
+
+static void struct_is_id_def(Node struc)
+{
+    is_in_struct = true;
+
+    const char *name = (struc->tag == STRUCT_is_DEF) ? "" : struc->child->val.s;
+    Node def = (struc->tag == STRUCT_is_DEF) ? struc->child : struc->child->sibling;
 
     // Construct struct
     Type *this = new_type(CMM_STRUCT, name, NULL, NULL);
-    this->lineno = body->child->lineno;
+    this->lineno = struc->lineno;
 
     // Get field list
-    this->field = analyze_deflist(body, STRUCT_SCOPE);
+    sema_visit(def);
+    this->field = def->sema.type;
+    def = def->sibling;
+    for (Type *tail = this->field; def != NULL; def = def->sibling) {
+        sema_visit(def);
+        tail->link = def->sema.type;
+        while (tail->link) tail = tail->link;
+    }
 
     int struct_size = 0;
+
     // Check field name collision and add up the size and offset
     for (Type *outer = this->field; outer != NULL; outer = outer->link) {
         if (outer->name[0] == '\0') {
@@ -207,23 +192,23 @@ static void analyze_struct_spec(const Node struct_spec) {
             inner = inner->link;
         }
     }
+
     this->type_size = struct_size;
 
     // Use the struct name to register in the symbol table.
     // Ignore the struct with empty tag.
 
-    int insert_rst = 1;
-    if (strcmp(this->name, "") != 0) {
+    if (struc->tag == STRUCT_is_ID_DEF) {
         Type *meta = new_type(CMM_TYPE, this->name, this, NULL);
-        meta->lineno = struct_spec->lineno;
-        insert_rst = insert(meta->name, meta, struct_spec->lineno, 0);
+        meta->lineno = struc->lineno;
+        if (insert(meta->name, meta, struc->lineno, 0) < 1) {
+            SEMA_ERROR_MSG(16, struc->lineno, "Duplicated name \"%s\".", name);
+        }
     }
 
-    if (insert_rst < 1) {
-        SEMA_ERROR_MSG(16, struct_spec->lineno, "Duplicated name \"%s\".", name);
-    }
+    struc->sema.type = this;
 
-    return this;
+    is_in_struct = false;
 }
 
 
@@ -244,48 +229,42 @@ static void spec_is_type(Node spec)
 
 static void spec_is_struct(Node spec)
 {
+    sema_visit(spec->child);
+    spec->sema = spec->child->sema;
 }
 
 
-//
-// Analyze FunDec production:
-//   FunDec -> ID LP VarList RP
-//   FunDec -> ID LP RP
-// The most important part is the analysis of VarList.
-// It is a param list, which is akin to the field list.
-// But we cannot reuse the analyze_field_declist because the production is so different.
-//
+static void var_is_spec_vardec(Node paramdec) {
+    Node spec = paramdec->child;
+    Node vardec = spec->sibling;
 
-// First we should analyze the VarList part. Because a parameter must follow a Specifier,
-// so we can avoid the hell of declist that inherits the same Specifier.
-// We can just register the parameter here.
-var_t analyze_paramdec(Node paramdec) {
-    assert(paramdec->type == YY_ParamDec);
-    Node specifier = paramdec->child;
-    Node vardec = specifier->sibling;
+    sema_visit(spec);
 
-    sema_visit(specifier);
+    Type *type = spec->sema.type;
+    vardec->sema.type = type;
 
-    Type *spec = specifier->sema.type;
-    var_t var = analyze_vardec(vardec, spec);
-    int insert_ret = insert(var.name, var.type, paramdec->lineno, -1);
+    sema_visit(vardec);
+
+    int insert_ret = insert(vardec->sema.name, vardec->sema.type, paramdec->lineno, -1);
     if (insert_ret < 1) {
-        SEMA_ERROR_MSG(3, vardec->lineno, "Duplicated variable definition of '%s'", var.name);
+        SEMA_ERROR_MSG(3, vardec->lineno, "Duplicated variable definition of '%s'", vardec->sema.name);
     }
-    return var;
+
+    paramdec->sema = vardec->sema;
 }
 
 // Then we should link the paramdec's type up to form a param type list.
 // varlist should return a type of CmmParam, and the generation of CmmParam occurs here.
-Type *analyze_varlist(Node varlist) {
-    Node paramdec = varlist->child;
-    Node sub_varlist = paramdec->sibling == NULL ? NULL : paramdec->sibling->sibling;
-    assert(paramdec->type == YY_ParamDec);
-    assert(sub_varlist == NULL || sub_varlist->type == YY_VarList);
+static Type *get_params(Node var) {
+    if (var == NULL) {
+        return NULL;
+    }
 
-    var_t param_attr = analyze_paramdec(paramdec);
-    Type *sub_list = sub_varlist == NULL ? NULL : analyze_varlist(sub_varlist);
-    Type *param = new_type(CMM_PARAM, param_attr.name, param_attr.type, sub_list);
+    sema_visit(var);
+
+    Type *sub_list = get_params(var->sibling);
+
+    Type *param = new_type(CMM_PARAM, var->sema.name, var->sema.type, sub_list);
 
     return param;
 }
@@ -303,7 +282,7 @@ static void func_is_id_var(Node fundec)
     const char *name = id->val.s;
 
     // Get param list if exists
-    Type *param_list = (var != NULL) ? analyze_varlist(var) : NULL;
+    Type *param_list = (var != NULL) ? get_params(var) : NULL;
 
     // Generate function symbol
     Type *func = new_type(CMM_FUNC, name, fundec->sema.type, param_list);
@@ -321,10 +300,7 @@ static void func_is_id_var(Node fundec)
 //
 static inline int is_lval(const Node exp)
 {
-    assert(exp != NULL && exp->type == YY_Exp);
-
-    if (exp->child->type == YY_ID)
-    {
+    if (exp->child->type == YY_ID) {
         // Avoid function name and type name.
         // An array directly found in the symbol table is a constant variable
         // which cannot be assigned.
@@ -332,8 +308,7 @@ static inline int is_lval(const Node exp)
         // TODO Ugly conditions
         return ent != NULL && ent->type->class != CMM_FUNC && ent->type->class != CMM_TYPE && ent->type->class != CMM_ARRAY;
     }
-    else 
-    {
+    else {
         Node follow = exp->child->sibling;
         return (follow != NULL && (follow->type == YY_LB || follow->type == YY_DOT));
     }
@@ -719,10 +694,15 @@ static ast_visitor sema_visitors[] = {
     [EXTDEC_is_VARDEC]           = extdec_is_vardec,
     [SPEC_is_TYPE]               = spec_is_type,
     [SPEC_is_STRUCT]             = spec_is_struct,
+    [STRUCT_is_ID]               = struct_is_id,
+    [STRUCT_is_DEF]              = struct_is_id_def,  // Share most part
+    [STRUCT_is_ID_DEF]           = struct_is_id_def,
     [FUNC_is_ID_VAR]             = func_is_id_var,
     [VARDEC_is_ID]               = vardec_is_id,
     [VARDEC_is_VARDEC_SIZE]      = vardec_is_vardec_size,
+    [VAR_is_SPEC_VARDEC]         = var_is_spec_vardec,
     [COMPST_is_DEF_STMT]         = compst_is_def_stmt,
+    [DEF_is_SPEC_DEC]            = def_is_spec_dec,
     [DEC_is_VARDEC]              = dec_is_vardec,
     [DEC_is_VARDEC_INITIALIZATION] = dec_is_vardec_initialization,
     [STMT_is_COMPST]             = stmt_is_compst,
