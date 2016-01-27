@@ -70,7 +70,7 @@ Node create_tree(enum ProductionTag tag, int lineno, ...)
     va_start(nodes, lineno);
         
     Node *curr = &(root->child);
-    for (; n_body_symbol > 1; n_body_symbol--) {
+    for (; n_body_symbol > 0; n_body_symbol--) {
         Node arg = va_arg(nodes, Node);
         if (arg == NULL) continue;
         *curr = arg;
