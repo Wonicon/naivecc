@@ -73,6 +73,8 @@ struct Node_ {
     // For semantic analysis
     struct {
         Type *type;
+        const char *name;
+        int lineno;
     } sema;
 
     // For intermediate code translation
