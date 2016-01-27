@@ -104,6 +104,7 @@ WS [[:blank:]]
 {FLOAT}     {
     yylval.nd = new_node(FLOAT - FLOAT + 3);
     yylval.nd->lineno = yylineno;
+    yylval.nd->tag = TERM_FLOAT;
     yylval.nd->val.f = atof(yytext);
     token_on_line++;
     return FLOAT;
@@ -114,6 +115,7 @@ WS [[:blank:]]
     }
     yylval.nd = new_node(INT - FLOAT + 3);
     yylval.nd->lineno = yylineno;
+    yylval.nd->tag = TERM_INT;
     yylval.nd->val.i = strtol(yytext, NULL, 16);
     token_on_line++;
     return INT;
@@ -124,6 +126,7 @@ WS [[:blank:]]
     }
     yylval.nd = new_node(INT - FLOAT + 3);
     yylval.nd->lineno = yylineno;
+    yylval.nd->tag = TERM_INT;
     yylval.nd->val.i = strtol(yytext, NULL, 8);
     token_on_line++;
     return INT;
@@ -131,6 +134,7 @@ WS [[:blank:]]
 {INT}       {
     yylval.nd = new_node(INT - FLOAT + 3);
     yylval.nd->lineno = yylineno;
+    yylval.nd->tag = TERM_INT;
     yylval.nd->val.i = strtol(yytext, NULL, 10);
     token_on_line++;
     return INT;
