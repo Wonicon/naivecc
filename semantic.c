@@ -32,12 +32,6 @@ static var_t default_attr = {NULL, 0, NULL};
 fprintf(stderr, "Error type %d at Line %d: " fmt "\n", type, lineno, ## __VA_ARGS__); } while(0)
 
 
-//
-// Some pre-declaration
-//
-Type *analyze_specifier(const Node);       // required by analyze_[def|paramdec|extdef]
-
-
 var_t analyze_vardec(Node vardec, Type *inh_type) {
     assert(vardec->type == YY_VarDec);
 
@@ -86,7 +80,8 @@ var_t analyze_dec(Node dec, Type *type, int scope) {
             SEMA_ERROR_MSG(15, dec->lineno, "Initialization in the structure definition is not allowed");
         } else {  // Assignment consistency check
             Node exp = vardec->sibling;
-            const Type *exp_type = analyze_exp(exp, scope);
+            sema_visit(exp);
+            const Type *exp_type = exp->sema.type;
             if (!typecmp(exp_type, type)) {
                 SEMA_ERROR_MSG(5, vardec->sibling->lineno, "Type mismatch");
             }
@@ -123,7 +118,8 @@ Type *analyze_def(Node def, int scope) {
 
     // Handle Specifier
     Node spec = def->child;
-    Type *type = analyze_specifier(spec);
+    sema_visit(spec);
+    Type *type = spec->sema.type;
     assert(type->type_size != 0);
 
     // Handle DecList and get a field list if we are in struct scope
@@ -263,19 +259,23 @@ Type *analyze_struct_spec(const Node struct_spec) {
 }
 
 
-Type * analyze_specifier(const Node specifier) {
-    if (specifier->child->type == YY_TYPE) {
-        const char *type_name = specifier->child->val.s;
-        if (!strcmp(type_name, BASIC_INT->name)) {
-            return BASIC_INT;
-        } else if (!strcmp(type_name, BASIC_FLOAT->name)) {
-            return BASIC_FLOAT;
-        } else {
-            assert(0);
-        }
-    } else {
-        return analyze_struct_spec(specifier->child);
+static void spec_is_type(Node spec)
+{
+    const char *type_name = spec->child->val.s;
+    if (!strcmp(type_name, BASIC_INT->name)) {
+        spec->sema.type = BASIC_INT;
     }
+    else if (!strcmp(type_name, BASIC_FLOAT->name)) {
+        spec->sema.type = BASIC_FLOAT;
+    }
+    else {
+        PANIC("Unexpected type");
+    }
+}
+
+
+static void spec_is_struct(Node spec)
+{
 }
 
 
@@ -295,7 +295,10 @@ var_t analyze_paramdec(Node paramdec) {
     assert(paramdec->type == YY_ParamDec);
     Node specifier = paramdec->child;
     Node vardec = specifier->sibling;
-    Type *spec = analyze_specifier(specifier);
+
+    sema_visit(specifier);
+
+    Type *spec = specifier->sema.type;
     var_t var = analyze_vardec(vardec, spec);
     int insert_ret = insert(var.name, var.type, paramdec->lineno, -1);
     if (insert_ret < 1) {
@@ -319,51 +322,27 @@ Type *analyze_varlist(Node varlist) {
     return param;
 }
 
-// Analyze the function and register it
-//   FunDec -> ID LP VarList RP
-//   FunDec -> ID LP RP
-const char *
-analyze_fundec(Node fundec, Type *inh_type) {
-    assert(fundec->type == YY_FunDec);
+
+// Analyze the function signiture, include function's name and parameter list.
+static void func_is_id_var(Node fundec)
+{
+    assert(fundec->tag == FUNC_is_ID_VAR);
+
     Node id = fundec->child;
-    Node varlist = id->sibling->sibling;
+    Node var = id->sibling;
 
     // Get identifier
     const char *name = id->val.s;
 
     // Get param list if exists
-    Type *param_list = NULL;
-    if (varlist->type == YY_VarList) {
-        param_list = analyze_varlist(varlist);
-    } else {
-        assert(varlist->type == YY_RP);
-    }
+    Type *param_list = (var != NULL) ? analyze_varlist(var) : NULL;
 
     // Generate function symbol
-    Type *func = new_type(CMM_FUNC, name, inh_type, param_list);
+    Type *func = new_type(CMM_FUNC, name, fundec->sema.type, param_list);
 
     if (insert(func->name, func, fundec->lineno, -1) < 0) {
         SEMA_ERROR_MSG(4, fundec->lineno, "Redefined function \"%s\"", func->name);
         // TODO handle memory leak!
-    }
-
-    return name;
-}
-
-
-void analyze_extdeclist(Node extdeclist, Type *inh_type) {
-    assert(extdeclist->type == YY_ExtDecList);
-
-    Node vardec = extdeclist->child;
-    assert(vardec->type == YY_VarDec);
-    var_t var_attr = analyze_vardec(vardec, inh_type);
-    if (insert(var_attr.name, var_attr.type, vardec->lineno, -1) < 0) {
-        SEMA_ERROR_MSG(3, vardec->child->lineno, "Duplicated identifier '%s'", var_attr.name);
-        // TODO handle memory leak
-    }
-
-    if (vardec->sibling != NULL) {
-        analyze_extdeclist(vardec->sibling, inh_type);
     }
 }
 
@@ -405,7 +384,8 @@ static int check_param_list(const Type *param, Node args, int scope) {
         Node arg = NULL;
         while (param != NULL) {
             arg = args->child;
-            const Type *param_type = analyze_exp(arg, scope);
+            sema_visit(arg);
+            Type *param_type = arg->sema.type;
             if (!typecmp(param_type, param->base)) {
                 SEMA_ERROR_MSG(9, arg->lineno, "parameter type mismatches");
             }
@@ -428,34 +408,45 @@ static int check_param_list(const Type *param, Node args, int scope) {
 }
 
 
-Type *
-analyze_exp_is_unary(Node exp, int scope)
+static void exp_is_unary(Node exp)
 {
-    return analyze_exp(exp->child, scope);
+    sema_visit(exp->child);
+
+    Type *type = exp->child->sema.type;
+
+    if (typecmp(type, BASIC_INT)) {
+        exp->sema.type = type;
+    }
+    else if (typecmp(type, BASIC_FLOAT) && exp->val.operator[0] == '!') {
+        SEMA_ERROR_MSG(7, exp->lineno, "\"!\" cannot cast on float");
+    }
+    else {
+        SEMA_ERROR_MSG(8, exp->lineno, "\"%s\" cannot case on unbasic type", exp->val.operator);
+    }
 }
 
 
-Type *
-analyze_exp_is_binary(Node exp, int scope)
+static void exp_is_binary(Node exp)
 {
-    Node left = exp->child;
-    Node right = left->sibling;
+    Node lexp = exp->child;
+    Node rexp = lexp->sibling;
 
-    Type *left_type = analyze_exp(left, scope);
-    Type *right_type = analyze_exp(right, scope);
+    sema_visit(lexp);
+    sema_visit(rexp);
 
-    if (!typecmp(left_type, right_type)) {
+    Type *ltype = lexp->sema.type;
+    Type *rtype = rexp->sema.type;
+
+    if (!typecmp(ltype, rtype)) {
         // Type mismatched
         SEMA_ERROR_MSG(7, exp->lineno, "Type mismatched for operands");
-        return NULL;
     }
-    else if (!typecmp(left_type, BASIC_INT) && !typecmp(left_type, BASIC_FLOAT)) {
+    else if (!typecmp(ltype, BASIC_INT) && !typecmp(ltype, BASIC_FLOAT)) {
         // Type matched, but cannot be operated
         SEMA_ERROR_MSG(7, exp->lineno, "The type is not allowed in operation '%s'", exp->val.operator);
-        return NULL;
     }
     else {
-        return left_type;
+        exp->sema.type = ltype;
     }
 }
 
@@ -685,6 +676,25 @@ static void compst_is_def_stmt(Node compst)
 }
 
 
+static void extdec_is_vardec(Node extdec)
+{
+    assert(extdec->tag == EXTDEC_is_VARDEC);
+
+    Node vardec = extdec->child;
+    while (vardec != NULL) {
+        vardec->sema.type = extdec->sema.type;
+        sema_visit(vardec);
+
+        if (insert(vardec->sema.name, vardec->sema.type, vardec->sema.lineno, -1) < 0) {
+            SEMA_ERROR_MSG(3, vardec->sema.lineno, "Duplicated identifier '%s'", vardec->sema.name);
+            // TODO handle memory leak
+        }
+
+        vardec = vardec->sibling;
+    }
+}
+
+
 static void extdef_is_spec_extdec(Node extdef)
 {
     assert(extdef->tag == EXTDEF_is_SPEC_EXTDEC);
@@ -738,6 +748,10 @@ static ast_visitor sema_visitors[] = {
     [EXTDEF_is_SPEC_EXTDEC]      = extdef_is_spec_extdec,
     [EXTDEF_is_SPEC]             = extdef_is_spec,
     [EXTDEF_is_SPEC_FUNC_COMPST] = extdef_is_spec_func_compst,
+    [EXTDEC_is_VARDEC]           = extdec_is_vardec,
+    [SPEC_is_TYPE]               = spec_is_type,
+    [SPEC_is_STRUCT]             = spec_is_struct,
+    [FUNC_is_ID_VAR]             = func_is_id_var,
     [COMPST_is_DEF_STMT]         = compst_is_def_stmt,
     [STMT_is_COMPST]             = stmt_is_compst,
     [STMT_is_EXP]                = stmt_is_exp,
@@ -752,6 +766,8 @@ static ast_visitor sema_visitors[] = {
     [EXP_is_EXP_IDX]             = exp_is_exp_idx,
     [EXP_is_ID_ARG]              = exp_is_id_arg,
     [EXP_is_EXP_FIELD]           = exp_is_exp_field,
+    [EXP_is_UNARY]               = exp_is_unary,
+    [EXP_is_BINARY]              = exp_is_binary,
 };
 
 
