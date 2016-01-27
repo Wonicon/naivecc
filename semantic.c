@@ -314,26 +314,6 @@ static inline int is_lval(const Node exp)
 }
 
 
-static void check_param_list(Type *param, Node args) {
-    Node arg = args;
-    while (param != NULL && arg != NULL) {
-        sema_visit(arg);
-        Type *param_type = arg->sema.type;
-
-        if (!typecmp(param_type, param->base)) {
-            SEMA_ERROR_MSG(9, arg->lineno, "parameter type mismatches");
-        }
-
-        param = param->link;
-        arg = arg->sibling;
-    }
-
-    if (!(param == NULL && args == NULL)) {
-        SEMA_ERROR_MSG(9, arg->lineno, "parameter number mismatches");
-    }
-}
-
-
 static void exp_is_unary(Node exp)
 {
     sema_visit(exp->child);
@@ -421,6 +401,25 @@ static void exp_is_exp_idx(Node exp)
 }
 
 
+static void check_param_list(Type *param, Node arg, int lineno) {
+    while (param != NULL && arg != NULL) {
+        sema_visit(arg);
+        Type *param_type = arg->sema.type;
+
+        if (!typecmp(param_type, param->base)) {
+            SEMA_ERROR_MSG(9, arg->lineno, "parameter type mismatches");
+        }
+
+        param = param->link;
+        arg = arg->sibling;
+    }
+
+    if (!(param == NULL && arg == NULL)) {
+        SEMA_ERROR_MSG(9, lineno, "parameter number mismatches");
+    }
+}
+
+
 static void exp_is_id_arg(Node exp)
 {
     Node id = exp->child;
@@ -435,7 +434,7 @@ static void exp_is_id_arg(Node exp)
     }
     else {
         // Error report in the check
-        check_param_list(query_result->type->param, id->sibling);
+        check_param_list(query_result->type->param, id->sibling, exp->lineno);
         // Return the return type while ignoring errors in arguments
         exp->sema.type = query_result->type->ret;
     }
@@ -674,6 +673,7 @@ static ast_visitor sema_visitors[] = {
     [EXP_is_EXP_FIELD]           = exp_is_exp_field,
     [EXP_is_UNARY]               = exp_is_unary,
     [EXP_is_BINARY]              = exp_is_binary,
+    [EXP_is_RELOP]               = exp_is_binary,
 };
 
 

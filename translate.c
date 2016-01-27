@@ -85,6 +85,7 @@ int translate_call(Node call);
 // 如果根据策略主动不生成指令, 返回 -2.
 // 一般情况下指令是流式生成的, 也就是不需要回退.
 //
+void bp();
 int translate_dispatcher(Node node) {
     if (node == NULL) {
         return NO_NEED_TO_GEN;
@@ -165,6 +166,7 @@ int translate_dispatcher(Node node) {
             return MULTI_INSTR;
         }
         default:
+            bp();
             translate_state = UNSUPPORT;
             return FAIL_TO_GEN;
     }
@@ -174,24 +176,24 @@ static void pass_arg(Node arg) {
     if (arg == NULL) {
         return;
     }
-    arg->child->dst = new_operand(OPE_TEMP);
-    translate_dispatcher(arg->child);
+    arg->dst = new_operand(OPE_TEMP);
+    translate_dispatcher(arg);
 
     pass_arg(arg->sibling);
 
-    Operand p = arg->child->dst;
+    Operand p = arg->dst;
     if (p->base_type && p->base_type->class == CMM_ARRAY) {
         // 按照测试样例, 数组要传地址
         LOG("传参: 数组引用");
         assert(p->type == OPE_REF || p->type == OPE_ADDR);
         if (p->type == OPE_REF) {
-            arg->child->dst = new_operand(OPE_ADDR);
-            new_instr(IR_ADDR, p, NULL, arg->child->dst);
+            arg->dst = new_operand(OPE_ADDR);
+            new_instr(IR_ADDR, p, NULL, arg->dst);
         }
     } else {
-        try_deref(arg->child);
+        try_deref(arg);
     }
-    new_instr(IR_ARG, arg->child->dst, NULL, NULL);
+    new_instr(IR_ARG, arg->dst, NULL, NULL);
 }
 
 int translate_call(Node call) {
@@ -205,10 +207,10 @@ int translate_call(Node call) {
     if (!strcmp(func->val.s, "read")) {
         return new_instr(IR_READ, NULL, NULL, call->dst);
     } else if (!strcmp(func->val.s, "write")) {
-        arg->child->dst = new_operand(OPE_TEMP);
-        translate_dispatcher(arg->child);
-        try_deref(arg->child);  // 这里的思路和return是类似的
-        return new_instr(IR_WRITE, arg->child->dst, NULL, NULL);
+        arg->dst = new_operand(OPE_TEMP);
+        translate_dispatcher(arg);
+        try_deref(arg);  // 这里的思路和return是类似的
+        return new_instr(IR_WRITE, arg->dst, NULL, NULL);
     }
 
     pass_arg(arg);

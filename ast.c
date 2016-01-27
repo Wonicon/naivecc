@@ -54,7 +54,6 @@ static int body_size[] = {
 void bp() {}
 Node create_tree(enum ProductionTag tag, int lineno, ...)
 {
-    if (tag == COMPST_is_DEF_STMT) bp();
     int n_body_symbol = body_size[tag];
 
     if (n_body_symbol <= 0) {
