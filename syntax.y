@@ -197,7 +197,7 @@ Exp             : Exp ASSIGNOP Exp { $$ = create_tree(EXP_is_ASSIGN, $2->lineno,
                 | Exp MINUS Exp    { $$ = create_tree(EXP_is_BINARY, $2->lineno, $1, $3); $$->val.operator = $2->val.s;}
                 | Exp STAR Exp     { $$ = create_tree(EXP_is_BINARY, $2->lineno, $1, $3); $$->val.operator = $2->val.s;}
                 | Exp DIV Exp      { $$ = create_tree(EXP_is_BINARY, $2->lineno, $1, $3); $$->val.operator = $2->val.s;}
-                | Exp LB Exp RB    { $$ = create_tree(EXP_is_BINARY, $2->lineno, $1, $3); $$->val.operator = $2->val.s;}
+                | Exp LB Exp RB    { $$ = create_tree(EXP_is_EXP_IDX, $2->lineno, $1, $3); $$->val.operator = $2->val.s;}
                 | Exp DOT ID       { $$ = create_tree(EXP_is_EXP_FIELD, $2->lineno, $1, $3); }
                 | LP Exp RP        { $$ = $2; }
                 | MINUS Exp        { $$ = create_tree(EXP_is_UNARY, $1->lineno, $2); $$->val.operator = $1->val.s;}

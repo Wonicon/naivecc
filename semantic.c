@@ -41,6 +41,7 @@ static void vardec_is_vardec_size(Node vardec)
     temp_array->size = size->val.i;
     temp_array->type_size = temp_array->size * vardec->sema.type->type_size;
     
+    sub_vardec->sema.type = temp_array;
     sema_visit(sub_vardec);
 
     vardec->sema = sub_vardec->sema;  // Together with name, lineno
