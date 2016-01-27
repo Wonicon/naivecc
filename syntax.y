@@ -18,56 +18,14 @@ int is_syn_error = 0;
 #include <stdio.h>
 static Node prog;
 static union YYSTYPE *YYVSP = NULL;
+
 #define S(x) # x
 #define concat(x, y) x ## y
 #define name(x) concat(YY_, x)
-
-#define LINK(x, n) do {\
-    YYVSP = yyvsp;\
-    yyval.nd = new_node(name(x));\
-    yyval.nd->lineno = yyloc.first_line;\
-    yyval.nd->val.s = yytname[name(x)];\
-    yyval.nd->child = yyvsp[1 - n].nd;\
-    Node cur = yyvsp[1 - n].nd;\
-    cur->sibling = NULL;\
-    int i = 2;\
-    while (i <= n) {\
-        cur->sibling = yyvsp[i - n].nd;\
-        cur = cur->sibling;\
-        i++;\
-    }\
-    prog = yyval.nd;\
-}while(0)
-
-#define LINK_NULL(x, n) do {\
-    YYVSP = yyvsp;\
-    yyval.nd = new_node(name(x));\
-    yyval.nd->lineno = yyloc.first_line;\
-    yyval.nd->val.s = yytname[name(x)];\
-    yyval.nd->child = yyvsp[1 - n].nd;\
-    Node cur = yyvsp[1 - n].nd;\
-    if (cur == NULL) break;\
-    cur->sibling = NULL;\
-    int i = 2;\
-    while (i <= n) {\
-        if (yyvsp[i - n].nd != NULL) {\
-            cur->sibling = yyvsp[i - n].nd;\
-            cur = cur->sibling;\
-        }\
-        i++;\
-    }\
-    prog = yyval.nd;\
-}while(0)
-
-//#define LINK LINK_NULL
-
 #define _str(x) # x
-//#define ERR
-#ifdef ERR
-#define LOGERR(x) do { printf("Hit " _str(x) "\n"); is_lex_error = 0; } while (0)
-#else // !ERR
-#define LOGERR(x) (is_lex_error = 0)
-#endif
+
+#define LINK(x, y)
+#define LINK_NULL(x, y)
 
 //
 // Pre-declaration
@@ -303,11 +261,7 @@ void semantic_analysis() {
 //
 // 简化语法分析树
 //
-Node simplify_tree(const Node);
 Node ast_tree;
-void simplify() {
-    ast_tree = simplify_tree(prog);
-}
 //
 // Release the parsing tree
 //

@@ -10,7 +10,6 @@ int yyparse();
 void ast();
 void semantic_analysis();
 void free_ast();
-void simplify();
 void translate();
 
 extern int is_lex_error;
@@ -51,8 +50,6 @@ int main(int argc, char *argv[]) {
         Type *write = new_type(CMM_FUNC, "write", NULL, NULL);
         write->param = new_type(CMM_PARAM, "o", BASIC_INT, NULL);
         insert("write", write, -1, 0);
-
-        simplify();
 
         semantic_analysis();
 
