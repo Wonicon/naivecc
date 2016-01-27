@@ -71,7 +71,9 @@ struct Node_ {
     /////////////////////////////////////////////////////////////////
 
     // For semantic analysis
-    Type *type;
+    struct {
+        Type *type;
+    } sema;
 
     // For intermediate code translation
     Operand dst;  // 一个表达式可能需要上层提供的目标地址, 值类型可能会将这个字段的值替换 [Feature]
