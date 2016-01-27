@@ -7,15 +7,8 @@
 #include <assert.h>
 
 
-typedef struct {
-    Type *type;
-    int lineno;
-    const char *name;
-} var_t;
-
-
 typedef void (*ast_visitor)(Node);
-static ast_visitor sema_visitors[];
+static ast_visitor sema_visitors[];  // Predeclaration
 #define sema_visit(x) sema_visitors[x->tag](x)
 
 
@@ -25,143 +18,118 @@ bool semantic_error = false;
 #define STRUCT_SCOPE (-10086)
 
 
-static var_t default_attr = {NULL, 0, NULL};
-
-
 #define SEMA_ERROR_MSG(type, lineno, fmt, ...) do { semantic_error = true; \
 fprintf(stderr, "Error type %d at Line %d: " fmt "\n", type, lineno, ## __VA_ARGS__); } while(0)
 
 
-var_t analyze_vardec(Node vardec, Type *inh_type) {
-    assert(vardec->type == YY_VarDec);
+static bool is_in_struct = false;
 
-    if (vardec->child->type == YY_ID) {
-        // Identifier
-        Node id = vardec->child;
-        var_t return_attr = { inh_type, id->lineno, id->val.s };
-        return return_attr;
-    } else if (vardec->child->type == YY_VarDec) {
-        // Array
-        // Now we have seen the most distanced dimension of an array
-        // It should be a base type of the prior vardec, so we generate
-        // a new array type first, and pass it as an inherit attribute
-        // to the sub vardec.
-        Node sub_vardec = vardec->child;
-        Type *temp_array = new_type(CMM_ARRAY, NULL, inh_type, NULL);
-        temp_array->size = sub_vardec->sibling->sibling->val.i;
-        temp_array->type_size = temp_array->size * inh_type->type_size;
-        return analyze_vardec(sub_vardec, temp_array);
-    } else {
-        assert(0);
-        return default_attr;
-    }
+
+static void vardec_is_id(Node vardec)
+{
+    vardec->sema.name = vardec->child->val.s;
+    vardec->sema.lineno = vardec->child->lineno;
 }
 
 
-// next comes from the declist behind
-var_t analyze_dec(Node dec, Type *type, int scope) {
-    assert(dec->type == YY_Dec);
+static void vardec_is_vardec_size(Node vardec)
+{
+    Node sub_vardec = vardec->child;
+    Node size = sub_vardec->sibling;
+
+    Type *temp_array = new_type(CMM_ARRAY, NULL, vardec->sema.type, NULL);
+    temp_array->size = size->val.i;
+    temp_array->type_size = temp_array->size * vardec->sema.type->type_size;
+    
+    sema_visit(sub_vardec);
+
+    vardec->sema = sub_vardec->sema;  // Together with name, lineno
+}
+
+
+static void dec_is_vardec(Node dec)
+{
 
     Node vardec = dec->child;
-    var_t var = analyze_vardec(vardec, type);
+    vardec->sema.type = dec->sema.type;
+    sema_visit(vardec);
 
-    if (scope != STRUCT_SCOPE) {
-        if (insert(var.name, var.type, dec->child->child->lineno, scope) < 0) {
-            if (scope != STRUCT_SCOPE) {
-                SEMA_ERROR_MSG(3, dec->child->child->lineno, "Redefined variable \"%s\".", var.name);
-            }
+    if (insert(vardec->sema.name, vardec->sema.type, vardec->sema.lineno, 1) < 0) {
+        SEMA_ERROR_MSG(3, vardec->sema.lineno, "Redefined variable \"%s\".", vardec->sema.name);
         // TODO handle memory leak
-        }
     }
 
-    // Assignment / Initialization
-    if (vardec->sibling != NULL) {
-        if (scope == STRUCT_SCOPE) {  // Field does not allow assignment
-            SEMA_ERROR_MSG(15, dec->lineno, "Initialization in the structure definition is not allowed");
-        } else {  // Assignment consistency check
-            Node exp = vardec->sibling;
-            sema_visit(exp);
-            const Type *exp_type = exp->sema.type;
-            if (!typecmp(exp_type, type)) {
-                SEMA_ERROR_MSG(5, vardec->sibling->lineno, "Type mismatch");
-            }
-        }
-    }
-
-    return var;
+    dec->sema = vardec->sema;
 }
 
 
-static Type *
-analyze_field_dec(Node dec, Type *type, int scope) {
-    if (dec == NULL) {
-        return NULL;
-    }
+static void dec_is_vardec_initialization(Node dec)
+{
+    dec_is_vardec(dec);
 
-    assert(dec->type == YY_Dec);
+    // Initialization
+    if (is_in_struct) {
+        // Field does not allow assignment
+        SEMA_ERROR_MSG(15, dec->lineno, "Initialization in the structure definition is not allowed");
+    }
+    else {
+        // Assignment consistency check
+        Node init = dec->child->sibling;
+        sema_visit(init);
+        if (!typecmp(init->sema.type, dec->sema.type)) {
+            SEMA_ERROR_MSG(5, init->lineno, "Type mismatch");
+        }
+    }
+}
+
+
+static void analyze_field_dec(Node dec)
+{
+    if (dec == NULL) {
+        dec->sema.type = NULL;
+        return;
+    }
 
     // Analyze the dec first in order to have a right symbol registering sequence.
-    var_t var = analyze_dec(dec, type, scope);
+    sema_visit(dec);
 
     // Recursively analyze field to insert the node before head in order.
-    Type *next_field_list = analyze_field_dec(dec, type, scope);
-    Type *new_field = new_type(CMM_FIELD, var.name, var.type, next_field_list);
+    analyze_field_dec(dec->sibling);
 
-    new_field->lineno = var.lineno;
+    Type *new_field = new_type(CMM_FIELD, dec->sema.name, dec->sema.type, dec->sibling->sema.type);
+    new_field->lineno = dec->sema.lineno;
 
-    return new_field;
+    dec->sema.type = new_field;
 }
 
 
-Type *analyze_def(Node def, int scope) {
-    assert(def->type == YY_Def);
-
+static void analyze_def(Node def)
+{
     // Handle Specifier
     Node spec = def->child;
     sema_visit(spec);
     Type *type = spec->sema.type;
     assert(type->type_size != 0);
 
-    // Handle DecList and get a field list if we are in struct scope
-    if (scope == STRUCT_SCOPE) {
-        return analyze_field_dec(spec->sibling, type, scope);
+    // Handle DecList and get a field list if in struct scope
+    if (is_in_struct) {
+        Node dec = spec->sibling;
+        dec->sema.type = type;
+
+        analyze_field_dec(spec->sibling);
+
+        def->sema.type = spec->sibling->sema.type;  // Transfer field link list
     }
     else {
         for (Node dec = spec->sibling; dec != NULL; dec = dec->sibling) {
-            analyze_dec(dec, type, scope);
+            dec->sema.type = type;
+            sema_visit(dec);
         }
-        return NULL;
     }
 }
 
 
-Type *analyze_deflist(const Node deflist, int scope) {
-    assert(deflist->type == YY_DefList);
-
-    // Resolve the first definition
-    Node def = deflist->child;
-    Type *field = analyze_def(def, scope);
-    // Resolve the rest definitions if exists
-    Node sub_list = def->sibling;
-    Type *sub_field = sub_list == NULL ? NULL : analyze_deflist(sub_list, scope);
-
-    // If we are in a struct scope, these CmmField will be discarded.
-
-    if (scope == STRUCT_SCOPE) {  // Link up the field
-        Type *pretail = field;
-        while (pretail->link != NULL) {
-            pretail = pretail->link;
-        }
-        pretail->link = sub_field;
-    } else {
-        assert(field == NULL && sub_field == NULL);
-    }
-
-    return field;
-}
-
-
-Type *analyze_struct_spec(const Node struct_spec) {
+static void analyze_struct_spec(const Node struct_spec) {
     assert(struct_spec->type == YY_StructSpecifier);
 
     Node body = struct_spec->child->sibling;  // Jump tag 'struct'
@@ -752,7 +720,11 @@ static ast_visitor sema_visitors[] = {
     [SPEC_is_TYPE]               = spec_is_type,
     [SPEC_is_STRUCT]             = spec_is_struct,
     [FUNC_is_ID_VAR]             = func_is_id_var,
+    [VARDEC_is_ID]               = vardec_is_id,
+    [VARDEC_is_VARDEC_SIZE]      = vardec_is_vardec_size,
     [COMPST_is_DEF_STMT]         = compst_is_def_stmt,
+    [DEC_is_VARDEC]              = dec_is_vardec,
+    [DEC_is_VARDEC_INITIALIZATION] = dec_is_vardec_initialization,
     [STMT_is_COMPST]             = stmt_is_compst,
     [STMT_is_EXP]                = stmt_is_exp,
     [STMT_is_IF]                 = stmt_is_if,
