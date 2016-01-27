@@ -282,7 +282,7 @@ static void func_is_id_var(Node fundec)
     const char *name = id->val.s;
 
     // Get param list if exists
-    Type *param_list = (var != NULL) ? get_params(var) : NULL;
+    Type *param_list = get_params(var);
 
     // Generate function symbol
     Type *func = new_type(CMM_FUNC, name, fundec->sema.type, param_list);
@@ -300,7 +300,7 @@ static void func_is_id_var(Node fundec)
 //
 static inline int is_lval(const Node exp)
 {
-    if (exp->child->type == YY_ID) {
+    if (exp->tag == EXP_is_ID) {
         // Avoid function name and type name.
         // An array directly found in the symbol table is a constant variable
         // which cannot be assigned.
@@ -309,44 +309,27 @@ static inline int is_lval(const Node exp)
         return ent != NULL && ent->type->class != CMM_FUNC && ent->type->class != CMM_TYPE && ent->type->class != CMM_ARRAY;
     }
     else {
-        Node follow = exp->child->sibling;
-        return (follow != NULL && (follow->type == YY_LB || follow->type == YY_DOT));
+        return exp->tag == EXP_is_EXP_IDX || exp->tag == EXP_is_EXP_FIELD;
     }
 }
 
 
-static int check_param_list(const Type *param, Node args, int scope) {
-    if (param == NULL && args->type == YY_RP) {
-        return 1;
-    } else if ((param == NULL && args->type != YY_RP) ||
-            (param != NULL && args->type == YY_RP)) {
-        SEMA_ERROR_MSG(9, args->lineno, "parameter mismatch");
-        return 0;
-    } else {
-        assert(args->type == YY_Args);
-        Node arg = NULL;
-        while (param != NULL) {
-            arg = args->child;
-            sema_visit(arg);
-            Type *param_type = arg->sema.type;
-            if (!typecmp(param_type, param->base)) {
-                SEMA_ERROR_MSG(9, arg->lineno, "parameter type mismatches");
-            }
-            param = param->link;
-            if (arg->sibling == NULL) {
-                args = arg->sibling;
-                break;
-            } else {
-                args = arg->sibling->sibling;
-            }
+static void check_param_list(Type *param, Node args) {
+    Node arg = args;
+    while (param != NULL && arg != NULL) {
+        sema_visit(arg);
+        Type *param_type = arg->sema.type;
+
+        if (!typecmp(param_type, param->base)) {
+            SEMA_ERROR_MSG(9, arg->lineno, "parameter type mismatches");
         }
 
-        if (!(param == NULL && args == NULL)) {
-            SEMA_ERROR_MSG(9, arg->lineno, "parameter number mismatches");
-            return 0;
-        } else {
-            return 1;
-        }
+        param = param->link;
+        arg = arg->sibling;
+    }
+
+    if (!(param == NULL && args == NULL)) {
+        SEMA_ERROR_MSG(9, arg->lineno, "parameter number mismatches");
     }
 }
 
@@ -396,8 +379,6 @@ static void exp_is_binary(Node exp)
 
 static void exp_is_assign(Node exp)
 {
-    assert(exp->tag == EXP_is_ASSIGN);
-
     Node lexp = exp->child;
     Node rexp = lexp->sibling;
 
@@ -442,8 +423,6 @@ static void exp_is_exp_idx(Node exp)
 
 static void exp_is_id_arg(Node exp)
 {
-    assert(exp->tag == EXP_is_ID_ARG);
-
     Node id = exp->child;
 
     sym_ent_t *query_result = query(id->val.s, 1);
@@ -456,7 +435,7 @@ static void exp_is_id_arg(Node exp)
     }
     else {
         // Error report in the check
-        check_param_list(query_result->type->param, id->sibling, 1);
+        check_param_list(query_result->type->param, id->sibling);
         // Return the return type while ignoring errors in arguments
         exp->sema.type = query_result->type->ret;
     }
@@ -465,8 +444,6 @@ static void exp_is_id_arg(Node exp)
 
 static void exp_is_exp_field(Node exp)
 {
-    assert(exp->tag == EXP_is_EXP_FIELD);
-
     Node struc = exp->child;
 
     sema_visit(struc);
@@ -490,8 +467,6 @@ static void exp_is_exp_field(Node exp)
 
 static void exp_is_id(Node exp)
 {
-    assert(exp->tag == EXP_is_ID);
-
     Node id = exp->child;
     sym_ent_t *query_result = query(id->val.s, 1);
 
@@ -509,24 +484,18 @@ static void exp_is_id(Node exp)
 
 static void exp_is_int(Node exp)
 {
-    assert(exp->tag == EXP_is_INT);
-
     exp->sema.type = BASIC_INT;
 }
 
 
 static void exp_is_float(Node exp)
 {
-    assert(exp->tag == EXP_is_FLOAT);
-
     exp->sema.type = BASIC_FLOAT;
 }
 
 
 static void stmt_is_return(Node stmt)
 {
-    assert(stmt->tag == STMT_is_RETURN);
-
     Node exp = stmt->child;
 
     sema_visit(exp);
@@ -539,8 +508,6 @@ static void stmt_is_return(Node stmt)
 
 static void stmt_is_while(Node stmt)
 {
-    assert(stmt->tag == STMT_is_WHILE);
-
     Node cond = stmt->child;
     Node loop = cond->sibling;
     
@@ -556,7 +523,6 @@ static void stmt_is_while(Node stmt)
 
 static void stmt_is_if(Node stmt)
 {
-    assert(stmt->tag == STMT_is_IF);
     Node cond = stmt->child;
     Node behav = cond->sibling;
     
@@ -572,7 +538,6 @@ static void stmt_is_if(Node stmt)
 
 static void stmt_is_if_else(Node stmt)
 {
-    assert(stmt->tag == STMT_is_IF_ELSE);
     Node cond = stmt->child;
     Node true_branch = cond->sibling;
     Node false_branch = cond->sibling;
@@ -592,15 +557,12 @@ static void stmt_is_if_else(Node stmt)
 
 static void stmt_is_exp(Node stmt)
 {
-    assert(stmt->tag == STMT_is_EXP);
     sema_visit(stmt->child);
 }
 
 
 static void stmt_is_compst(Node stmt)
 {
-    assert(stmt->tag == STMT_is_COMPST);
-
     Node compst = stmt->child;
     compst->sema.type = stmt->sema.type;
     sema_visit(compst);
@@ -609,8 +571,6 @@ static void stmt_is_compst(Node stmt)
 
 static void compst_is_def_stmt(Node compst)
 {
-    assert(compst->tag == COMPST_is_DEF_STMT);
-
     Node stmt = compst->child;
     while (stmt != NULL) {
         sema_visit(stmt);
@@ -621,8 +581,6 @@ static void compst_is_def_stmt(Node compst)
 
 static void extdec_is_vardec(Node extdec)
 {
-    assert(extdec->tag == EXTDEC_is_VARDEC);
-
     Node vardec = extdec->child;
     while (vardec != NULL) {
         vardec->sema.type = extdec->sema.type;
@@ -660,8 +618,6 @@ static void extdef_is_spec(Node extdef)
 
 static void extdef_is_spec_func_compst(Node extdef)
 {
-    assert(extdef->tag == EXTDEF_is_SPEC_FUNC_COMPST);
-
     Node spec = extdef->child;
     Node func = spec->sibling;
     Node compst = func->sibling;
@@ -676,8 +632,6 @@ static void extdef_is_spec_func_compst(Node extdef)
 
 static void prog_is_extdef(Node prog)
 {
-    assert(prog->tag == PROG_is_EXTDEF);
-
     Node extdef = prog->child;
     while (extdef != NULL) {
         sema_visit(extdef);
