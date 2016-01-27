@@ -296,7 +296,8 @@ void ast() {
 // Analyze the parsing tree
 //
 void semantic_analysis() {
-    analyze_program(prog);
+    extern Node ast_tree;
+    analyze_program(ast_tree);
 }
 
 //
