@@ -598,136 +598,98 @@ Type *analyze_exp(Node exp, int scope) {
 }
 
 
-//
-// Statement analyzer will check condition type and return type
-// which cannot be judged in expression analyzer. In other cases
-// it is just a router, and receives the type of the composite 
-// statement, which may contain a return statement.
-//
-Type *analyze_stmt(Node stmt, Type *inh_func_type, int scope) {
-    assert(stmt->type == YY_Stmt);
+static void stmt_is_return(Node stmt)
+{
+    assert(stmt->tag == STMT_is_RETURN);
 
-    Node first = stmt->child;
-    Node exp;
-    Node sub_stmt;
-    Type *cond_type;  // Used to check condition type
-    Type *return_type = NULL;
-    Type *else_return_type;
-    switch (first->type) {
-        case YY_Exp:
-            analyze_exp(first, scope);
-            break;
-        case YY_CompSt:
-            return_type = analyze_compst(first, inh_func_type, scope);
-            break;
-        case YY_IF:
-            exp = first->sibling->sibling;
-            cond_type = analyze_exp(exp, scope);
-            if (!typecmp(cond_type, BASIC_INT)) {
-                SEMA_ERROR_MSG(7, exp->lineno, "The condition expression must return int");
-            }
-            sub_stmt = exp->sibling->sibling;
-            return_type = analyze_stmt(sub_stmt, inh_func_type, scope);
-            if (sub_stmt->sibling != NULL) {
-                // ELSE
-                else_return_type = analyze_stmt(sub_stmt->sibling->sibling, inh_func_type, scope);
-                return_type = (return_type != NULL) ? else_return_type : return_type;
-            } else {
-                return_type = NULL;
-            }
-            break;
-        case YY_WHILE:
-            exp = first->sibling->sibling;
-            cond_type = analyze_exp(exp, scope);
-            if (!typecmp(cond_type, BASIC_INT)) {
-                SEMA_ERROR_MSG(7, exp->lineno, "The condition expression must return int");
-            }
-            sub_stmt = exp->sibling->sibling;
-            analyze_stmt(sub_stmt, inh_func_type, scope);
-            // We suppose the loop can jump out, so whether the compst returned decided by the following statement.
-            break;
-        case YY_RETURN:
-            exp = first->sibling;
-            return_type = analyze_exp(exp, scope);
-            if (!typecmp(return_type, inh_func_type)) {
-                SEMA_ERROR_MSG(8, exp->lineno, "Type mismatched for return.");
-            }
-            break;
-        default:
-            LOG("Awful statement");
-            assert(0);
+    Node exp = stmt->child;
+
+    sema_visit(exp);
+
+    if (!typecmp(exp->sema.type, stmt->sema.type)) {
+        SEMA_ERROR_MSG(8, exp->lineno, "Type mismatched for return.");
     }
-
-    return return_type;
 }
 
 
-//
-// Traverse the stmtlist
-//
-Type *analyze_stmtlist(Node stmtlist, Type *inh_func_type, int scope) {
-    Node stmt = stmtlist->child;
-    Type *return_type = analyze_stmt(stmt, inh_func_type, scope);
-    Type *sub_return_type;
-    if (stmt->sibling != NULL) {
-        sub_return_type = analyze_stmtlist(stmt->sibling, inh_func_type, scope);
-        return_type = (return_type != NULL) ? return_type : sub_return_type;
+static void stmt_is_while(Node stmt)
+{
+    assert(stmt->tag == STMT_is_WHILE);
+
+    Node cond = stmt->child;
+    Node loop = cond->sibling;
+    
+    sema_visit(cond);
+    if (!typecmp(cond->sema.type, BASIC_INT)) {
+        SEMA_ERROR_MSG(7, exp->lineno, "The condition expression must return int");
     }
-    return return_type;
+
+    loop->type = stmt->type;  // Check return type in true-branch
+    sema_visit(loop);
 }
 
 
-//
-// Second level analyzer router : CompSt
-// Currently the scope has no thing to do with analysis
-//
-Type *analyze_compst(Node compst, Type *inh_func_type, int scope) {
-    assert(compst->type == YY_CompSt);
-
-    Node list = compst->child->sibling;
-
-    Type *return_type = NULL;
-    while (list != NULL) {
-        if (list->type == YY_DefList) {
-            analyze_deflist(list, scope);
-        } else if (list->type == YY_StmtList) {
-            return_type = analyze_stmtlist(list, inh_func_type, scope);
-        }
-        list = list->sibling;
+static void stmt_is_if(Node stmt)
+{
+    assert(stmt->tag == STMT_is_IF);
+    Node cond = stmt->child;
+    Node behav = cond->sibling;
+    
+    sema_visit(cond);
+    if (!typecmp(cond->sema.type, BASIC_INT)) {
+        SEMA_ERROR_MSG(7, exp->lineno, "The condition expression must return int");
     }
 
-    return return_type;
+    behav->type = stmt->type;  // Check return type in true-branch
+    sema_visit(behav);
 }
 
 
-//
-// Top level analyzer of extdef acting as a router
-// Production:
-//   ExtDef -> Specifier ExtDecList SEMI
-//   ExtDef -> Specifier FunDec CompSt
-//   ExtDef -> Specifier SEMI
-//
-void analyze_extdef(Node extdef) {
-    Node spec = extdef->child;
-    Type *type = analyze_specifier(spec);
-    Type *return_type;
-    const char *func_name;
-    switch (spec->sibling->type) {
-        case YY_ExtDecList:
-            analyze_extdeclist(spec->sibling, type);
-            break;
-        case YY_FunDec:
-            func_name = analyze_fundec(spec->sibling, type);
-            return_type = analyze_compst(spec->sibling->sibling, type, 0);
-            if (return_type == NULL) {
-               fprintf(stderr, "Unreturned branch in function \"%s\"!\n", func_name);
-            }
-            break;
-        case YY_SEMI:
-            LOG("Well, I think this is used for struct");
-            break;
-        default:
-            LOG("WTF");
+static void stmt_is_if_else(Node stmt)
+{
+    assert(stmt->tag == STMT_is_IF_ELSE);
+    Node cond = stmt->child;
+    Node true_branch = cond->sibling;
+    Node false_branch = cond->sibling;
+    
+    sema_visit(cond);
+    if (!typecmp(cond->sema.type, BASIC_INT)) {
+        SEMA_ERROR_MSG(7, exp->lineno, "The condition expression must return int");
+    }
+
+    true_branch->sema.type = stmt->sema.type;  // Check return type
+    sema_visit(true_branch);
+
+    false_branch->sema.type = stmt->sema.type; // Cehck return type
+    sema_visit(false_branch);
+}
+
+
+static void stmt_is_exp(Node stmt)
+{
+    assert(stmt->tag == STMT_is_EXP);
+    sema_visit(stmt->child);
+}
+
+
+static void stmt_is_compst(Node stmt)
+{
+    assert(stmt->tag == STMT_is_COMPST);
+
+    Node compst = stmt->child;
+    compst->sema.type = stmt->sema.type;
+    sema_visit(compst);
+}
+
+
+static void compst_is_def_stmt(Node compst)
+{
+    assert(compst->tag == COMPST_is_DEF_STMT);
+
+    Node stmt = compst->child;
+    while (stmt != NULL) {
+        sema_visit(stmt);
+        stmt = stmt->sibling;
     }
 }
 
@@ -740,7 +702,7 @@ static void extdef_is_spec_extdec(Node extdef)
     Node extdec = spec->sibling;
 
     sema_visit(spec);
-    extdec = spec->type;
+    extdec->sema.type = spec->sema.type;
     sema_visit(extdec);
 }
 
@@ -748,8 +710,7 @@ static void extdef_is_spec_extdec(Node extdef)
 static void extdef_is_spec(Node extdef)
 {
     assert(extdef->tag == EXTDEF_is_SPEC);
-    Node spec = extdef->child;
-    sema_visit(spec);
+    sema_visit(extdef->child);
 }
 
 
@@ -762,9 +723,9 @@ static void extdef_is_spec_func_compst(Node extdef)
     Node compst = func->sibling;
 
     sema_visit(spec);
-    func->type = spec->type;
+    func->sema.type = spec->sema.type;  // Inherit the type info to register the function symbol
     sema_visit(func);
-    compst->type = spec->type;
+    compst->sema.type = spec->sema.type; // Inherit the type info to check return type consistentcy
     sema_visit(compst);
 }
 
@@ -775,7 +736,7 @@ static void prog_is_extdef(Node prog)
 
     Node extdef = prog->child;
     while (extdef != NULL) {
-        analyze_extdef(extdef);
+        sema_visit(extdef);
         extdef = extdef->sibling;
     }
 }
@@ -785,7 +746,13 @@ static ast_visitor sema_visitors[] = {
     [PROG_is_EXTDEF]             = prog_is_extdef,
     [EXTDEF_is_SPEC_EXTDEC]      = extdef_is_spec_extdec,
     [EXTDEF_is_SPEC]             = extdef_is_spec,
-    [EXTDEF_is_SPEC_FUNC_COMPST] = extdef_is_spec_func_compst
+    [EXTDEF_is_SPEC_FUNC_COMPST] = extdef_is_spec_func_compst,
+    [COMPST_is_DEF_STMT]         = compst_is_def_stmt,
+    [STMT_is_COMPST]             = stmt_is_compst,
+    [STMT_is_EXP]                = stmt_is_exp,
+    [STMT_is_IF]                 = stmt_is_if,
+    [STMT_is_IF_ELSE]            = stmt_is_if_else,
+    [STMT_is_WHILE]              = stmt_is_while,
 };
 
 
