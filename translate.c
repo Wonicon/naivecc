@@ -85,7 +85,6 @@ int translate_call(Node call);
 // 如果根据策略主动不生成指令, 返回 -2.
 // 一般情况下指令是流式生成的, 也就是不需要回退.
 //
-void bp();
 int translate_dispatcher(Node node) {
     if (node == NULL) {
         return NO_NEED_TO_GEN;
@@ -166,7 +165,6 @@ int translate_dispatcher(Node node) {
             return MULTI_INSTR;
         }
         default:
-            bp();
             translate_state = UNSUPPORT;
             return FAIL_TO_GEN;
     }
