@@ -7,21 +7,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define Type enum yytokentype
 
 extern int is_lex_error;
 extern int is_syn_error;
 
-Type lex_handle(Type type);
 void ErrorMsg(char *desc, char *lexeme, int lineno);
 
 int yycolumn = 1;
-int token_on_line = 0;
-
-//
-// Wrapper of lex_handle aimed to use LOG
-//
-#define HANDLE(type) { return lex_handle(type); }
 
 #define YY_USER_ACTION \
 yylloc.first_line = yylloc.last_line = yylineno;\
@@ -29,134 +21,113 @@ yylloc.first_column = yycolumn;\
 yylloc.last_column = yycolumn + yyleng - 1;\
 yycolumn += yyleng;
 
-
-//
-// Pre-declaration
-//
-int check_oct(char *yytext, int yyleng, int yylineno);
-int check_hex(char *yytext, int yyleng, int yylineno);
+static enum yytokentype num(int radix);
+static enum yytokentype op(enum yytokentype type);
+static enum yytokentype sym(enum yytokentype type);
+static enum yytokentype node(enum yytokentype type, enum ProductionTag tag);
+static int check_oct(char *yytext, int yyleng, int yylineno);
+static int check_hex(char *yytext, int yyleng, int yylineno);
 %}
 digit [0-9]
 letter [a-zA-Z]
-SEMI ;
-COMMA ,
-ASSIGNOP =
-RELOP >|<|>=|<=|==|!=
-PLUS \+
-MINUS -
-STAR \*
-DIV \/
-AND &&
-OR \|\|
-DOT \.
-NOT !
-TYPE int|float
-LP \(
-RP \)
-LB \[
-RB \]
-LC \{
-RC \}
-STRUCT struct
-RETURN return
-IF if
-ELSE else
-WHILE while
-ID ({letter}|_)({letter}|{digit}|_)*
-HEX 0(x|X)({digit}|{letter})+
-OCT 0[0-9]+
-INT 0|[1-9][0-9]*
-FLOAT [0-9]+\.[0-9]+
-WS [[:blank:]]
 
 %%
 
-{SEMI}      HANDLE(SEMI)
-{COMMA}     HANDLE(COMMA)
-{ASSIGNOP}  HANDLE(ASSIGNOP)
-{RELOP}     HANDLE(RELOP)
-{PLUS}      HANDLE(PLUS)
-{MINUS}     HANDLE(MINUS)
-{STAR}      HANDLE(STAR)
-{DIV}       HANDLE(DIV)
-{AND}       HANDLE(AND)
-{OR}        HANDLE(OR)
-{DOT}       HANDLE(DOT)
-{NOT}       HANDLE(NOT)
-{TYPE}      HANDLE(TYPE)
-{LP}        HANDLE(LP)
-{RP}        HANDLE(RP)
-{LB}        HANDLE(LB)
-{RB}        HANDLE(RB)
-{LC}        HANDLE(LC)
-{RC}        HANDLE(RC)
-{STRUCT}    HANDLE(STRUCT)
-{RETURN}    HANDLE(RETURN)
-{IF}        HANDLE(IF)
-{ELSE}      HANDLE(ELSE)
-{WHILE}     HANDLE(WHILE)
-{ID}        {
-    lex_handle(ID);
-    yylval.nd->tag = TERM_ID;
-    return ID;
-            }
-{FLOAT}     {
-    yylval.nd = new_node(FLOAT - FLOAT + 3);
+"=" return sym(ASSIGNOP);
+"," return sym(COMMA);
+";" return sym(SEMI);
+"." return sym(DOT);
+"(" return sym(LP);
+")" return sym(RP);
+"[" return sym(LB);
+"]" return sym(RB);
+"{" return sym(LC);
+"}" return sym(RC);
+"if" return sym(IF);
+"else" return sym(ELSE);
+"while" return sym(WHILE);
+"struct" return sym(STRUCT);
+"return" return sym(RETURN);
+
+"+" return op(PLUS);
+"-" return op(MINUS);
+"*" return op(STAR);
+"/" return op(DIV);
+"!" return op(NOT);
+"||" return op(OR);
+"&&" return op(AND);
+>|<|>=|<=|==|!= return op(RELOP);
+
+"int"|"float" return node(TYPE, TERM_ID);
+({letter}|_)({letter}|{digit}|_)* return node(ID, TERM_ID);
+
+[0-9]+\.[0-9]+ {
+    yylval.nd = new_node();
     yylval.nd->lineno = yylineno;
     yylval.nd->tag = TERM_FLOAT;
     yylval.nd->val.f = atof(yytext);
-    token_on_line++;
     return FLOAT;
-            }
-{HEX}       {
+}
+
+0(x|X)({digit}|{letter})+ {
     if (!check_hex(yytext, yyleng, yylineno)) {
         is_syn_error = 1;
     }
-    yylval.nd = new_node(INT - FLOAT + 3);
-    yylval.nd->lineno = yylineno;
-    yylval.nd->tag = TERM_INT;
-    yylval.nd->val.i = strtol(yytext, NULL, 16);
-    token_on_line++;
-    return INT;
-            }
-{OCT}       {
+    return num(16);
+}
+0[0-9]+ {
     if (!check_oct(yytext, yyleng, yylineno)) {
         is_syn_error = 1;
     }
-    yylval.nd = new_node(INT - FLOAT + 3);
-    yylval.nd->lineno = yylineno;
-    yylval.nd->tag = TERM_INT;
-    yylval.nd->val.i = strtol(yytext, NULL, 8);
-    token_on_line++;
-    return INT;
-            }
-{INT}       {
-    yylval.nd = new_node(INT - FLOAT + 3);
-    yylval.nd->lineno = yylineno;
-    yylval.nd->tag = TERM_INT;
-    yylval.nd->val.i = strtol(yytext, NULL, 10);
-    token_on_line++;
-    return INT;
-            }
-"\n" {
-    token_on_line = 0;
-    yycolumn = 1;
+    return num(8);
 }
-{WS} {}
+0|[1-9][0-9]* return num(10);
+
+"\n" yycolumn = 1;
+[[:blank:]] ;
 . {
     ErrorMsg("Mysterious character", yytext, yylineno);
     is_syn_error = 1;
-
-    return yylex();
 }
 
 %%
 
+static enum yytokentype num(int radix)
+{
+    yylval.nd = new_node(INT - FLOAT + 3);
+    yylval.nd->lineno = yylineno;
+    yylval.nd->tag = TERM_INT;
+    yylval.nd->val.i = strtol(yytext, NULL, radix);
+    return INT;
+}
+
+static enum yytokentype sym(enum yytokentype type)
+{
+    yylval.lineno = yylineno;
+    return type;
+}
+
+static enum yytokentype op(enum yytokentype type)
+{
+    yylval.op.lineno = yylineno;
+    yylval.op.s = register_str(yytext);
+    return type;
+}
+
+static enum yytokentype node(enum yytokentype type, enum ProductionTag tag)
+{
+    yylval.nd = new_node();
+    yylval.nd->lineno = yylineno;
+    yylval.nd->val.s = register_str(yytext);
+    yylval.nd->tag = tag;
+    return type;
+}
+
 int check_oct(char *yytext, int yyleng, int yylineno)
 {
-    int i;
     // all zero here is considered oct
-    for (i = 0; i < yyleng; i++) {
+    int i = 0;
+    for (; i < yyleng; i++) {
         char ch = yytext[i];
         if (ch == '8' || ch == '9') {
             ErrorMsg("Illegal octal number", yytext, yylineno);
@@ -169,9 +140,9 @@ int check_oct(char *yytext, int yyleng, int yylineno)
 
 int check_hex(char *yytext, int yyleng, int yylineno)
 {
-    int i;
     // Jump over '0x'
-    for (i = 2; i < yyleng; i++) {
+    int i = 2;
+    for (; i < yyleng; i++) {
         char ch = yytext[i];
         if ((ch > 'f' && ch <= 'z') || (ch > 'F' && ch <= 'Z')) {
             ErrorMsg("Illegal hexadecimal number", yytext, yylineno);
@@ -180,22 +151,6 @@ int check_hex(char *yytext, int yyleng, int yylineno)
         }
     }
     return 1;
-}
-
-//
-// lex_handle : the common handle routine
-// Param type : the type of the lexeme
-// RETURN     : the type of the lexeme 
-//
-Type lex_handle(Type type)
-{
-    // Currently FLOAT is the first token defined in syntax.y
-    // In lexical phase we don't pay attention to non-terminals
-    yylval.nd = new_node();
-    yylval.nd->lineno = yylineno;
-    yylval.nd->val.s = register_str(yytext);
-    token_on_line++;
-    return type;
 }
 
 void ErrorMsg(char *desc, char *lexeme, int lineno)

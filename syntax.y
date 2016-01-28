@@ -19,29 +19,35 @@ Node prog;
 /* declared types */
 %union {
     Node nd;
+    int lineno;
+    struct {
+        int lineno;
+        const char *s;
+    } op;
 }
 
 %token <nd>
-/* token start */
     FLOAT
     INT
     ID
-    ASSIGNOP
+    TYPE
+
+%token <op>
     RELOP
     PLUS MINUS STAR DIV
     AND OR NOT
+
+%token <lineno>
     DOT
-    TYPE
     LB RB
-    STRUCT
-    RETURN
-    IF ELSE SUB_ELSE
-    WHILE
     LP RP
     LC RC
+    WHILE
+    STRUCT
+    RETURN
+    ASSIGNOP
     SEMI COMMA
-    UND
-/* token end */
+    IF ELSE SUB_ELSE
 
 %type <nd>
     Program
@@ -111,9 +117,9 @@ Specifier       : TYPE            { $$ = create_tree(SPEC_is_TYPE, $1->lineno, $
                 | StructSpecifier { $$ = create_tree(SPEC_is_STRUCT, $1->lineno, $1); }
                 ;
 
-StructSpecifier : STRUCT ID LC DefList RC { $$ = create_tree(STRUCT_is_ID_DEF, $1->lineno, $2, $4); }
-                | STRUCT LC DefList RC    { $$ = create_tree(STRUCT_is_DEF, $1->lineno, $3); }
-                | STRUCT ID               { $$ = create_tree(STRUCT_is_ID, $1->lineno, $2); }
+StructSpecifier : STRUCT ID LC DefList RC { $$ = create_tree(STRUCT_is_ID_DEF, $1, $2, $4); }
+                | STRUCT LC DefList RC    { $$ = create_tree(STRUCT_is_DEF, $1, $3); }
+                | STRUCT ID               { $$ = create_tree(STRUCT_is_ID, $1, $2); }
                 ;
 
 /* Declarators */
@@ -135,7 +141,7 @@ VarList         : ParamDec COMMA VarList { $1->sibling = $3; $$ = $1; }
 
 /* Statements */
 
-CompSt          : LC DefList StmtList RC { $$ = create_tree(COMPST_is_DEF_STMT, $1->lineno, $2, $3); }
+CompSt          : LC DefList StmtList RC { $$ = create_tree(COMPST_is_DEF_STMT, $1, $2, $3); }
                 ;
 
 StmtList        : Stmt StmtList { $1->sibling = $2; $$ = $1; }
@@ -144,10 +150,10 @@ StmtList        : Stmt StmtList { $1->sibling = $2; $$ = $1; }
 
 Stmt            : Exp SEMI                         { $$ = create_tree(STMT_is_EXP, $1->lineno, $1); }
                 | CompSt                           { $$ = create_tree(STMT_is_COMPST, $1->lineno, $1); }
-                | RETURN Exp SEMI                  { $$ = create_tree(STMT_is_RETURN, $1->lineno, $2); }
-                | IF LP Exp RP Stmt %prec SUB_ELSE { $$ = create_tree(STMT_is_IF, $1->lineno, $3, $5); }
-                | IF LP Exp RP Stmt ELSE Stmt      { $$ = create_tree(STMT_is_IF_ELSE, $1->lineno, $3, $5, $7); }
-                | WHILE LP Exp RP Stmt             { $$ = create_tree(STMT_is_WHILE, $1->lineno, $3, $5); }
+                | RETURN Exp SEMI                  { $$ = create_tree(STMT_is_RETURN, $1, $2); }
+                | IF LP Exp RP Stmt %prec SUB_ELSE { $$ = create_tree(STMT_is_IF, $1, $3, $5); }
+                | IF LP Exp RP Stmt ELSE Stmt      { $$ = create_tree(STMT_is_IF_ELSE, $1, $3, $5, $7); }
+                | WHILE LP Exp RP Stmt             { $$ = create_tree(STMT_is_WHILE, $1, $3, $5); }
                 ;
 
 /* Local Definitions */
@@ -169,19 +175,19 @@ Dec             : VarDec              { $$ = create_tree(DEC_is_VARDEC, $1->line
 
 /* Expressions */
 
-Exp             : Exp ASSIGNOP Exp { $$ = create_tree(EXP_is_ASSIGN, $2->lineno, $1, $3); }
-                | Exp AND Exp      { $$ = create_tree(EXP_is_AND, $2->lineno, $1, $3); }
-                | Exp OR Exp       { $$ = create_tree(EXP_is_OR, $2->lineno, $1, $3); }
-                | Exp RELOP Exp    { $$ = create_tree(EXP_is_RELOP, $2->lineno, $1, $3); $$->val.operator = $2->val.s; }
-                | Exp PLUS Exp     { $$ = create_tree(EXP_is_BINARY, $2->lineno, $1, $3); $$->val.operator = $2->val.s;}
-                | Exp MINUS Exp    { $$ = create_tree(EXP_is_BINARY, $2->lineno, $1, $3); $$->val.operator = $2->val.s;}
-                | Exp STAR Exp     { $$ = create_tree(EXP_is_BINARY, $2->lineno, $1, $3); $$->val.operator = $2->val.s;}
-                | Exp DIV Exp      { $$ = create_tree(EXP_is_BINARY, $2->lineno, $1, $3); $$->val.operator = $2->val.s;}
-                | Exp LB Exp RB    { $$ = create_tree(EXP_is_EXP_IDX, $2->lineno, $1, $3); $$->val.operator = $2->val.s;}
-                | Exp DOT ID       { $$ = create_tree(EXP_is_EXP_FIELD, $2->lineno, $1, $3); }
+Exp             : Exp ASSIGNOP Exp { $$ = create_tree(EXP_is_ASSIGN, $2, $1, $3); }
+                | Exp AND Exp      { $$ = create_tree(EXP_is_AND, $2.lineno, $1, $3); }
+                | Exp OR Exp       { $$ = create_tree(EXP_is_OR, $2.lineno, $1, $3); }
+                | Exp RELOP Exp    { $$ = create_tree(EXP_is_RELOP, $2.lineno, $1, $3); $$->val.operator = $2.s; }
+                | Exp PLUS Exp     { $$ = create_tree(EXP_is_BINARY, $2.lineno, $1, $3); $$->val.operator = $2.s; }
+                | Exp MINUS Exp    { $$ = create_tree(EXP_is_BINARY, $2.lineno, $1, $3); $$->val.operator = $2.s; }
+                | Exp STAR Exp     { $$ = create_tree(EXP_is_BINARY, $2.lineno, $1, $3); $$->val.operator = $2.s; }
+                | Exp DIV Exp      { $$ = create_tree(EXP_is_BINARY, $2.lineno, $1, $3); $$->val.operator = $2.s; }
+                | Exp LB Exp RB    { $$ = create_tree(EXP_is_EXP_IDX, $2, $1, $3); }
+                | Exp DOT ID       { $$ = create_tree(EXP_is_EXP_FIELD, $2, $1, $3); }
                 | LP Exp RP        { $$ = $2; }
-                | MINUS Exp        { $$ = create_tree(EXP_is_UNARY, $1->lineno, $2); $$->val.operator = $1->val.s;}
-                | NOT Exp          { $$ = create_tree(EXP_is_UNARY, $1->lineno, $2); $$->val.operator = $1->val.s;}
+                | MINUS Exp        { $$ = create_tree(EXP_is_UNARY, $1.lineno, $2); $$->val.operator = $1.s;}
+                | NOT Exp          { $$ = create_tree(EXP_is_UNARY, $1.lineno, $2); $$->val.operator = $1.s;}
                 | ID LP Args RP    { $$ = create_tree(EXP_is_ID_ARG, $1->lineno, $1, $3); }
                 | ID LP RP         { $$ = create_tree(EXP_is_ID_ARG, $1->lineno, $1, NULL); }
                 | ID               { $$ = create_tree(EXP_is_ID, $1->lineno, $1); }
