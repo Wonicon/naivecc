@@ -18,8 +18,11 @@ bool semantic_error = false;
 #define STRUCT_SCOPE (-10086)
 
 
-#define SEMA_ERROR_MSG(type, lineno, fmt, ...) do { semantic_error = true; \
-fprintf(stderr, "Error type %d at Line %d: " fmt "\n", type, lineno, ## __VA_ARGS__); } while(0)
+#define SEMA_ERROR_MSG(lineno, fmt, ...) \
+    do {\
+        semantic_error = true; \
+        fprintf(stderr, "Semantic error at line %d: " fmt "\n", lineno, ## __VA_ARGS__);\
+    } while(0)
 
 
 static bool is_in_struct = false;
@@ -56,7 +59,7 @@ static void dec_is_vardec(Node dec)
     sema_visit(vardec);
 
     if (insert(vardec->sema.name, vardec->sema.type, vardec->sema.lineno, 1) < 0) {
-        SEMA_ERROR_MSG(3, vardec->sema.lineno, "Redefined variable \"%s\".", vardec->sema.name);
+        SEMA_ERROR_MSG(vardec->sema.lineno, "Redefined variable \"%s\".", vardec->sema.name);
         // TODO handle memory leak
     }
 
@@ -71,14 +74,14 @@ static void dec_is_vardec_initialization(Node dec)
     // Initialization
     if (is_in_struct) {
         // Field does not allow assignment
-        SEMA_ERROR_MSG(15, dec->lineno, "Initialization in the structure definition is not allowed");
+        SEMA_ERROR_MSG(dec->lineno, "Initialization in the structure definition is not allowed");
     }
     else {
         // Assignment consistency check
         Node init = dec->child->sibling;
         sema_visit(init);
         if (!typecmp(init->sema.type, dec->sema.type)) {
-            SEMA_ERROR_MSG(5, init->lineno, "Type mismatch");
+            SEMA_ERROR_MSG(init->lineno, "Type mismatch");
         }
     }
 }
@@ -135,7 +138,7 @@ static void struct_is_id(Node struc)
     Node id = struc->child;
     sym_ent_t *ent = query(id->val.s, STRUCT_SCOPE);
     if (ent == NULL || ent->type->class != CMM_TYPE || ent->type->meta->class != CMM_STRUCT) {
-        SEMA_ERROR_MSG(17, id->lineno, "Undefined struct name '%s'", id->val.s);
+        SEMA_ERROR_MSG(id->lineno, "Undefined struct name '%s'", id->val.s);
     }
     else {
         // ent->type is a meta type
@@ -175,7 +178,7 @@ static void struct_is_id_def(Node struc)
         }
 
         if (insert(outer->name, outer->base, outer->lineno, STRUCT_SCOPE) < 0) {
-            SEMA_ERROR_MSG(3, outer->lineno, "Redefined field \"%s\".", outer->name);
+            SEMA_ERROR_MSG(outer->lineno, "Redefined field \"%s\".", outer->name);
         }
 
         // 记录偏移量并累加大小
@@ -185,7 +188,7 @@ static void struct_is_id_def(Node struc)
         Type *inner = outer->link;
         while (inner != NULL) {
             if (!strcmp(outer->name, inner->name)) {
-                SEMA_ERROR_MSG(15, inner->lineno,
+                SEMA_ERROR_MSG(inner->lineno,
                                "Duplicated decleration of field %s, the previous one is at %d",
                                outer->name, outer->lineno);
                 inner->name = "";
@@ -203,7 +206,7 @@ static void struct_is_id_def(Node struc)
         Type *meta = new_type(CMM_TYPE, this->name, this, NULL);
         meta->lineno = struc->lineno;
         if (insert(meta->name, meta, struc->lineno, 0) < 1) {
-            SEMA_ERROR_MSG(16, struc->lineno, "Duplicated name \"%s\".", name);
+            SEMA_ERROR_MSG(struc->lineno, "Duplicated name \"%s\".", name);
         }
     }
 
@@ -248,7 +251,7 @@ static void var_is_spec_vardec(Node paramdec) {
 
     int insert_ret = insert(vardec->sema.name, vardec->sema.type, paramdec->lineno, -1);
     if (insert_ret < 1) {
-        SEMA_ERROR_MSG(3, vardec->lineno, "Duplicated variable definition of '%s'", vardec->sema.name);
+        SEMA_ERROR_MSG(vardec->lineno, "Duplicated variable definition of '%s'", vardec->sema.name);
     }
 
     paramdec->sema = vardec->sema;
@@ -289,7 +292,7 @@ static void func_is_id_var(Node fundec)
     Type *func = new_type(CMM_FUNC, name, fundec->sema.type, param_list);
 
     if (insert(func->name, func, fundec->lineno, -1) < 0) {
-        SEMA_ERROR_MSG(4, fundec->lineno, "Redefined function \"%s\"", func->name);
+        SEMA_ERROR_MSG(fundec->lineno, "Redefined function \"%s\"", func->name);
         // TODO handle memory leak!
     }
 }
@@ -325,10 +328,10 @@ static void exp_is_unary(Node exp)
         exp->sema.type = type;
     }
     else if (typecmp(type, BASIC_FLOAT) && exp->val.operator[0] == '!') {
-        SEMA_ERROR_MSG(7, exp->lineno, "\"!\" cannot cast on float");
+        SEMA_ERROR_MSG(exp->lineno, "\"!\" cannot cast on float");
     }
     else {
-        SEMA_ERROR_MSG(8, exp->lineno, "\"%s\" cannot case on unbasic type", exp->val.operator);
+        SEMA_ERROR_MSG(exp->lineno, "\"%s\" cannot case on unbasic type", exp->val.operator);
     }
 }
 
@@ -346,11 +349,11 @@ static void exp_is_binary(Node exp)
 
     if (!typecmp(ltype, rtype)) {
         // Type mismatched
-        SEMA_ERROR_MSG(7, exp->lineno, "Type mismatched for operands");
+        SEMA_ERROR_MSG(exp->lineno, "Type mismatched for operands");
     }
     else if (!typecmp(ltype, BASIC_INT) && !typecmp(ltype, BASIC_FLOAT)) {
         // Type matched, but cannot be operated
-        SEMA_ERROR_MSG(7, exp->lineno, "The type is not allowed in operation '%s'", exp->val.operator);
+        SEMA_ERROR_MSG(exp->lineno, "The type is not allowed in operation '%s'", exp->val.operator);
     }
     else {
         exp->sema.type = ltype;
@@ -367,10 +370,10 @@ static void exp_is_assign(Node exp)
     sema_visit(rexp);
 
     if (!typecmp(lexp->sema.type, rexp->sema.type)) {
-        SEMA_ERROR_MSG(5, exp->lineno, "Type mismatched for assignment.");
+        SEMA_ERROR_MSG(exp->lineno, "Type mismatched for assignment.");
     }
     else if (!is_lval(lexp)) {
-        SEMA_ERROR_MSG(6, exp->lineno, "The left-hand side of an assignment must be a variable.");
+        SEMA_ERROR_MSG(exp->lineno, "The left-hand side of an assignment must be a variable.");
     }
 
     exp->sema.type = lexp->sema.type;
@@ -386,14 +389,14 @@ static void exp_is_exp_idx(Node exp)
     sema_visit(rexp);
 
     if (rexp->sema.type != NULL && rexp->sema.type->class != CMM_INT) {
-        SEMA_ERROR_MSG(12, rexp->lineno, "expression is not a integer");
+        SEMA_ERROR_MSG(rexp->lineno, "expression is not a integer");
     }
 
     // If lexp_type is null, it means that an semantic error has occurred, then we can ignore the
     // consecutive errors.
     if (exp->sema.type != NULL) {
         if (exp->sema.type->class != CMM_ARRAY) {
-            SEMA_ERROR_MSG(10, lexp->lineno, "expression is not an array.");
+            SEMA_ERROR_MSG(lexp->lineno, "expression is not an array.");
         }
         else {
             exp->sema.type = lexp->sema.type->base;
@@ -408,7 +411,7 @@ static void check_param_list(Type *param, Node arg, int lineno) {
         Type *param_type = arg->sema.type;
 
         if (!typecmp(param_type, param->base)) {
-            SEMA_ERROR_MSG(9, arg->lineno, "parameter type mismatches");
+            SEMA_ERROR_MSG(arg->lineno, "parameter type mismatches");
         }
 
         param = param->link;
@@ -416,7 +419,7 @@ static void check_param_list(Type *param, Node arg, int lineno) {
     }
 
     if (!(param == NULL && arg == NULL)) {
-        SEMA_ERROR_MSG(9, lineno, "parameter number mismatches");
+        SEMA_ERROR_MSG(lineno, "parameter number mismatches");
     }
 }
 
@@ -428,10 +431,10 @@ static void exp_is_id_arg(Node exp)
     sym_ent_t *query_result = query(id->val.s, 1);
 
     if (query_result == NULL) {
-        SEMA_ERROR_MSG(2, id->lineno, "Undefined function \"%s\".", id->val.s);
+        SEMA_ERROR_MSG(id->lineno, "Undefined function \"%s\".", id->val.s);
     }
     else if (query_result->type->class != CMM_FUNC) {
-        SEMA_ERROR_MSG(11, id->lineno, "\"%s\" is not a function.", id->val.s);
+        SEMA_ERROR_MSG(id->lineno, "\"%s\" is not a function.", id->val.s);
     }
     else {
         // Error report in the check
@@ -449,13 +452,13 @@ static void exp_is_exp_field(Node exp)
     sema_visit(struc);
 
     if (struc->sema.type->class != CMM_STRUCT) {
-        SEMA_ERROR_MSG(13, exp->lineno, "The left identifier of '.' is not a struct");
+        SEMA_ERROR_MSG(exp->lineno, "The left identifier of '.' is not a struct");
     }
     else {
         Node field = struc->sibling;
         Type *field_type = query_field(struc->sema.type, field->val.s);
         if (field_type == NULL) {
-            SEMA_ERROR_MSG(14, field->lineno, "Undefined field \"%s\" in struct \"%s\".",
+            SEMA_ERROR_MSG(field->lineno, "Undefined field \"%s\" in struct \"%s\".",
                     field->val.s, struc->sema.type->name);
         }
         else {
@@ -471,10 +474,10 @@ static void exp_is_id(Node exp)
     sym_ent_t *query_result = query(id->val.s, 1);
 
     if (query_result == NULL) {
-        SEMA_ERROR_MSG(1, id->lineno, "Undefined variable \"%s\"", id->val.s);
+        SEMA_ERROR_MSG(id->lineno, "Undefined variable \"%s\"", id->val.s);
     }
     else if (query_result->type->class == CMM_TYPE) {
-        SEMA_ERROR_MSG(1, id->lineno, "Cannot resovle variable \"%s\"", id->val.s);
+        SEMA_ERROR_MSG(id->lineno, "Cannot resovle variable \"%s\"", id->val.s);
     }
     else {
         exp->sema.type = query_result->type;
@@ -501,7 +504,7 @@ static void stmt_is_return(Node stmt)
     sema_visit(exp);
 
     if (!typecmp(exp->sema.type, stmt->sema.type)) {
-        SEMA_ERROR_MSG(8, exp->lineno, "Type mismatched for return.");
+        SEMA_ERROR_MSG(exp->lineno, "Type mismatched for return.");
     }
 }
 
@@ -513,7 +516,7 @@ static void stmt_is_while(Node stmt)
     
     sema_visit(cond);
     if (!typecmp(cond->sema.type, BASIC_INT)) {
-        SEMA_ERROR_MSG(7, cond->lineno, "The condition expression must return int");
+        SEMA_ERROR_MSG(cond->lineno, "The condition expression must return int");
     }
 
     loop->sema.type = stmt->sema.type;  // Check return type in true-branch
@@ -528,7 +531,7 @@ static void stmt_is_if(Node stmt)
     
     sema_visit(cond);
     if (!typecmp(cond->sema.type, BASIC_INT)) {
-        SEMA_ERROR_MSG(7, stmt->lineno, "The condition expression must return int");
+        SEMA_ERROR_MSG(stmt->lineno, "The condition expression must return int");
     }
 
     behav->sema.type = stmt->sema.type;  // Check return type in true-branch
@@ -544,7 +547,7 @@ static void stmt_is_if_else(Node stmt)
     
     sema_visit(cond);
     if (!typecmp(cond->sema.type, BASIC_INT)) {
-        SEMA_ERROR_MSG(7, stmt->lineno, "The condition expression must return int");
+        SEMA_ERROR_MSG(stmt->lineno, "The condition expression must return int");
     }
 
     true_branch->sema.type = stmt->sema.type;  // Check return type
@@ -587,7 +590,7 @@ static void extdec_is_vardec(Node extdec)
         sema_visit(vardec);
 
         if (insert(vardec->sema.name, vardec->sema.type, vardec->sema.lineno, -1) < 0) {
-            SEMA_ERROR_MSG(3, vardec->sema.lineno, "Duplicated identifier '%s'", vardec->sema.name);
+            SEMA_ERROR_MSG(vardec->sema.lineno, "Duplicated identifier '%s'", vardec->sema.name);
             // TODO handle memory leak
         }
 
