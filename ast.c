@@ -51,7 +51,6 @@ static int body_size[] = {
 };
 
 
-void bp() {}
 Node create_tree(enum ProductionTag tag, int lineno, ...)
 {
     int n_body_symbol = body_size[tag];

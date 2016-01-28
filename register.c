@@ -89,7 +89,8 @@ int get_reg(int start, int end)  // [start, end]
 
         if (ope == NULL) {  // An empty register
             break;
-        } else if (victim_next_use < ope->next_use) {
+        }
+        else if (victim_next_use < ope->next_use) {
             victim = i;
             victim_next_use = ope->next_use;
         }
@@ -97,7 +98,8 @@ int get_reg(int start, int end)  // [start, end]
 
     if (i <= end) {  // Find empty register
         return i;
-    } else {
+    }
+    else {
         TEST(start <= victim && victim <= end && ope_in_reg[victim], "Victim should be updated");
         Operand vic = ope_in_reg[victim];
         if (vic->next_use != MAX_LINE || vic->liveness) {
@@ -180,7 +182,8 @@ int ensure(Operand ope)
 
     if (is_const(ope)) {
         emit_asm(li, "%s, %d", reg_s[result], ope->integer); // Jump '#' required by ir
-    } else {
+    }
+    else {
         emit_asm(lw, "%s, %d($sp)  # sp_offset %d addr %d",
                 reg_s[result], sp_offset - ope->address, sp_offset, ope->address);
     }

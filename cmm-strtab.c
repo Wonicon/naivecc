@@ -14,7 +14,8 @@ static size_t strtab_size = 0;
 static size_t strtab_capacity = 0;
 
 
-void init_strtab() {
+void init_strtab()
+{
     strtab = (const char **)calloc(DEFAULT_SIZE, sizeof(char *));
     strtab_capacity = DEFAULT_SIZE;
 }
@@ -24,7 +25,8 @@ void init_strtab() {
 // Store the string in the strtab
 // We assume that the table will never delete entries
 //
-const char *register_str(const char *str) {
+const char *register_str(const char *str)
+{
     for (size_t i = 0; i < strtab_size; i++) {
         if (!strcmp(strtab[i], str)) {
             // Find duplicated string
@@ -32,9 +34,7 @@ const char *register_str(const char *str) {
         }
     }
 
-    if (strtab_size < strtab_capacity) {
-
-    } else {
+    if (strtab_size >= strtab_capacity) {
         // Extend the capacity
         strtab_capacity = strtab_capacity + strtab_capacity / 2;
         strtab = (const char **)realloc(strtab, strtab_capacity * sizeof(char *));
@@ -44,3 +44,4 @@ const char *register_str(const char *str) {
     strtab[strtab_size++] = s;
     return s;
 }
+

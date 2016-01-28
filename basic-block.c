@@ -8,7 +8,8 @@
 #include "operand.h"
 #include <string.h>
 
-void reset_block(Block block[], int nr_block) {
+void reset_block(Block block[], int nr_block)
+{
     memset(block, 0, sizeof(block[0]) * nr_block);
 }
 
@@ -19,7 +20,8 @@ void reset_block(Block block[], int nr_block) {
 //   2. 跳转类指令的目标(就是 Label)
 //   3. 跳转类指令后面的那条指令
 //
-static bool is_leader(IR instr[], int ir_idx) {
+static bool is_leader(IR instr[], int ir_idx)
+{
     return ir_idx == 0 ||
            instr[ir_idx].type == IR_LABEL ||
            instr[ir_idx].type == IR_FUNC ||
@@ -29,7 +31,8 @@ static bool is_leader(IR instr[], int ir_idx) {
 //
 // 划分基本块
 //
-int block_partition(Block block[], IR instr[], int n) {
+int block_partition(Block block[], IR instr[], int n)
+{
     int count = 0;
     for (int i = 0; i < n; i++) {
         if (is_leader(instr, i)) {
@@ -47,7 +50,8 @@ int block_partition(Block block[], IR instr[], int n) {
 }
 
 // 找到需要的LABEL, 返回LABEL所在指令缓冲的下标
-static int find_label(Operand label, IR instr[], int nr_instr) {
+static int find_label(Operand label, IR instr[], int nr_instr)
+{
     if (label == NULL) {
         return nr_instr;
     }
@@ -61,7 +65,8 @@ static int find_label(Operand label, IR instr[], int nr_instr) {
     return nr_instr;
 }
 
-void construct_cfg(Block block[], int nr_block, IR instr[], int nr_instr) {
+void construct_cfg(Block block[], int nr_block, IR instr[], int nr_instr)
+{
     for (int idx_blk = 0; idx_blk < nr_block; idx_blk++) {
         Block *blk = &block[idx_blk];
 
@@ -87,9 +92,11 @@ void construct_cfg(Block block[], int nr_block, IR instr[], int nr_instr) {
         Operand label;
         if (is_branch(ir)) {
             label = ir->rd;
-        } else if (ir->type == IR_JMP) {
+        }
+        else if (ir->type == IR_JMP) {
             label = ir->rs;
-        } else {
+        }
+        else {
             label = NULL;
         }
 
@@ -106,7 +113,8 @@ void construct_cfg(Block block[], int nr_block, IR instr[], int nr_instr) {
     }
 }
 
-void cfg_to_dot(const char *filename, Block block[], int nr_block) {
+void cfg_to_dot(const char *filename, Block block[], int nr_block)
+{
     FILE *fp = fopen(filename, "w");
     fprintf(fp, "digraph cfg {\n");
     for (int i = 0; i < nr_block; i++) {

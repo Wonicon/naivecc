@@ -15,30 +15,31 @@ const char *class_s[] = {
 };
 
 Type _BASIC_INT = {
-        CMM_INT,
-        "int",
-        { NULL },
-        { NULL },
-        { 0 },
-        { 4 },
-        0
+    CMM_INT,
+    "int",
+    { NULL },
+    { NULL },
+    { 0 },
+    { 4 },
+    0
 };
 
 Type _BASIC_FLOAT = {
-        CMM_FLOAT,
-        "float",
-        { NULL },
-        { NULL },
-        { 0 },
-        { 4 },
-        0
+    CMM_FLOAT,
+    "float",
+    { NULL },
+    { NULL },
+    { 0 },
+    { 4 },
+    0
 };
 
 Type *BASIC_INT = &_BASIC_INT;
 Type *BASIC_FLOAT = &_BASIC_FLOAT;
 
 // Constructor
-Type *new_type(CmmType class, const char *name, Type *type, Type *link) {
+Type *new_type(CmmType class, const char *name, Type *type, Type *link)
+{
     Type *this = NEW(Type);
     this->class = class;
     this->name = name;
@@ -49,11 +50,13 @@ Type *new_type(CmmType class, const char *name, Type *type, Type *link) {
     return this;
 }
 
-bool typecmp(const Type *x, const Type *y) {
+bool typecmp(const Type *x, const Type *y)
+{
     // TODO allow void ?
     if (x == y) {  // Allow void
         return true;
-    } else if (x == NULL || y == NULL) {  // void vs others
+    }
+    else if (x == NULL || y == NULL) {  // void vs others
         return true;  // This is error, but NULL is used for undefined variables, return true allow not reporting error recursively.
     }
 
@@ -69,7 +72,8 @@ bool typecmp(const Type *x, const Type *y) {
         LOG("Then we fall into func comparision");
         if (strcmp(x->name, y->name) != 0) {
             return false;
-        } else {
+        }
+        else {
             const Type *param_x = x->param;
             const Type *param_y = y->param;
             while (param_x != NULL && param_y != NULL && typecmp(param_x->base, param_y->base)) {
@@ -80,7 +84,8 @@ bool typecmp(const Type *x, const Type *y) {
             // Compare to the end means all the same
             if (param_x != NULL || param_y != NULL) {
                 return false;
-            } else {
+            }
+            else {
                 // Compare return type
                 // TODO: we don't allow void type now
                 assert(x->ret != NULL && y->ret != NULL);
@@ -126,7 +131,8 @@ bool typecmp(const Type *x, const Type *y) {
 
         if (field_x == NULL && field_y == NULL) {
             return true;  /* The fields' numbers are the same, and the type is the same respectively */
-        } else {
+        }
+        else {
             return false;
         }
 #else  // just the name
@@ -141,7 +147,8 @@ bool typecmp(const Type *x, const Type *y) {
 
 // Find out whether a field belongs to a given structure
 // return the type of that field, NULL if not found
-Type *query_field(Type *target, const char *field_name) {
+Type *query_field(Type *target, const char *field_name)
+{
     assert(target->class == CMM_STRUCT);
     assert(field_name != NULL);
 
@@ -157,7 +164,8 @@ Type *query_field(Type *target, const char *field_name) {
     return NULL;
 }
 
-void _print_type(const Type *type, char *end) {
+void _print_type(const Type *type, char *end)
+{
     const Type *base, *link;
     if (type == NULL) {
         printf("void%s", end);
@@ -220,7 +228,8 @@ void _print_type(const Type *type, char *end) {
     printf("%s", end);
 }
 
-void print_type(const Type *type) {
+void print_type(const Type *type)
+{
     _print_type(type, "\n");
 }
 
@@ -273,3 +282,4 @@ int test_cmm_type()
 
     return 0;
 }
+

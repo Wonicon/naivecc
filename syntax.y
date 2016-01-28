@@ -197,27 +197,19 @@ Args            : Exp COMMA Args  { $1->sibling = $3; $$ = $1; }
 
 %%
 
-
-//
-// if type_code refers to a terminal, then return true(1)
-// else return 0
-//
-int is_terminal(int type_code) {
-    return type_code < YYNTOKENS;
-}
-
-
 //
 // Analyze the parsing tree
 //
-void semantic_analysis() {
+void semantic_analysis()
+{
     analyze_program(prog);
 }
 
 //
 // Release the parsing tree
 //
-void free_ast() {
+void free_ast()
+{
     free_node(prog);
 }
 
@@ -225,7 +217,8 @@ void free_ast() {
 //
 // oeverride of yyerror
 //
-int yyerror(const char *msg) {
+int yyerror(const char *msg)
+{
     is_syn_error = 1;
     if (is_lex_error) {
         is_lex_error = 0;

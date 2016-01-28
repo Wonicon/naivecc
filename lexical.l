@@ -152,7 +152,8 @@ WS [[:blank:]]
 
 %%
 
-int check_oct(char *yytext, int yyleng, int yylineno) {
+int check_oct(char *yytext, int yyleng, int yylineno)
+{
     int i;
     // all zero here is considered oct
     for (i = 0; i < yyleng; i++) {
@@ -166,7 +167,8 @@ int check_oct(char *yytext, int yyleng, int yylineno) {
     return 1;
 }
 
-int check_hex(char *yytext, int yyleng, int yylineno) {
+int check_hex(char *yytext, int yyleng, int yylineno)
+{
     int i;
     // Jump over '0x'
     for (i = 2; i < yyleng; i++) {
@@ -185,7 +187,8 @@ int check_hex(char *yytext, int yyleng, int yylineno) {
 // Param type : the type of the lexeme
 // RETURN     : the type of the lexeme 
 //
-Type lex_handle(Type type) {
+Type lex_handle(Type type)
+{
     // Currently FLOAT is the first token defined in syntax.y
     // In lexical phase we don't pay attention to non-terminals
     yylval.nd = new_node();
@@ -195,7 +198,8 @@ Type lex_handle(Type type) {
     return type;
 }
 
-void ErrorMsg(char *desc, char *lexeme, int lineno) {
+void ErrorMsg(char *desc, char *lexeme, int lineno)
+{
     printf("Error type A at Line %d: %s '%s'\n", lineno, desc, lexeme);
 }
 

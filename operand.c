@@ -22,7 +22,8 @@ bool is_always_live(Operand ope)
 }
 
 // 操作数构造函数
-Operand new_operand(Ope_Type type) {
+Operand new_operand(Ope_Type type)
+{
     static int nr_ope = 0;  // Use uniform encoding for operands
     static int nr_label = 0;
 
@@ -68,12 +69,14 @@ Operand new_operand(Ope_Type type) {
 // 打印操作数, 为了变量和标签工厂函数可以简单实现, 以及方便比较,
 // 变量和标签都存储为整型, 在打印操作数的时候加上统一前缀变成合法的变量名
 // NOP指令答应为空字符串, 希望将来可以自动过滤.
-const char *print_operand(Operand ope) {
+const char *print_operand(Operand ope)
+{
     static char str[NAME_LEN];
 
     if (ope == NULL) {
         sprintf(str, "%s", "");
-    } else {
+    }
+    else {
         switch (ope->type) {
             case OPE_VAR:
                 sprintf(str, "v%d", ope->index);
@@ -128,7 +131,8 @@ bool is_tmp(Operand ope)
 {
     if (ope == NULL) {
         return false;
-    } else {
+    }
+    else {
         return ope->type == OPE_ADDR || ope->type == OPE_TEMP;
     }
 }
@@ -188,14 +192,17 @@ Operand get_neg(Operand ope)
         Operand p = new_operand(ope->type);
         if (ope->type == OPE_INTEGER) {
             p->integer = -ope->integer;
-        } else if (ope->type == OPE_FLOAT) {
+        }
+        else if (ope->type == OPE_FLOAT) {
             p->real = -ope->real;
-        } else {
+        }
+        else {
             LOG("Error");
             assert(0);
         }
         return p;
-    } else {
+    }
+    else {
         LOG("Not const");
         assert(0);
     }
@@ -205,14 +212,16 @@ bool cmp_operand(Operand first, Operand second)
 {
     if (first == second) {
         return true;
-    } else if (is_const(first) && is_const(second) && first->type == second->type) {
+    }
+    else if (is_const(first) && is_const(second) && first->type == second->type) {
         switch (first->type) {
             case OPE_INTEGER: return first->integer == second->integer;
             case OPE_FLOAT: return first->real == second->real;
             default: PANIC("Unexpected");
         }
         return false;
-    } else {
+    }
+    else {
         return false;
     }
 }

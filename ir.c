@@ -1,7 +1,3 @@
-//
-// Created by whz on 15-11-20.
-//
-
 #include "ir.h"
 #include "operand.h"
 #include "basic-block.h"
@@ -12,7 +8,9 @@
 #include <string.h>
 #include <assert.h>
 
+
 extern FILE *asm_file;  // Stream to store assembly code.
+
 
 #ifdef INLINE_REPLACE
 bool inline_deref = true;
@@ -59,7 +57,8 @@ extern int dagnode_count;
 // 中间代码构造函数
 // 返回 IR 在缓冲区中的下标
 //
-void new_instr_(IR *pIR, IR_Type type, Operand rs, Operand rt, Operand rd) {
+void new_instr_(IR *pIR, IR_Type type, Operand rs, Operand rt, Operand rd)
+{
     assert(nr_instr < MAX_LINE);
 
     pIR->type = type;
@@ -68,7 +67,8 @@ void new_instr_(IR *pIR, IR_Type type, Operand rs, Operand rt, Operand rd) {
     pIR->rd = rd;
 }
 
-int new_instr(IR_Type type, Operand rs, Operand rt, Operand rd) {
+int new_instr(IR_Type type, Operand rs, Operand rt, Operand rd)
+{
     new_instr_(&instr_buffer[nr_instr], type, rs, rt, rd);
     return nr_instr++;
 }
@@ -104,7 +104,8 @@ static const char *ir_format[] = {
 //
 // 单条指令打印函数
 //
-const char *ir_to_s(IR *pir) {
+const char *ir_to_s(IR *pir)
+{
     static char buf[120];
     strcpy(rd_s, print_operand(pir->rd));
     strcpy(rs_s, print_operand(pir->rs));
@@ -113,16 +114,19 @@ const char *ir_to_s(IR *pir) {
     // 约定 BEQ 和 BNE 包围所有 Branch 指令
     if (IR_BEQ <= pir->type && pir->type <= IR_BNE) {
         sprintf(buf, ir_format[pir->type], rs_s, rt_s, rd_s);  // 交换顺序
-    } else if (pir->type == IR_DEC) {  // 规划干不过特例
+    }
+    else if (pir->type == IR_DEC) {  // 规划干不过特例
         sprintf(buf, ir_format[pir->type], rd_s, rs_s, rt_s + 1);
-    } else {
+    }
+    else {
         sprintf(buf, ir_format[pir->type], rd_s, rs_s, rt_s);
     }
 
     return buf;
 }
 
-void print_single_instr(IR instr, FILE *file) {
+void print_single_instr(IR instr, FILE *file)
+{
     fprintf(file, "%s", ir_to_s(&instr));
 
     if (instr.type != IR_NOP) {
@@ -157,7 +161,8 @@ int in_func_check(IR buf[], int index, int n)
         curr = &buf[index];
         curr->rs->size = 0;
         param_size = 0;
-    } else if (type != IR_PARAM) {
+    }
+    else if (type != IR_PARAM) {
         for (int i = 0; i < 3; i++) {
             Operand ope = buf[index].operand[i];
             if (ope == NULL) {
@@ -165,19 +170,19 @@ int in_func_check(IR buf[], int index, int n)
             }
 
             switch (ope->type) {
-            case OPE_VAR:
-            case OPE_REF:
-            case OPE_TEMP:
-            case OPE_BOOL:
-            case OPE_ADDR:
-                if (!exists[ope->index]) {
-                    curr->rs->size += ope->size;
-                    ope->address = curr->rs->size;  // Calc afterwards because the stack grows from high to low
-                    exists[ope->index] = true;
-                }
-                break;
-            default:
-                ;
+                case OPE_VAR:
+                case OPE_REF:
+                case OPE_TEMP:
+                case OPE_BOOL:
+                case OPE_ADDR:
+                    if (!exists[ope->index]) {
+                        curr->rs->size += ope->size;
+                        ope->address = curr->rs->size;  // Calc afterwards because the stack grows from high to low
+                        exists[ope->index] = true;
+                    }
+                    break;
+                default:
+                    ;
             }
         }
 
@@ -186,7 +191,8 @@ int in_func_check(IR buf[], int index, int n)
         if (type == IR_CALL || type == IR_READ || type == IR_WRITE) {
             curr->rs->has_subroutine = true;
         }
-    } else {
+    }
+    else {
         curr->rs->nr_arg++;
         buf[index].rs->is_param = true;
         buf[index].rs->address = - param_size;
@@ -206,7 +212,8 @@ void optimize_in_block();
 void inline_replace(IR buf[], int nr);
 int compress_ir(IR buf[], int n);
 
-void print_instr(FILE *file) {
+void print_instr(FILE *file)
+{
     // 相当于窥孔优化
     preprocess_ir();
 
@@ -286,10 +293,12 @@ void print_instr(FILE *file) {
         if (can_jump(instr_buffer + j)) {
             push_all();  // jump instr just load data, they don't change data.
             gen_asm(instr_buffer + j);
-        } else if (instr_buffer[j].type != IR_RET) {
+        }
+        else if (instr_buffer[j].type != IR_RET) {
             gen_asm(instr_buffer + j);  // May change variables
             push_all();
-        } else {
+        }
+        else {
             gen_asm(instr_buffer + j);  // Local variables do not need to store when return
         }
 
@@ -311,7 +320,8 @@ typedef enum {
 //
 // 替换操作数, 返回替换数量
 //
-int replace_operand(Operand newbie, Operand old, RepOpeMode mode) {
+int replace_operand(Operand newbie, Operand old, RepOpeMode mode)
+{
     int rep_count = 0;
     for (int i = 0; i < nr_instr; i++) {
         IR *pIR = &instr_buffer[i];
@@ -338,24 +348,28 @@ int replace_operand(Operand newbie, Operand old, RepOpeMode mode) {
 //
 // 全局替换操作数
 //
-int replace_operand_global(Operand newbie, Operand old) {
+int replace_operand_global(Operand newbie, Operand old)
+{
     return replace_operand(newbie, old, REP_SRC | REP_DST | REP_BLK);
 }
 
 //
 // 检查是否为分支类指令
 //
-int is_branch(IR *pIR) {
+int is_branch(IR *pIR)
+{
     return IR_BEQ <= pIR->type && pIR->type <= IR_BNE;
 }
 
 //
 // 检查是否为跳转类指令
 //
-bool can_jump(IR *pIR) {
+bool can_jump(IR *pIR)
+{
     if (is_branch(pIR)) {
         return true;
-    } else {
+    }
+    else {
         switch (pIR->type) {
             case IR_JMP:
                 return true;
@@ -391,7 +405,8 @@ search_relop_common(get_relop_anti, anti, IR_Type, OPE_NOT_USED)
         return IR_NOP;
     }
 
-void deref_label(IR *pIR) {
+void deref_label(IR *pIR)
+{
     assert(pIR->type == IR_LABEL);
     pIR->rs->label_ref_cnt--;
     if (pIR->rs->label_ref_cnt == 0) {
@@ -404,7 +419,8 @@ void deref_label(IR *pIR) {
 //
 // 压缩指令, 删除NOP
 //
-int compress_ir(IR instr[], int n) {
+int compress_ir(IR instr[], int n)
+{
     int slow = 0;
     for (int fast = 0; fast < n; fast++) {
         if (instr[fast].type != IR_NOP) {
@@ -417,14 +433,16 @@ int compress_ir(IR instr[], int n) {
 //
 // 预处理 IR
 //
-void preprocess_ir() {
+void preprocess_ir()
+{
     IR *pIR = &instr_buffer[0];
 
     // Label 的引用计数
     for (int i = 0; i < nr_instr; i++) {
         if (is_branch(pIR)) {
             pIR->rd->label_ref_cnt++;
-        } else if (pIR->type == IR_JMP) {
+        }
+        else if (pIR->type == IR_JMP) {
             pIR->rs->label_ref_cnt++;
         }
         pIR++;
@@ -442,7 +460,8 @@ void preprocess_ir() {
             deref_label(pIR + 2);
             pIR->rd = (pIR + 1)->rs;
             (pIR + 1)->type = IR_NOP;
-        } else if (pIR->type == IR_JMP &&
+        }
+        else if (pIR->type == IR_JMP &&
                 (pIR + 1)->type == IR_LABEL &&
                 (pIR + 1)->rs == pIR->rs) {
             // goto 后面就是对应的 label
@@ -458,9 +477,11 @@ void preprocess_ir() {
     for (int i = 0; i < nr_instr; i++) {
         if (pIR->type == IR_LABEL && preLabel == NULL) {
             preLabel = pIR;
-        } else if (pIR->type != IR_LABEL) {
+        }
+        else if (pIR->type != IR_LABEL) {
             preLabel = NULL;
-        } else {
+        }
+        else {
             // 连续 Label
             preLabel->rs->label_ref_cnt += pIR->rs->label_ref_cnt;
             replace_operand_global(preLabel->rs, pIR->rs);
@@ -510,7 +531,8 @@ void preprocess_ir() {
 // end 不可取
 //
 
-void optimize_liveness(int start, int end) {
+void optimize_liveness(int start, int end)
+{
     // Init
     for (int i = end - 1; i >= start; i--) {
         IR *ir = &instr_buffer[i];
@@ -524,7 +546,8 @@ void optimize_liveness(int start, int end) {
 
             if (ope->type == OPE_VAR || ope->type == OPE_BOOL) {
                 ope->liveness = ALIVE;
-            } else {
+            }
+            else {
                 ope->liveness = DISALIVE;
             }
 
@@ -558,7 +581,8 @@ void optimize_liveness(int start, int end) {
     }
 }
 
-static void gen_dag_from_instr(IR *pIR) {
+static void gen_dag_from_instr(IR *pIR)
+{
     LOG("转换: %s", ir_to_s(pIR));
 
     Operand rs = pIR->rs;
@@ -590,13 +614,16 @@ static void gen_dag_from_instr(IR *pIR) {
             if (is_always_live(rd) && is_tmp(rs) && rs->dep->op == IR_DEREF_R) {
                 rd->dep = new_dagnode(rs->dep->op, rs->dep->left, rs->dep->right);  // 右解引用不会被当做公共子表达式
                 TEST(0, "我就看看");
-            } else {
+            }
+            else {
                 rd->dep = rs->dep;
             }
-        } else {
+        }
+        else {
             if (pIR->type == IR_CALL || pIR->type == IR_READ) {
                 rd->dep = new_dagnode(pIR->type, rs ? rs->dep : NULL, rt ? rt->dep : NULL);
-            } else {
+            }
+            else {
                 rd->dep = query_dag_node(pIR->type, rs ? rs->dep : NULL, rt ? rt->dep : NULL);
                 if (is_always_live(rd) && query_operand_depending_on(rd->dep) && rd->dep->op == IR_DEREF_R) {
                     WARN("夭寿, 依赖到了将被替换的变量(%s)的解引用", print_operand(rd->dep->embody));
@@ -609,7 +636,8 @@ static void gen_dag_from_instr(IR *pIR) {
         if (is_always_live(rd) || pIR->type == IR_CALL || pIR->type == IR_READ) {
             rd->dep->ref_count++;
         }
-    } else {
+    }
+    else {
         // 没有目标操作数的指令必须被生成
         pIR->depend = new_dagnode(pIR->type, rs ? rs->dep : NULL, rt ? rt->dep : NULL);
         if (can_jump(pIR)) {
@@ -621,14 +649,16 @@ static void gen_dag_from_instr(IR *pIR) {
     }
 }
 
-void gen_dag(IR buf[], int start, int end) {
+void gen_dag(IR buf[], int start, int end)
+{
     init_dag();
     for (int i = start; i < end; i++) {
         gen_dag_from_instr(&buf[i]);
     }
 }
 
-int new_dag_ir(IR_Type type, Operand rs, Operand rt, Operand rd) {
+int new_dag_ir(IR_Type type, Operand rs, Operand rt, Operand rd)
+{
     new_instr_(&ir_from_dag[nr_ir_from_dag], type, rs, rt, rd);
     return nr_ir_from_dag++;
 }
@@ -637,7 +667,8 @@ int new_dag_ir(IR_Type type, Operand rs, Operand rt, Operand rd) {
 // 将 a := *b 和 a := &b 内联到指令中
 // 这会破坏操作数的依赖, 所以必须放到所有优化(包括多趟)之后
 //
-void log_ir(IR buf[], int start, int end) {
+void log_ir(IR buf[], int start, int end)
+{
 #ifndef DEBUG
     return;
 #else
@@ -649,7 +680,8 @@ void log_ir(IR buf[], int start, int end) {
 #endif
 }
 
-void inline_replace(IR buf[], int nr) {
+void inline_replace(IR buf[], int nr)
+{
     for (int i = 0; i < nr; i++) {
         IR *pir = &buf[i];
         if (pir->rd && is_always_live(pir->rd)) {  // 变量不能被修改!
@@ -660,14 +692,17 @@ void inline_replace(IR buf[], int nr) {
             pir->type = IR_NOP;
             if (pir->rs->type == OPE_ADDR) {
                 pir->rd->type = OPE_DEREF;
-            } else if (pir->rs->type == OPE_REFADDR) {
+            }
+            else if (pir->rs->type == OPE_REFADDR) {
                 pir->rd->type = OPE_REF;
-            } else {
+            }
+            else {
                 PANIC("右解引用的操作数不是地址");
             }
             pir->rd->index = pir->rs->index;
             log_ir(buf, i, nr);
-        } else if (pir->type == IR_ADDR) {
+        }
+        else if (pir->type == IR_ADDR) {
             LOG("发现取地址 %s", ir_to_s(pir));
             pir->type = IR_NOP;
             pir->rd->type = OPE_REFADDR;
@@ -689,7 +724,8 @@ void inline_replace(IR buf[], int nr) {
             pir->rd->index = pir->rs->index;
             pir->rs = pir->rt;
             pir->rt = NULL;
-        } else if (pir->rs && pir->rs->type == OPE_REFADDR && pir->type == IR_DEREF_R) {
+        }
+        else if (pir->rs && pir->rs->type == OPE_REFADDR && pir->type == IR_DEREF_R) {
             LOG("HIT DEREF_R");
             log_ir(buf, i, i + 1);
             TEST(pir->rt == NULL, "DEREF_L没有第二个操作数");
@@ -702,7 +738,8 @@ void inline_replace(IR buf[], int nr) {
     }
 }
 
-Operand gen_single_instr_from_dag(pDagNode dag) {
+Operand gen_single_instr_from_dag(pDagNode dag)
+{
     if (dag == NULL) {
         return NULL;
     }
@@ -710,20 +747,21 @@ Operand gen_single_instr_from_dag(pDagNode dag) {
     if (dag->type == DAG_LEAF) {
         Operand old_init = dag->initial_value;
         Operand current = query_operand_depending_on(dag);
-        //if (old_init != current && current !=) {
         if (old_init != current) {
             LOG("原操作数%s已经不保有其初始值", print_operand(old_init));
             if (current == NULL) {
                 WARN("预期外的空指针初始值操作数, 检查是否出现了自赋值");
                 current = old_init;
-            } else {
+            }
+            else {
                 LOG("用保存了初始值的%s代替", print_operand(current));
             }
 
             dag->initial_value = current;
         }
         return old_init;  // 叶结点用于返回初始值
-    } else if (dag->type == DAG_OP && !dag->has_gen) {
+    }
+    else if (dag->type == DAG_OP && !dag->has_gen) {
         dag->embody = query_operand_depending_on(dag);
         if (dag->embody == NULL && (dag->op == IR_ADD || dag->op == IR_MUL || dag->op == IR_SUB || dag->op == IR_DIV)) {
             WARN("FUCK");
@@ -733,20 +771,23 @@ Operand gen_single_instr_from_dag(pDagNode dag) {
         new_dag_ir(dag->op, gen_single_instr_from_dag(dag->left), gen_single_instr_from_dag(dag->right), dag->embody);
         dag->has_gen = 1;  // 防止重复生成
         return dag->embody;  // 使用统一的代表操作数, 提供后续优化机会
-    } else {
+    }
+    else {
         dag->embody = query_operand_depending_on(dag);
         return dag->embody;
     }
 }
 
-void gen_instr_from_dag(int start, int end) {
+void gen_instr_from_dag(int start, int end)
+{
     for (int i = start; i < end; i++) {
         IR *p = &instr_buffer[i];
         if (p->depend->ref_count > 0 || p->type == IR_CALL || p->type == IR_READ) {
             pDagNode dag;
             if (p->rd && (p->type != IR_CALL && p->type != IR_READ)) {
                 dag = query_dagnode_depended_on(p->rd);
-            } else {
+            }
+            else {
                 dag = p->depend;
                 if (!query_operand_depending_on(dag) && p->rd) {
                     add_depend(p->depend, p->rd);
@@ -758,7 +799,8 @@ void gen_instr_from_dag(int start, int end) {
                 if (p->depend != query_dagnode_depended_on(p->rd)) {
                     LOG("引用已经改变, 不生成: %s", ir_to_s(&ir_from_dag[nr_ir_from_dag - 1]));
                     nr_ir_from_dag--;
-                } else {
+                }
+                else {
                     LOG("弥补变量赋值 No.%d : %s", nr_ir_from_dag, ir_to_s(&ir_from_dag[nr_ir_from_dag - 1]));
                 }
             }
@@ -779,7 +821,8 @@ void gen_instr_from_dag(int start, int end) {
 //
 // 打印基本块
 //
-void optimize_in_block() {
+void optimize_in_block()
+{
     nr_blk = block_partition(blk_buf, instr_buffer, nr_instr);
     for (int i = 0; i < nr_blk; i++) {
         int beg = blk_buf[i].start;

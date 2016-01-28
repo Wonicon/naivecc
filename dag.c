@@ -23,7 +23,8 @@ typedef struct DependPair {
 DependPair depend_buf[DEP_SIZE];
 int depend_count = 0;
 
-void init_dag() {
+void init_dag()
+{
     dagnode_count = 0;
     depend_count = 0;
 }
@@ -78,7 +79,8 @@ void delete_depend(Operand operand)
 }
 
 // 查询依赖的operand
-Operand query_operand_depending_on(pDagNode dagnode) {
+Operand query_operand_depending_on(pDagNode dagnode)
+{
     if (dagnode == NULL) {
         WARN("查询空DAG结点");
     }
@@ -107,7 +109,8 @@ pDagNode query_dagnode_depended_on(Operand operand)
     return NULL;
 }
 
-pDagNode new_leaf(Operand ope) {
+pDagNode new_leaf(Operand ope)
+{
     pDagNode p = query_dagnode_depended_on(ope);
     if (p == NULL) {
         TEST(dagnode_count < MAX, "DAG超限");
@@ -119,7 +122,8 @@ pDagNode new_leaf(Operand ope) {
     return p;
 }
 
-pDagNode new_dagnode(IR_Type ir_type, pDagNode left, pDagNode right) {
+pDagNode new_dagnode(IR_Type ir_type, pDagNode left, pDagNode right)
+{
     TEST(dagnode_count < MAX, "DAG超限");
     pDagNode p = &dag_buf[dagnode_count++];
     memset(p, 0, sizeof(*p));
@@ -135,7 +139,8 @@ int cmp_dag_node(pDagNode first, pDagNode second)
     if (first == NULL && second == NULL) {
         WARN("比较了两个全空的DAG结点, 检查下上文");
         return true;
-    } else if (first == NULL || second == NULL) {
+    }
+    else if (first == NULL || second == NULL) {
         return false;
     }
 
@@ -173,7 +178,8 @@ int cmp_dag_node(pDagNode first, pDagNode second)
 
         return false;
 
-    } else if (first->type== DAG_LEAF) {
+    }
+    else if (first->type== DAG_LEAF) {
         return cmp_operand(first->initial_value, second->initial_value);
     }
     return false;
@@ -244,12 +250,15 @@ bool exchangable(IR_Type op)
     return op == IR_ADD || op == IR_MUL;
 }
 
-bool check_counter(IR_Type op, pDagNode left, pDagNode right) {
+bool check_counter(IR_Type op, pDagNode left, pDagNode right)
+{
     if (op == IR_ADD && left->op == op && right->op == IR_SUB && cmp_dag_node(left->right, right->right)) {
         return true;
-    } else if (op == IR_MUL && left->op == op && right->op == IR_DIV && cmp_dag_node(left->right, right->right)) {
+    }
+    else if (op == IR_MUL && left->op == op && right->op == IR_DIV && cmp_dag_node(left->right, right->right)) {
         return true;
-    } else {
+    }
+    else {
         return false;
     }
 }
@@ -283,14 +292,16 @@ pDagNode const_associativity(IR_Type op, pDagNode left, pDagNode right)
 
     if (left == NULL || right == NULL || IR_ADD > op || op > IR_DIV) {
         return NULL;
-    } else if (is_const_dag_node(left) && is_const_dag_node(right)) {
+    }
+    else if (is_const_dag_node(left) && is_const_dag_node(right)) {
         LOG("左右皆为常量");
         Operand result = calc_const(op, left->initial_value, right->initial_value);
         dagnode_count--;  // 删除刚才生成的表达式结点
         pDagNode leaf = new_leaf(result);
         add_depend(leaf, result);
         return leaf;
-    } else if (is_const_dag_node(left) && is_same_op_level(op, right->op)) {
+    }
+    else if (is_const_dag_node(left) && is_same_op_level(op, right->op)) {
         if (!is_tmp(right->embody)) {
             LOG("不能折叠非临时变量");
             return NULL;
@@ -308,7 +319,8 @@ pDagNode const_associativity(IR_Type op, pDagNode left, pDagNode right)
             pDagNode leaf = new_leaf(const_rst);
             add_depend(leaf, const_rst);
             return new_dagnode(top_op[OFF(lop)][OFF(rop)], leaf, right->right);  // 第二个操作符为取消结合后的, 同样适用上表.
-        } else if (is_const_dag_node(right->right)) {
+        }
+        else if (is_const_dag_node(right->right)) {
             LOG("C1 op1 (V op2 C2) -> C1 op1 V op3 C2 -> (C1 op3 C2) op1 V");
             Operand rrope = right->right->initial_value;  // 可以确认右结点的右结点可以拿出Operand
             Operand const_rst = calc_const(top_op[OFF(lop)][OFF(rop)], lope, rrope);  // 获得取消结合后的操作符, 并且移动到前面
@@ -316,11 +328,13 @@ pDagNode const_associativity(IR_Type op, pDagNode left, pDagNode right)
             pDagNode leaf = new_leaf(const_rst);
             add_depend(leaf, const_rst);
             return new_dagnode(lop, leaf, right->left);  // 操作符不需要处理
-        } else {
+        }
+        else {
             LOG("左边是常量, 右边没有常量, 无法结合");
             return NULL;
         }
-    } else if (is_const_dag_node(right) && is_same_op_level(op, left->op)) {
+    }
+    else if (is_const_dag_node(right) && is_same_op_level(op, left->op)) {
         if (!is_tmp(left->embody)) {
             LOG("不能折叠非临时变量");
             return NULL;
@@ -340,7 +354,8 @@ pDagNode const_associativity(IR_Type op, pDagNode left, pDagNode right)
             pDagNode leaf = new_leaf(const_rst);
             add_depend(leaf, const_rst);
             return new_dagnode(lop, leaf, left->right);
-        } else if (is_const_dag_node(left->right)) {
+        }
+        else if (is_const_dag_node(left->right)) {
             LOG("(V op1 C1) op2 C2 -> V op1 (C1 op3 C2)");
             Operand lrope = left->right->initial_value;
             Operand const_rst = calc_const(top_op[OFF(lop)][OFF(rop)], lrope, rope);
@@ -348,23 +363,28 @@ pDagNode const_associativity(IR_Type op, pDagNode left, pDagNode right)
             pDagNode leaf = new_leaf(const_rst);
             add_depend(leaf, const_rst);
             return new_dagnode(lop, left->left, leaf);
-        } else {
+        }
+        else {
             LOG("右边是常量, 左边没有常量, 无法结合");
             return NULL;
         }
-    } else {
+    }
+    else {
         if (exchangable(op) && (check_counter(op, left, right) || check_counter(op, right, left))) {
             LOG("(A op B) op (C anti B) -> A op C");
             dagnode_count--;  // 删除刚才生成的表达式结点
             return new_dagnode(op, left->left, right->left);
-        } else if (is_same_op_level(op, IR_ADD) && is_anti_op(op, left->op) && cmp_dag_node(right, left->right)) {
+        }
+        else if (is_same_op_level(op, IR_ADD) && is_anti_op(op, left->op) && cmp_dag_node(right, left->right)) {
             LOG("(A op B) anti B -> A");
             return left->left;
-        } else if (is_same_op_level(op, IR_ADD) && is_anti_op(op, right->op) && cmp_dag_node(left, right->right)) {
+        }
+        else if (is_same_op_level(op, IR_ADD) && is_anti_op(op, right->op) && cmp_dag_node(left, right->right)) {
             LOG("A op (B anti A) -> B");
             dagnode_count--;  // 删除刚才生成的表达式结点
             return right->left;
-        } else if (is_const_dag_node(left->right) && is_const_dag_node(right->right) &&
+        }
+        else if (is_const_dag_node(left->right) && is_const_dag_node(right->right) &&
                    is_same_op_level(op, left->op) && is_same_op_level(op, right->op)) {
             LOG("(A op1 C1) op2 (B op3 C2) -> (A op2 B) op1 C3");
             dagnode_count--;  // 删除刚才生成的表达式结点
@@ -395,25 +415,29 @@ pDagNode const_associativity(IR_Type op, pDagNode left, pDagNode right)
                 v->embody = new_operand(OPE_TEMP);
                 add_depend(v, v->embody);
                 return new_dagnode(high_level_op, v, lr);
-            } else if (mul && cmp_dag_node(ll, rl)) {
+            }
+            else if (mul && cmp_dag_node(ll, rl)) {
                 dagnode_count--;  // 删除刚才生成的表达式结点
                 pDagNode v = query_dag_node(op, lr, rr);
                 v->embody = new_operand(OPE_TEMP);
                 add_depend(v, v->embody);
                 return new_dagnode(high_level_op, v, ll);
-            } else if (mul && cmp_dag_node(lr, rl)) {
+            }
+            else if (mul && cmp_dag_node(lr, rl)) {
                 dagnode_count--;  // 删除刚才生成的表达式结点
                 pDagNode v = query_dag_node(op, ll, rr);
                 v->embody = new_operand(OPE_TEMP);
                 add_depend(v, v->embody);
                 return new_dagnode(high_level_op, v, lr);
-            } else if (mul && cmp_dag_node(ll, rr)) {
+            }
+            else if (mul && cmp_dag_node(ll, rr)) {
                 dagnode_count--;  // 删除刚才生成的表达式结点
                 pDagNode v = query_dag_node(op, lr, rl);
                 v->embody = new_operand(OPE_TEMP);
                 add_depend(v, v->embody);
                 return new_dagnode(high_level_op, v, ll);
-            } else {
+            }
+            else {
                 LOG("无法结合");
             }
         }
@@ -423,7 +447,8 @@ pDagNode const_associativity(IR_Type op, pDagNode left, pDagNode right)
 #undef OFF
 }
 
-pDagNode erase_identity(IR_Type op, pDagNode left, pDagNode right) {
+pDagNode erase_identity(IR_Type op, pDagNode left, pDagNode right)
+{
     // 模式匹配模板 单位元发现
 #define INT_IDENTITY_CHECK(x, y) (x->type == OPE_INTEGER && x->integer == y)
 #define FLOAT_IDENTITY_CHECK(x, y) (x->type == OPE_FLOAT && abs(x->real - y) < 1e-10)

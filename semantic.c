@@ -238,7 +238,8 @@ static void spec_is_struct(Node spec)
 }
 
 
-static void var_is_spec_vardec(Node paramdec) {
+static void var_is_spec_vardec(Node paramdec)
+{
     Node spec = paramdec->child;
     Node vardec = spec->sibling;
 
@@ -259,7 +260,8 @@ static void var_is_spec_vardec(Node paramdec) {
 
 // Then we should link the paramdec's type up to form a param type list.
 // varlist should return a type of CmmParam, and the generation of CmmParam occurs here.
-static Type *get_params(Node var) {
+static Type *get_params(Node var)
+{
     if (var == NULL) {
         return NULL;
     }
@@ -405,7 +407,8 @@ static void exp_is_exp_idx(Node exp)
 }
 
 
-static void check_param_list(Type *param, Node arg, int lineno) {
+static void check_param_list(Type *param, Node arg, int lineno)
+{
     while (param != NULL && arg != NULL) {
         sema_visit(arg);
         Type *param_type = arg->sema.type;

@@ -6,7 +6,8 @@
 #define SIZE 0x3fff
 static sym_ent_t *symtab[SIZE] = { 0 };
 
-unsigned int hash(const char *name) {
+unsigned int hash(const char *name)
+{
     unsigned int val = 0, i;
     for (; *name; ++name) {
         val = (val << 2) + *name;
@@ -18,7 +19,8 @@ unsigned int hash(const char *name) {
     return val;
 }
 
-int insert(const char *sym, Type *type, int line, int scope) {
+int insert(const char *sym, Type *type, int line, int scope)
+{
     assert(sym != NULL);
     assert(type != NULL);
 
@@ -33,7 +35,8 @@ int insert(const char *sym, Type *type, int line, int scope) {
         if (!strcmp(sym, symtab[index]->symbol)) {
             LOG("To insert %s: collision detected at slot %d, list %d", sym, index, listno);
             return -1;
-        } else {
+        }
+        else {
             LOG("Unfortunately, slot %d's list has '%s'", index, dest->symbol);
             pre = dest;
             dest = dest->link;
@@ -46,7 +49,8 @@ int insert(const char *sym, Type *type, int line, int scope) {
         assert(dest == symtab[index]);
         dest = symtab[index] = NEW(sym_ent_t);
         memset(dest, 0, sizeof(*dest));
-    } else {
+    }
+    else {
         dest = pre->link = NEW(sym_ent_t);
         memset(dest, 0, sizeof(*dest));
     }  // NOTE we should modify the pointer stored in the hash table, but not only `dest'
@@ -59,7 +63,8 @@ int insert(const char *sym, Type *type, int line, int scope) {
     return 1;
 }
 
-sym_ent_t *query(const char *sym, int scope) {
+sym_ent_t *query(const char *sym, int scope)
+{
     assert(sym);
     unsigned int index = hash(sym);
     sym_ent_t *scanner = symtab[index];
@@ -75,7 +80,8 @@ sym_ent_t *query(const char *sym, int scope) {
             LOG("To query %s: collision detected at slot %d, list %d", sym, index, listno);
             // TODO: check scope
             return scanner;
-        } else {
+        }
+        else {
             listno++;
             scanner = scanner->link;
         }
@@ -84,7 +90,8 @@ sym_ent_t *query(const char *sym, int scope) {
     return NULL;
 }
 
-void print_symtab() {
+void print_symtab()
+{
     for (int i = 0; i < SIZE; i++) {
         if (symtab[i] == NULL) {
             continue;
@@ -98,3 +105,4 @@ void print_symtab() {
         }
     }
 }
+
