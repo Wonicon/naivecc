@@ -28,70 +28,65 @@ static enum yytokentype node(enum yytokentype type, enum ProductionTag tag);
 static int check_oct(char *yytext, int yyleng, int yylineno);
 static int check_hex(char *yytext, int yyleng, int yylineno);
 %}
+%start COMMENT
 digit [0-9]
 letter [a-zA-Z]
-
 %%
-
-"=" return sym(ASSIGNOP);
-"," return sym(COMMA);
-";" return sym(SEMI);
-"." return sym(DOT);
-"(" return sym(LP);
-")" return sym(RP);
-"[" return sym(LB);
-"]" return sym(RB);
-"{" return sym(LC);
-"}" return sym(RC);
-"if" return sym(IF);
-"else" return sym(ELSE);
-"while" return sym(WHILE);
-"struct" return sym(STRUCT);
-"return" return sym(RETURN);
-
-"+" return op(PLUS);
-"-" return op(MINUS);
-"*" return op(STAR);
-"/" return op(DIV);
-"!" return op(NOT);
-"||" return op(OR);
-"&&" return op(AND);
->|<|>=|<=|==|!= return op(RELOP);
-
-"int"|"float" return node(TYPE, TERM_ID);
-({letter}|_)({letter}|{digit}|_)* return node(ID, TERM_ID);
-
-[0-9]+\.[0-9]+ {
+<INITIAL>"=" return sym(ASSIGNOP);
+<INITIAL>"," return sym(COMMA);
+<INITIAL>";" return sym(SEMI);
+<INITIAL>"." return sym(DOT);
+<INITIAL>"(" return sym(LP);
+<INITIAL>")" return sym(RP);
+<INITIAL>"[" return sym(LB);
+<INITIAL>"]" return sym(RB);
+<INITIAL>"{" return sym(LC);
+<INITIAL>"}" return sym(RC);
+<INITIAL>"if" return sym(IF);
+<INITIAL>"else" return sym(ELSE);
+<INITIAL>"while" return sym(WHILE);
+<INITIAL>"struct" return sym(STRUCT);
+<INITIAL>"return" return sym(RETURN);
+<INITIAL>"+" return op(PLUS);
+<INITIAL>"-" return op(MINUS);
+<INITIAL>"*" return op(STAR);
+<INITIAL>"/" return op(DIV);
+<INITIAL>"!" return op(NOT);
+<INITIAL>"||" return op(OR);
+<INITIAL>"&&" return op(AND);
+<INITIAL>>|<|>=|<=|==|!= return op(RELOP);
+<INITIAL>"int"|"float" return node(TYPE, TERM_ID);
+<INITIAL>({letter}|_)({letter}|{digit}|_)* return node(ID, TERM_ID);
+<INITIAL>[0-9]+\.[0-9]+ {
     yylval.nd = new_node();
     yylval.nd->lineno = yylineno;
     yylval.nd->tag = TERM_FLOAT;
     yylval.nd->val.f = atof(yytext);
     return FLOAT;
 }
-
-0(x|X)({digit}|{letter})+ {
+<INITIAL>0(x|X)({digit}|{letter})+ {
     if (!check_hex(yytext, yyleng, yylineno)) {
         is_syn_error = 1;
     }
     return num(16);
 }
-0[0-9]+ {
+<INITIAL>0[0-9]+ {
     if (!check_oct(yytext, yyleng, yylineno)) {
         is_syn_error = 1;
     }
     return num(8);
 }
-0|[1-9][0-9]* return num(10);
-
-"\n" yycolumn = 1;
-[[:blank:]] ;
-. {
+<INITIAL>0|[1-9][0-9]* return num(10);
+<INITIAL>"//" { BEGIN COMMENT; }
+<INITIAL>"\n" yycolumn = 1;
+<INITIAL>[[:blank:]] ;
+<INITIAL>. {
     ErrorMsg("Mysterious character", yytext, yylineno);
     is_syn_error = 1;
 }
-
+<COMMENT>. ;
+<COMMENT>"\n" { BEGIN INITIAL; }
 %%
-
 static enum yytokentype num(int radix)
 {
     yylval.nd = new_node(INT - FLOAT + 3);
