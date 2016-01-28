@@ -394,7 +394,7 @@ bool can_jump(IR *pIR)
 
 search_relop_common(get_relop_symbol, str, const char *, NULL)
 
-search_relop_common(get_relop_anti, anti, IR_Type, OPE_NOT_USED)
+search_relop_common(get_relop_anti, anti, IR_Type, IR_NOP)
 
     IR_Type get_relop(const char *sym) {
         for (int i = 0; i < LENGTH(relop_dict); i++) {
