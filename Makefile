@@ -3,28 +3,37 @@ FLEX = flex
 BISON = bison
 CFLAGS = -std=gnu99 -Wall -Werror -ggdb #-D DEBUG
 
-CFILES = $(shell find ./ -name "*.c")
-OBJS = $(CFILES:.c=.o)
+GDBFLAGS = -ex "set args test.cmm test.S"\
+		   -ex "set print pretty on"
+
+
 LFILE = $(shell find ./ -name "*.l")
 YFILE = $(shell find ./ -name "*.y")
+
 LFC = $(shell find ./ -name "*.l" | sed s/[^/]*\\.l/lex.yy.c/)
 YFC = $(shell find ./ -name "*.y" | sed s/[^/]*\\.y/syntax.tab.c/)
+CFILES = $(filter-out $(LFC) $(YFC), $(shell find ./ -name "*.c"))
+
+OBJS = $(CFILES:.c=.o)
 LFO = $(LFC:.c=.o)
 YFO = $(YFC:.c=.o)
 
 COMPILER := cmm
 
-$(COMPILER): syntax $(filter-out $(LFO),$(OBJS))
-	$(CC) -ggdb -o $@ $(filter-out $(LFO),$(OBJS)) -lfl -ly
+$(COMPILER): $(YFO) $(LFO) $(OBJS)
+	$(CC) -ggdb -o $@ $^
 
-syntax: lexical syntax-c
-	$(CC) -ggdb -c $(YFC) -o $(YFO)
+$(LFO): $(LFC)
+	$(CC) -ggdb -c $^
 
-lexical: $(LFILE)
-	$(FLEX) -o $(LFC) $(LFILE)
+$(YFO): $(YFC)
+	$(CC) -ggdb -c $^
 
-syntax-c: $(YFILE)
-	$(BISON) -o $(YFC) -d -v $(YFILE)
+$(LFC): $(LFILE)
+	$(FLEX) -o $@ $^
+
+$(YFC): $(YFILE)
+	$(BISON) -o $@ -d -v $^
 
 -include $(patsubst %.o, %.d, $(OBJS))
 
@@ -34,10 +43,10 @@ test: $(COMPILER)
 	./test.sh
 
 gdb: $(COMPILER)
-	gdb $(COMPILER) -ex "set args test.cmm test.S"
+	gdb $(COMPILER) $(GDBFLAGS)
 
 clean:
-	rm -f $(COMPILER) lex.yy.c syntax.tab.c syntax.tab.h syntax.output
+	rm -f $(COMPILER) syntax.output
 	rm -f $(OBJS) $(OBJS:.o=.d)
 	rm -f $(LFC) $(YFC) $(YFC:.c=.h)
 	rm -f *~

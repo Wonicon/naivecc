@@ -1,19 +1,22 @@
+%option yylineno
+%option noyywrap
 %{
-
-
-#include "syntax.tab.h"
 #include "node.h"
+#include "syntax.tab.h"
 #include "cmm-strtab.h"
 #include <stdio.h>
 #include <stdlib.h>
 
 #define Type enum yytokentype
 
+extern int is_lex_error;
+extern int is_syn_error;
+
 Type lex_handle(Type type);
 void ErrorMsg(char *desc, char *lexeme, int lineno);
+
 int yycolumn = 1;
 int token_on_line = 0;
-extern int is_lex_error;
 
 //
 // Wrapper of lex_handle aimed to use LOG
@@ -32,16 +35,9 @@ yycolumn += yyleng;
 //
 int check_oct(char *yytext, int yyleng, int yylineno);
 int check_hex(char *yytext, int yyleng, int yylineno);
-
 %}
-
-
-%option yylineno
-
 digit [0-9]
 letter [a-zA-Z]
-
-/* READ START */
 SEMI ;
 COMMA ,
 ASSIGNOP =
@@ -67,7 +63,6 @@ IF if
 ELSE else
 WHILE while
 ID ({letter}|_)({letter}|{digit}|_)*
-/* READ END */
 HEX 0(x|X)({digit}|{letter})+
 OCT 0[0-9]+
 INT 0|[1-9][0-9]*

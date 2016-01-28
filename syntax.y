@@ -2,36 +2,18 @@
 %error-verbose
 %{
 #include "node.h"
-#include "cmm-type.h"
 #include "cmm-symtab.h"
 #include "lib.h"
 #include "ast.h"
-#include <assert.h>
+#include <stdio.h>
+
+#define YYDEBUG 1
+
+extern int yylineno;
 
 int is_lex_error = 0;
 int is_syn_error = 0;
-
-#define YYDEBUG 1
-#include "lex.yy.c"
-
-#include <stdio.h>
 Node prog;
-static union YYSTYPE *YYVSP = NULL;
-
-#define S(x) # x
-#define concat(x, y) x ## y
-#define name(x) concat(YY_, x)
-#define _str(x) # x
-
-#define LINK(x, y)
-#define LINK_NULL(x, y)
-
-//
-// Pre-declaration
-//
-int yyerror(const char *msg);
-void midorder(Node, int);
-
 %}
 
 /* declared types */
