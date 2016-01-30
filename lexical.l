@@ -13,6 +13,12 @@ void ErrorMsg(char *desc, char *lexeme, int lineno);
 
 int yycolumn = 1;
 
+// To support netsed multi-line comment, use this counter
+// to record how many '/*' there are that haven't met a '*/'.
+// This in deed is not a DFA way ;-)
+// Note that we ignore '/*' and '*/' after '//' in a line.
+static int n_unpaired = 0;
+
 #define YY_USER_ACTION \
 yylloc.first_line = yylloc.last_line = yylineno;\
 yylloc.first_column = yycolumn;\
@@ -26,7 +32,7 @@ static enum yytokentype node(enum yytokentype type, enum ProductionTag tag);
 static int check_oct(char *yytext, int yyleng, int yylineno);
 static int check_hex(char *yytext, int yyleng, int yylineno);
 %}
-%start COMMENT
+%start ONE_LINE_COMMENT MULTI_LINE_COMMENT ONE_LINE_IN_MULTI_LINE
 digit [0-9]
 letter [a-zA-Z]
 %%
@@ -45,6 +51,7 @@ letter [a-zA-Z]
 <INITIAL>"while" return sym(WHILE);
 <INITIAL>"struct" return sym(STRUCT);
 <INITIAL>"return" return sym(RETURN);
+
 <INITIAL>"+" return op(PLUS);
 <INITIAL>"-" return op(MINUS);
 <INITIAL>"*" return op(STAR);
@@ -53,8 +60,10 @@ letter [a-zA-Z]
 <INITIAL>"||" return op(OR);
 <INITIAL>"&&" return op(AND);
 <INITIAL>>|<|>=|<=|==|!= return op(RELOP);
+
 <INITIAL>"int"|"float" return node(TYPE, TERM_ID);
 <INITIAL>({letter}|_)({letter}|{digit}|_)* return node(ID, TERM_ID);
+
 <INITIAL>[0-9]+\.[0-9]+ {
     yylval.nd = new_node();
     yylval.nd->lineno = yylineno;
@@ -75,15 +84,35 @@ letter [a-zA-Z]
     return num(8);
 }
 <INITIAL>0|[1-9][0-9]* return num(10);
-<INITIAL>"//" { BEGIN COMMENT; }
+
+<INITIAL>"//" { BEGIN ONE_LINE_COMMENT; }
+<INITIAL>"/*" {
+    n_unpaired++;
+    BEGIN MULTI_LINE_COMMENT;
+}
 <INITIAL>"\n" yycolumn = 1;
 <INITIAL>[[:blank:]] ;
 <INITIAL>. {
     ErrorMsg("Mysterious character", yytext, yylineno);
     is_syn_error = 1;
 }
-<COMMENT>. ;
-<COMMENT>"\n" { BEGIN INITIAL; }
+
+<MULTI_LINE_COMMENT>"/*" { n_unpaired++; }
+<MULTI_LINE_COMMENT>"//" { BEGIN ONE_LINE_IN_MULTI_LINE; }
+<MULTI_LINE_COMMENT>"*/" {
+    n_unpaired--;
+    if (n_unpaired == 0) {
+        BEGIN INITIAL;
+    }
+}
+<MULTI_LINE_COMMENT>"\n" ;
+<MULTI_LINE_COMMENT>. ;
+
+<ONE_LINE_IN_MULTI_LINE>"\n" { BEGIN MULTI_LINE_COMMENT; }
+<ONE_LINE_IN_MULTI_LINE>. ;
+
+<ONE_LINE_COMMENT>"\n" { BEGIN INITIAL; }
+<ONE_LINE_COMMENT>. ;
 %%
 static enum yytokentype num(int radix)
 {

@@ -1,0 +1,30 @@
+// Test one-line commet
+
+/**
+ * Test mult-line comment
+ * int foo() {
+ *     return 0;
+ * }
+ */
+
+/**
+ * Test multi-line comment with one-line comment
+ * // like this
+ * // this */
+ * // this /*
+ * // and this /* */
+ */
+
+int foo()
+{
+    return 2;
+}
+
+int main()
+{
+    // Expect 2
+    write(foo());
+
+    return 0;
+}
+

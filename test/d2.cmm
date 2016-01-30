@@ -1,3 +1,5 @@
+// File-queen problem
+
 int absolute(int value)
 {
     if (value >= 0)
