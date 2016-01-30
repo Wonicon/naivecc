@@ -7,8 +7,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-
-extern int is_lex_error;
 extern int is_syn_error;
 
 void ErrorMsg(char *desc, char *lexeme, int lineno);

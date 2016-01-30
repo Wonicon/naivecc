@@ -11,7 +11,6 @@
 
 extern int yylineno;
 
-int is_lex_error = 0;
 int is_syn_error = 0;
 Node prog;
 %}
@@ -226,11 +225,6 @@ void free_ast()
 int yyerror(const char *msg)
 {
     is_syn_error = 1;
-    if (is_lex_error) {
-        is_lex_error = 0;
-        return 0;
-    }
-
     printf("Error type B at line %d: %s.\n", yylineno, msg);
     return 0;
 }

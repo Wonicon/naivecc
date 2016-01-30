@@ -14,7 +14,6 @@ void free_ast();
 void translate();
 
 
-extern int is_lex_error;
 extern int is_syn_error;
 extern bool semantic_error;
 
