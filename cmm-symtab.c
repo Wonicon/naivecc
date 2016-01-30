@@ -3,13 +3,12 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define SIZE 0x3fff
-static sym_ent_t *symtab[SIZE] = { 0 };
+#define SIZE 0x3f
 
 unsigned int hash(const char *name)
 {
     unsigned int val = 0, i;
-    for (; *name; ++name) {
+    for (; *name; name++) {
         val = (val << 2) + *name;
         i = val * SIZE;
         if (i) {
@@ -19,7 +18,7 @@ unsigned int hash(const char *name)
     return val;
 }
 
-int insert(const char *sym, Type *type, int line, int scope)
+int insert(const char *sym, Type *type, int line, Symbol **table)
 {
     assert(sym != NULL);
     assert(type != NULL);
@@ -28,81 +27,73 @@ int insert(const char *sym, Type *type, int line, int scope)
     LOG("Hash index %u", index);
 
     // Find collision or reach the end
-    sym_ent_t *dest = symtab[index];
-    sym_ent_t *pre = NULL;
+    Symbol **ptr = &table[index];
     int listno = 0;
-    while (dest != NULL) {
-        if (!strcmp(sym, symtab[index]->symbol)) {
+    while (*ptr != NULL) {
+        if (!strcmp(sym, table[index]->symbol)) {
             LOG("To insert %s: collision detected at slot %d, list %d", sym, index, listno);
             return -1;
         }
         else {
             LOG("Unfortunately, slot %d's list has '%s'", index, dest->symbol);
-            pre = dest;
-            dest = dest->link;
+            ptr = &((*ptr)->link);
+            listno++;
         }
-        listno++;
     }
 
-    if (pre == NULL) {
-        LOG("The slot %d is empty, insert %s here", index, sym);
-        assert(dest == symtab[index]);
-        dest = symtab[index] = NEW(sym_ent_t);
-        memset(dest, 0, sizeof(*dest));
-    }
-    else {
-        dest = pre->link = NEW(sym_ent_t);
-        memset(dest, 0, sizeof(*dest));
-    }  // NOTE we should modify the pointer stored in the hash table, but not only `dest'
-
-    dest->symbol = sym;
-    dest->type = type;
-    dest->line  = line;
-    dest->scope = scope;
+    *ptr = malloc(sizeof(Symbol));
+    memset(*ptr, 0, sizeof(Symbol));
+    (*ptr)->symbol = sym;
+    (*ptr)->type   = type;
+    (*ptr)->line   = line;
 
     return 1;
 }
 
-sym_ent_t *query(const char *sym, int scope)
+const Symbol *query(const char *sym, Symbol **table)
 {
-    assert(sym);
+    assert(sym != NULL);
+    assert(table != NULL);
+
     unsigned int index = hash(sym);
-    sym_ent_t *scanner = symtab[index];
+    Symbol *scanner = table[index];
 
     if (scanner == NULL) {
-        LOG("To query %s: totaly emtpy slot", sym);
-        return 0;
+        LOG("Cannot find %s", sym);
+        return NULL;
     }
 
     int listno = 0;
     while (scanner != NULL) {
         if (!strcmp(sym, scanner->symbol)) {
             LOG("To query %s: collision detected at slot %d, list %d", sym, index, listno);
-            // TODO: check scope
             return scanner;
         }
         else {
-            listno++;
             scanner = scanner->link;
+            listno++;
         }
     }
 
+    LOG("Cannot find %s", sym);
     return NULL;
 }
 
-void print_symtab()
+void init_symtab()
 {
-    for (int i = 0; i < SIZE; i++) {
-        if (symtab[i] == NULL) {
-            continue;
-        }
-        sym_ent_t *ent = symtab[i];
-        for (int k = 0; ent != NULL; k++, ent = ent->link) {
-            printf("Slot %d, list %d: symbol '%s'\n", i, k, ent->symbol);
-            printf("  Type: ");
-            print_type(ent->type);
-            printf("  Line: %d\n", ent->line);
-        }
-    }
+}
+
+void new_symtab()
+{
+}
+
+Symbol **pop_symtab()
+{
+    return NULL;
+}
+
+Symbol **get_symtab_top()
+{
+    return NULL;
 }
 

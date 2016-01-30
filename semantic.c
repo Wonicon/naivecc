@@ -58,7 +58,7 @@ static void dec_is_vardec(Node dec)
     vardec->sema.type = dec->sema.type;
     sema_visit(vardec);
 
-    if (insert(vardec->sema.name, vardec->sema.type, vardec->sema.lineno, 1) < 0) {
+    if (insert(vardec->sema.name, vardec->sema.type, vardec->sema.lineno, get_symtab_top()) < 0) {
         SEMA_ERROR_MSG(vardec->sema.lineno, "Redefined variable \"%s\".", vardec->sema.name);
         // TODO handle memory leak
     }
@@ -136,7 +136,7 @@ static void def_is_spec_dec(Node def)
 static void struct_is_id(Node struc)
 {
     Node id = struc->child;
-    sym_ent_t *ent = query(id->val.s, STRUCT_SCOPE);
+    const Symbol *ent = query(id->val.s, get_symtab_top());
     if (ent == NULL || ent->type->class != CMM_TYPE || ent->type->meta->class != CMM_STRUCT) {
         SEMA_ERROR_MSG(id->lineno, "Undefined struct name '%s'", id->val.s);
     }
@@ -177,7 +177,7 @@ static void struct_is_id_def(Node struc)
             continue;
         }
 
-        if (insert(outer->name, outer->base, outer->lineno, STRUCT_SCOPE) < 0) {
+        if (insert(outer->name, outer->base, outer->lineno, get_symtab_top()) < 0) {
             SEMA_ERROR_MSG(outer->lineno, "Redefined field \"%s\".", outer->name);
         }
 
@@ -205,7 +205,7 @@ static void struct_is_id_def(Node struc)
     if (struc->tag == STRUCT_is_ID_DEF) {
         Type *meta = new_type(CMM_TYPE, this->name, this, NULL);
         meta->lineno = struc->lineno;
-        if (insert(meta->name, meta, struc->lineno, 0) < 1) {
+        if (insert(meta->name, meta, struc->lineno, get_symtab_top()) < 1) {
             SEMA_ERROR_MSG(struc->lineno, "Duplicated name \"%s\".", name);
         }
     }
@@ -250,7 +250,7 @@ static void var_is_spec_vardec(Node paramdec)
 
     sema_visit(vardec);
 
-    int insert_ret = insert(vardec->sema.name, vardec->sema.type, paramdec->lineno, -1);
+    int insert_ret = insert(vardec->sema.name, vardec->sema.type, paramdec->lineno, get_symtab_top());
     if (insert_ret < 1) {
         SEMA_ERROR_MSG(vardec->lineno, "Duplicated variable definition of '%s'", vardec->sema.name);
     }
@@ -293,7 +293,7 @@ static void func_is_id_var(Node fundec)
     // Generate function symbol
     Type *func = new_type(CMM_FUNC, name, fundec->sema.type, param_list);
 
-    if (insert(func->name, func, fundec->lineno, -1) < 0) {
+    if (insert(func->name, func, fundec->lineno, get_symtab_top()) < 0) {
         SEMA_ERROR_MSG(fundec->lineno, "Redefined function \"%s\"", func->name);
         // TODO handle memory leak!
     }
@@ -310,7 +310,7 @@ static inline int is_lval(const Node exp)
         // Avoid function name and type name.
         // An array directly found in the symbol table is a constant variable
         // which cannot be assigned.
-        sym_ent_t *ent = query(exp->child->val.s, 0);
+        const Symbol *ent = query(exp->child->val.s, get_symtab_top());
         // TODO Ugly conditions
         return ent != NULL && ent->type->class != CMM_FUNC && ent->type->class != CMM_TYPE && ent->type->class != CMM_ARRAY;
     }
@@ -431,7 +431,7 @@ static void exp_is_id_arg(Node exp)
 {
     Node id = exp->child;
 
-    sym_ent_t *query_result = query(id->val.s, 1);
+    const Symbol *query_result = query(id->val.s, get_symtab_top());
 
     if (query_result == NULL) {
         SEMA_ERROR_MSG(id->lineno, "Undefined function \"%s\".", id->val.s);
@@ -474,7 +474,7 @@ static void exp_is_exp_field(Node exp)
 static void exp_is_id(Node exp)
 {
     Node id = exp->child;
-    sym_ent_t *query_result = query(id->val.s, 1);
+    const Symbol *query_result = query(id->val.s, get_symtab_top());
 
     if (query_result == NULL) {
         SEMA_ERROR_MSG(id->lineno, "Undefined variable \"%s\"", id->val.s);
@@ -592,7 +592,7 @@ static void extdec_is_vardec(Node extdec)
         vardec->sema.type = extdec->sema.type;
         sema_visit(vardec);
 
-        if (insert(vardec->sema.name, vardec->sema.type, vardec->sema.lineno, -1) < 0) {
+        if (insert(vardec->sema.name, vardec->sema.type, vardec->sema.lineno, get_symtab_top()) < 0) {
             SEMA_ERROR_MSG(vardec->sema.lineno, "Duplicated identifier '%s'", vardec->sema.name);
             // TODO handle memory leak
         }

@@ -128,7 +128,7 @@ static int translate_exp_is_id(Node exp)
 {
     Node id = exp->child;
 
-    sym_ent_t *sym = query(id->val.s, 0);
+    const Symbol *sym = query(id->val.s, 0);
 
     if (sym == NULL) {
         return FAIL_TO_GEN;
@@ -875,7 +875,8 @@ static int translate_func_head(Node func)
         while (id->tag != TERM_ID) {
             id = id->child;
         }
-        sym_ent_t *sym = query(id->val.s, 0);
+        // TODO eliminate coercion
+        Symbol *sym = (Symbol *)query(id->val.s, 0);
         if (sym->type->class == CMM_ARRAY) {
             sym->address = new_operand(OPE_ADDR);
             sym->address->base_type = sym->type;
@@ -900,7 +901,8 @@ static int translate_dec_is_vardec(Node dec)
     Node vardec = dec->child;
     Node iterator = vardec->child;
     if (iterator->tag == TERM_ID) {  // 普通变量声明, 分配空间就好了.
-        sym_ent_t *sym = query(iterator->val.s, 0);
+        // TODO eliminate coercion
+        Symbol *sym = (Symbol *)query(iterator->val.s, 0);
         sym->address = new_operand(OPE_VAR);
         sym->address->base_type = sym->type;
 
@@ -928,7 +930,8 @@ static int translate_dec_is_vardec(Node dec)
         iterator = iterator->child;
     }
 
-    sym_ent_t *sym = query(iterator->val.s, 0);
+    // TODO eliminate coercion
+    Symbol *sym = (Symbol *)query(iterator->val.s, 0);
     sym->address = new_operand(OPE_REF);
     sym->address->size = sym->type->type_size;
     sym->address->base_type = sym->type;

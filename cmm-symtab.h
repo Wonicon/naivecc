@@ -3,40 +3,40 @@
 
 //
 // C-- symbol table:
-// This module handle the storing, inserting and querying of symbols.
-// We use a hash table with open hashing method to store the symbol.
+// This module handles the storing, inserting and querying of symbols.
+// We use a hash table with open hashing method to store symbols.
 // The query will return a clone of the found symbol. Modifying the returned symbol
 // will make no sense.
 //
 // One thing deserves to mention is the scope.
-// Scope is the state determined by parser. So users should provide this attribute.
-// As symbols with the same name will store in the same slot, we can conveniently access every
-// overriding symbol. If the scope is mismatched, the query will select the nearest scope that
-// is smaller than the provided one.
+// Scope is the state determined by parser. So this attribute should be provided by the user.
+// But the symbol table module will help maintain the hierarchy of nested scopes, and perform
+// the fall back schema.
 //
 // We store structure types together with variables, functions in one single symbol table.
-// This may be ambiguous when we consulting a symbol. One way to solve this ambiguity is
-// check the symbol string with the string pointer stored in the structure type.
+// structure type name can conflict with another variable. To solve the problem, we decide
+// to store the structure type name with modified string like 'struct typename'
 //
 
 #include "cmm-type.h"
-#include "ir.h"
+#include "operand.h"
 
-typedef struct _sym_ent_t
-{
-    const char *symbol;  // The symbol string
-    Type *type;          // The generic type pointer, we can know the real type by dereferncing it
-    int line;            // The line number this symbol first DECLARED
-    int size;            // The size this symbol will occupy the memory, maybe we can get it from the type?
-    Operand address;     // The memory address, or register code */
-    int scope;           // The scope index, each symbol will get exactly one
-    struct _sym_ent_t *link;  /* Used for open hashing */
-} sym_ent_t;
+typedef struct _Symbol {
+    struct _Symbol *link;  // Used for open hashing
+    const char *symbol;    // The symbol string
+    int line;              // The line where the symbol first DECLARED
+    Type *type;            // Detailed type information
+    Operand address;       // The ir destination
+    const struct _Symbol *field_table;  // Valid only for structure type
+} Symbol;
 
-int insert(const char *sym, Type *type, int line, int scope);
-// NOTE the return value is a shallow copy of the found symbol
-// Release it directly through free, DO NOT release any of its pointer fields.
-sym_ent_t *query(const char *sym, int scope);
-void print_symtab();
+int insert(const char *sym, Type *type, int line, Symbol **table);
+const Symbol *query(const char *sym, Symbol **table);
 
-#endif /* CMM_SYMTAB_H */
+void init_symtab();
+void push_symtab();
+Symbol **pop_symtab();
+Symbol **get_symtab_top();
+
+#endif // CMM_SYMTAB_H
+
