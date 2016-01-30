@@ -10,21 +10,34 @@ Some significant limitations are shown below:
 
 1. No scope, all names should be distinguished;
 1. No declaration, all functions should be defined before called;
-1. No global variables;
-1. No struct;
-1. No comments;
+1. No global variables (parsed but cannot generate code);
+1. No struct (parsed but cannot generate code);
 1. No preprocessor;
-1. Basic type only consists of int;
+1. Basic type only consists of int (float is parsed but cannot generate code);
 1. All local variables should be defined at the beginning of a function.
 
 The top level of a program should look like this:
 
 ```c
-int global_variable;
+// one-line comment
+
+/**
+ * multi-line comment
+ * ignore everything after //
+ * like // */
+ * like // /*
+ * like // *//*
+ * like // /*_*/
+ */ // This is the end of this multi-line commet!
+
+// int read()
+// write(int x)
+// are provided functions to support input and output
 
 int echo(int e)
 {
-    return e;
+    write(e);
+    return read();
 }
 
 int main()
