@@ -948,6 +948,7 @@ static int translate_dec_is_vardec(Node dec)
 
     if (!typecmp(sym->type, BASIC_INT) && !typecmp(sym->type, BASIC_FLOAT)) {
         sym->address = new_operand(OPE_REF);
+        sym->address->size = sym->type->type_size;
         Operand size = new_operand(OPE_INTEGER);
         size->integer = sym->type->type_size;
         new_instr(IR_DEC, sym->address, size, NULL);
