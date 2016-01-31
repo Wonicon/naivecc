@@ -8,9 +8,6 @@
 #include <string.h>
 
 
-#define TASK_2
-
-
 extern Node prog;
 extern FILE *asm_file;
 
@@ -134,12 +131,6 @@ static int translate_exp_is_id(Node exp)
         return FAIL_TO_GEN;
     }
 
-#ifdef TASK_2
-    if (sym->type->class == CMM_STRUCT) {
-        translate_state = UNSUPPORT;
-    }
-#endif
-
     // 上层希望存储到一个地址变量, 说明现在在寻址模式
     if (exp->dst && exp->dst->type == OPE_REF_INFO) {
         exp->dst->base_type = sym->address->base_type;  // 初始综合属性
@@ -154,9 +145,15 @@ static int translate_exp_is_id(Node exp)
                 exp->dst->ref = new_operand(OPE_ADDR);
                 return new_instr(IR_ADDR, sym->address, NULL, exp->dst->ref);
             default:
-                LOG("Unexpected sym->address->type");
-                assert(0);
+                PANIC("Unexpected sym->address->type");
         }
+    }
+    else if (sym->address->type == OPE_REF) {
+        if (exp->dst && exp->dst->type == OPE_TEMP) {
+            free(exp->dst);
+        }
+        exp->dst = new_operand(OPE_ADDR);
+        return new_instr(IR_ADDR, sym->address, NULL, exp->dst);
     }
 
     // 替换不必要的目标地址
@@ -366,7 +363,6 @@ static int translate_exp_is_exp_idx(Node exp)
     // 虽然任何指令都可以内嵌解引用, 但是这样会产生复杂的依赖和同步问题,
     // 所以比较好的策略是先生成一个解引用赋值指令, 进行完所有的优化后, 找到这些解引用赋值,
     // 然后将属性替换, 删除该指令.
-    // TODO 在全部优化结束后, 遍历指令, 将解引用赋值替换成内联解引用
     if (exp->dst->type != OPE_TEMP) {
         LOG("(warn)没有来自上层exp(行号: %d)的目标操作数, 这不符合常理", exp->lineno);
     }
@@ -505,6 +501,34 @@ static int translate_binary_operation(Node exp)
     }
 }
 #undef CALC
+
+
+// Translate exp -> exp.field
+// This translation will set exp->dst to an addr operand
+// Remember to dereference it
+static int translate_exp_is_exp_field(Node exp)
+{
+    Node struc = exp->child;
+    Node field = struc->sibling;
+    // Recursive translation of exp.field and array will return address
+    translate_dispatcher(struc);
+    // The semantic type of this exp node is set in semantic analysis,
+    // So we directly use it.
+    const Symbol *sym = query_without_fallback(field->val.s, struc->sema.type->field_table);
+    if (sym == NULL) {
+        PANIC("Unexpected non-exisiting field %s at line %d\n", field->val.s, field->lineno);
+        return FAIL_TO_GEN;
+    }
+    else {
+        Operand offset = new_operand(OPE_INTEGER);
+        offset->integer = sym->offset;
+        if (exp->dst && exp->dst->type == OPE_TEMP) {
+            free(exp->dst);
+        }
+        exp->dst = new_operand(OPE_ADDR);
+        return new_instr(IR_ADD, struc->dst, offset, exp->dst);
+    }
+}
 
 
 static void pass_arg(Node arg)
@@ -847,6 +871,12 @@ static int translate_stmt_is_exp(Node stmt)
 /////////////////////////////////////////////////////////////////////
 
 
+static int translate_extdef_spec(Node extdef)
+{
+    return NO_NEED_TO_GEN;
+}
+
+
 static int translate_extdef_func(Node extdef)
 {
     push_symtab(extdef->sema.symtab);
@@ -908,31 +938,6 @@ static int translate_dec_is_vardec(Node dec)
 {
     Node vardec = dec->child;
     Node iterator = vardec->child;
-    if (iterator->tag == TERM_ID) {  // 普通变量声明, 分配空间就好了.
-        // TODO eliminate coercion
-        Symbol *sym = (Symbol *)query(iterator->val.s);
-        sym->address = new_operand(OPE_VAR);
-        sym->address->base_type = sym->type;
-
-        if (vardec->sibling != NULL) {  // 有初始化语句
-            LOG("翻译初始化语句");
-            vardec->sibling->dst = new_operand(OPE_TEMP);
-            translate_dispatcher(vardec->sibling);
-            try_deref(vardec->sibling);
-            // [优化] 当左值为变量而右值为运算指令时, 将右值的目标操作数转化为变量
-            if (sym->address->type == OPE_VAR && vardec->sibling->dst->type == OPE_TEMP) {
-                LOG("初始化: 左值为变量(编号%d), 直接赋值", sym->address->index);
-                replace_operand_global(sym->address, vardec->sibling->dst);
-                return NO_NEED_TO_GEN;
-            }
-            else {
-                LOG("初始化: 直接的赋值");
-                return new_instr(IR_ASSIGN, vardec->sibling->dst, NULL, sym->address);
-            }
-            return new_instr(IR_ASSIGN, vardec->sibling->dst, NULL, sym->address);
-        }
-        return NO_NEED_TO_GEN;
-    }
 
     while (iterator->tag != TERM_ID) {
         iterator = iterator->child;
@@ -940,12 +945,38 @@ static int translate_dec_is_vardec(Node dec)
 
     // TODO eliminate coercion
     Symbol *sym = (Symbol *)query(iterator->val.s);
-    sym->address = new_operand(OPE_REF);
-    sym->address->size = sym->type->type_size;
+
+    if (!typecmp(sym->type, BASIC_INT) && !typecmp(sym->type, BASIC_FLOAT)) {
+        sym->address = new_operand(OPE_REF);
+        Operand size = new_operand(OPE_INTEGER);
+        size->integer = sym->type->type_size;
+        new_instr(IR_DEC, sym->address, size, NULL);
+    }
+    else {
+        sym->address = new_operand(OPE_VAR);
+    }
+
     sym->address->base_type = sym->type;
-    Operand size = new_operand(OPE_INTEGER);
-    size->integer = sym->type->type_size;
-    return new_instr(IR_DEC, sym->address, size, NULL);
+
+    if (vardec->sibling != NULL) {
+        // Translate initialization expression.
+        vardec->sibling->dst = new_operand(OPE_TEMP);
+        translate_dispatcher(vardec->sibling);
+        try_deref(vardec->sibling);
+        // [优化] 当左值为变量而右值为运算指令时, 将右值的目标操作数转化为变量
+        if (sym->address->type == OPE_VAR && vardec->sibling->dst->type == OPE_TEMP) {
+            LOG("初始化: 左值为变量(编号%d), 直接赋值", sym->address->index);
+            replace_operand_global(sym->address, vardec->sibling->dst);
+            return NO_NEED_TO_GEN;
+        }
+        else {
+            LOG("初始化: 直接的赋值");
+            return new_instr(IR_ASSIGN, vardec->sibling->dst, NULL, sym->address);
+        }
+    }
+    else {
+        return NO_NEED_TO_GEN;
+    }
 }
 
 
@@ -967,6 +998,7 @@ static int translate_def_is_spec_dec(Node def)
 static trans_visitor trans_visitors[] =
 {
     [PROG_is_EXTDEF]               = translate_ast,
+    [EXTDEF_is_SPEC]               = translate_extdef_spec,
     [EXTDEF_is_SPEC_FUNC_COMPST]   = translate_extdef_func,
     [FUNC_is_ID_VAR]               = translate_func_head,
     [COMPST_is_DEF_STMT]           = translate_compst,
@@ -981,6 +1013,7 @@ static trans_visitor trans_visitors[] =
     [STMT_is_WHILE]                = translate_while,
     [EXP_is_EXP]                   = translate_exp_is_exp,
     [EXP_is_BINARY]                = translate_binary_operation,
+    [EXP_is_EXP_FIELD]             = translate_exp_is_exp_field,
     [EXP_is_UNARY]                 = translate_unary_operation,
     [EXP_is_INT]                   = translate_exp_is_const,
     [EXP_is_FLOAT]                 = translate_exp_is_const,
@@ -991,6 +1024,6 @@ static trans_visitor trans_visitors[] =
     [EXP_is_AND]                   = translate_cond_prepare,
     [EXP_is_OR]                    = translate_cond_prepare,
     [EXP_is_NOT]                   = translate_cond_prepare,
-    [EXP_is_RELOP]                 =  translate_cond_prepare,
+    [EXP_is_RELOP]                 = translate_cond_prepare,
 };
 

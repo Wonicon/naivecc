@@ -136,7 +136,10 @@ static void struct_is_id_def(Node struc)
     this->lineno = struc->lineno;
 
     // Get field list
-    sema_visit(def);
+    while (def != NULL) {
+        sema_visit(def);
+        def = def->sibling;
+    }
 
     // Save the struct symbol table for fields
     this->field_table = pop_symtab();
