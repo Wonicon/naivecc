@@ -9,10 +9,20 @@ struct Bar {
     struct Foo m;
 };
 
+// Test struct as arg
+int xxx(struct Bar x)
+{
+    x.m.a = 23;
+    return x.m.b;
+}
+
 int main()
 {
     struct Bar a[5];
     a[2].m.a = 233;
+    a[2].m.b = 12;
+    write(a[2].m.a);
+    write(xxx(a[2]));
     write(a[2].m.a);
     return 0;
 }

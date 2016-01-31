@@ -153,6 +153,7 @@ static int translate_exp_is_id(Node exp)
             free(exp->dst);
         }
         exp->dst = new_operand(OPE_ADDR);
+        exp->dst->base_type = sym->type;
         return new_instr(IR_ADDR, sym->address, NULL, exp->dst);
     }
 
@@ -543,9 +544,9 @@ static void pass_arg(Node arg)
     pass_arg(arg->sibling);
 
     Operand p = arg->dst;
-    if (p->base_type && p->base_type->class == CMM_ARRAY) {
+    if (p->base_type && (p->base_type->class == CMM_ARRAY || p->base_type->class == CMM_STRUCT)) {
         // 按照测试样例, 数组要传地址
-        LOG("传参: 数组引用");
+        LOG("Reference parameter");
         assert(p->type == OPE_REF || p->type == OPE_ADDR);
         if (p->type == OPE_REF) {
             arg->dst = new_operand(OPE_ADDR);
