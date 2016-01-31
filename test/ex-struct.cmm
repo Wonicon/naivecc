@@ -1,0 +1,17 @@
+struct A {
+    int a;
+    int b;
+};
+
+struct B {
+    int a;
+    int b;
+    struct A m[10][10];
+};
+
+int main()
+{
+    struct B a[10][10];
+    a[0][0].m[10][10] = 23;
+    write(a[0][0].m[10][10]);
+}
