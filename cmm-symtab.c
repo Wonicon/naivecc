@@ -18,36 +18,35 @@ unsigned int hash(const char *name)
     return val;
 }
 
-int insert(const char *sym, Type *type, int line, Symbol **table)
+Symbol *insert(const char *sym, Type *type, int line, Symbol **table)
 {
     assert(sym != NULL);
     assert(type != NULL);
 
     unsigned int index = hash(sym);
-    LOG("Hash index %u", index);
 
     // Find collision or reach the end
     Symbol **ptr = &table[index];
     int listno = 0;
     while (*ptr != NULL) {
         if (!strcmp(sym, table[index]->symbol)) {
-            LOG("To insert %s: collision detected at slot %d, list %d", sym, index, listno);
-            return -1;
+            LOG("When inserting %s: collision detected at slot %d, list %d", sym, index, listno);
+            return NULL;
         }
         else {
-            LOG("Unfortunately, slot %d's list has '%s'", index, (*ptr)->symbol);
             ptr = &((*ptr)->link);
             listno++;
         }
     }
 
+    LOG("Insert %s at slot %d, list %d", sym, index, listno);
     *ptr = malloc(sizeof(Symbol));
     memset(*ptr, 0, sizeof(Symbol));
     (*ptr)->symbol = sym;
     (*ptr)->type   = type;
     (*ptr)->line   = line;
 
-    return 1;
+    return *ptr;
 }
 
 // query_without_fallback:
@@ -70,7 +69,7 @@ const Symbol *query_without_fallback(const char *sym, Symbol **table)
     int listno = 0;
     while (scanner != NULL) {
         if (!strcmp(sym, scanner->symbol)) {
-            LOG("To query %s: collision detected at slot %d, list %d", sym, index, listno);
+            LOG("Find %s at slot %d, list %d", sym, index, listno);
             return scanner;
         }
         else {

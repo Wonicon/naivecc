@@ -810,16 +810,11 @@ static int translate_return(Node exp)
 //
 static int translate_compst(Node compst)
 {
-    push_symtab(compst->sema.symtab);
-
     Node child = compst->child;
     while (child != NULL) {
         translate_dispatcher(child);
         child = child->sibling;
     }
-
-    Symbol **symtab = pop_symtab();
-    assert(symtab == compst->sema.symtab);
     return MULTI_INSTR;
 }
 
@@ -829,7 +824,11 @@ static int translate_compst(Node compst)
 //
 static int translate_stmt_is_compst(Node stmt)
 {
-    return translate_dispatcher(stmt->child);
+    push_symtab(stmt->sema.symtab);
+    translate_dispatcher(stmt->child);
+    Symbol **symtab = pop_symtab();
+    assert(symtab == stmt->sema.symtab);
+    return MULTI_INSTR;
 }
 
 
@@ -850,11 +849,15 @@ static int translate_stmt_is_exp(Node stmt)
 
 static int translate_extdef_func(Node extdef)
 {
+    push_symtab(extdef->sema.symtab);
     Node spec = extdef->child;
     Node func = spec->sibling;
     translate_dispatcher(func);
     Node compst = func->sibling;
     translate_dispatcher(compst);
+    
+    Symbol **symtab = pop_symtab();
+    assert(symtab == extdef->sema.symtab);
     return MULTI_INSTR;
 }
 

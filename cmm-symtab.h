@@ -27,10 +27,11 @@ typedef struct _Symbol {
     int line;              // The line where the symbol first DECLARED
     Type *type;            // Detailed type information
     Operand address;       // The ir destination
+    int offset;            // The field offset in struct
     const struct _Symbol **field_table;  // Valid only for structure type
 } Symbol;
 
-int insert(const char *sym, Type *type, int line, Symbol **table);
+Symbol *insert(const char *sym, Type *type, int line, Symbol **table);
 const Symbol *query_without_fallback(const char *sym, Symbol **table);
 const Symbol *query(const char *sym);
 

@@ -59,11 +59,14 @@ static void dec_is_vardec(Node dec)
     vardec->sema.type = dec->sema.type;
     sema_visit(vardec);
 
-    if (insert(vardec->sema.name, vardec->sema.type, vardec->sema.lineno, get_symtab_top()) < 0) {
+    Symbol *symbol = insert(vardec->sema.name, vardec->sema.type, vardec->sema.lineno, get_symtab_top());
+    if (symbol == NULL) {
         SEMA_ERROR_MSG(vardec->sema.lineno, "Redefined variable \"%s\".", vardec->sema.name);
         // TODO handle memory leak
     }
 
+    symbol->offset = offset;
+    offset += symbol->type->type_size;
     dec->sema = vardec->sema;
 }
 
@@ -144,7 +147,7 @@ static void struct_is_id_def(Node struc)
     if (struc->tag == STRUCT_is_ID_DEF) {
         Type *meta = new_type(CMM_TYPE, this->name, this, NULL);
         meta->lineno = struc->lineno;
-        if (insert(meta->name, meta, struc->lineno, get_symtab_top()) < 1) {
+        if (insert(meta->name, meta, struc->lineno, get_symtab_top()) == NULL) {
             SEMA_ERROR_MSG(struc->lineno, "Duplicated name \"%s\".", name);
         }
     }
@@ -190,10 +193,12 @@ static void var_is_spec_vardec(Node paramdec)
 
     sema_visit(vardec);
 
-    int insert_ret = insert(vardec->sema.name, vardec->sema.type, paramdec->lineno, get_symtab_top());
-    if (insert_ret < 1) {
+    Symbol *sym = insert(vardec->sema.name, vardec->sema.type, paramdec->lineno, get_symtab_top());
+    if (sym == NULL) {
         SEMA_ERROR_MSG(vardec->lineno, "Duplicated variable definition of '%s'", vardec->sema.name);
     }
+    sym->offset = offset;
+    offset += sym->type->type_size;
 
     paramdec->sema = vardec->sema;
 }
@@ -226,17 +231,18 @@ static void func_is_id_var(Node fundec)
 
     // Get identifier
     const char *name = id->val.s;
-
-    // Get param list if exists
-    Type *param_list = get_params(var);
-
+    Type *func = new_type(CMM_FUNC, name, fundec->sema.type, NULL);
     // Generate function symbol
-    Type *func = new_type(CMM_FUNC, name, fundec->sema.type, param_list);
-
-    if (insert(func->name, func, fundec->lineno, get_symtab_top()) < 0) {
+    if (insert(func->name, func, fundec->lineno, get_symtab_top()) == NULL) {
         SEMA_ERROR_MSG(fundec->lineno, "Redefined function \"%s\"", func->name);
         // TODO handle memory leak!
     }
+
+    // Get param list if exists
+    // Put the function's parameters and local variables in a new symbol table.
+    // The pop is called in extdef production
+    new_symtab();
+    func->param = get_params(var);
 }
 
 
@@ -509,24 +515,25 @@ static void stmt_is_exp(Node stmt)
 
 static void stmt_is_compst(Node stmt)
 {
+    // Change symbol table here but not compst to make
+    // registering function parameters easier.
+    new_symtab();
+
     Node compst = stmt->child;
     compst->sema.type = stmt->sema.type;
     sema_visit(compst);
 
+    stmt->sema.symtab = pop_symtab();
 }
 
 
 static void compst_is_def_stmt(Node compst)
 {
-    new_symtab();
-
     Node stmt = compst->child;
     while (stmt != NULL) {
         sema_visit(stmt);
         stmt = stmt->sibling;
     }
-
-    compst->sema.symtab = pop_symtab();
 }
 
 
@@ -537,11 +544,14 @@ static void extdec_is_vardec(Node extdec)
         vardec->sema.type = extdec->sema.type;
         sema_visit(vardec);
 
-        if (insert(vardec->sema.name, vardec->sema.type, vardec->sema.lineno, get_symtab_top()) < 0) {
+        Symbol *sym = insert(vardec->sema.name, vardec->sema.type, vardec->sema.lineno, get_symtab_top());
+        if (sym == NULL) {
             SEMA_ERROR_MSG(vardec->sema.lineno, "Duplicated identifier '%s'", vardec->sema.name);
             // TODO handle memory leak
         }
 
+        sym->offset = offset;
+        offset += sym->type->type_size;
         vardec = vardec->sibling;
     }
 }
@@ -574,10 +584,18 @@ static void extdef_is_spec_func_compst(Node extdef)
     Node compst = func->sibling;
 
     sema_visit(spec);
+
+    int saved_offset = offset;
+    offset = 0;
+
     func->sema.type = spec->sema.type;  // Inherit the type info to register the function symbol
     sema_visit(func);
+
     compst->sema.type = spec->sema.type; // Inherit the type info to check return type consistentcy
     sema_visit(compst);
+
+    offset = saved_offset;
+    extdef->sema.symtab = pop_symtab();
 }
 
 
