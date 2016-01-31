@@ -4,6 +4,8 @@
 #include "lib.h"
 #include <stdio.h>
 
+struct _Symbol;
+
 typedef struct _Type {
     CmmType class;
     const char *name;
@@ -16,6 +18,7 @@ typedef struct _Type {
         struct _Type *link;    // For field and param
         struct _Type *field;   // For struct
         struct _Type *param;   // For function
+        struct _Symbol **field_table;
     };
     union {
         int ref;               // How many instance are using this type, used by struct

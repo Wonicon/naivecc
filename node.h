@@ -2,12 +2,10 @@
 #define NODE_H
 
 #include "cmm-type.h"
+#include "cmm-symtab.h"
 
 typedef struct Node_ *Node;
 typedef struct Operand_ *Operand;
-
-
-
 
 struct Node_ {
     enum ProductionTag tag;
@@ -30,6 +28,7 @@ struct Node_ {
         Type *type;
         const char *name;
         int lineno;
+        Symbol **symtab;
     } sema;
 
     // For intermediate code translation

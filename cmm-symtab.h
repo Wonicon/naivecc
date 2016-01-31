@@ -27,14 +27,15 @@ typedef struct _Symbol {
     int line;              // The line where the symbol first DECLARED
     Type *type;            // Detailed type information
     Operand address;       // The ir destination
-    const struct _Symbol *field_table;  // Valid only for structure type
+    const struct _Symbol **field_table;  // Valid only for structure type
 } Symbol;
 
 int insert(const char *sym, Type *type, int line, Symbol **table);
 const Symbol *query(const char *sym, Symbol **table);
 
 void init_symtab();
-void push_symtab();
+void new_symtab();
+void push_symtab(Symbol **);
 Symbol **pop_symtab();
 Symbol **get_symtab_top();
 

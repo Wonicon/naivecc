@@ -45,15 +45,6 @@ int main(int argc, char *argv[])
     yyparse();
 
     if (!is_syn_error) {
-        // Add predefined functions
-        Type *read = new_type(CMM_FUNC, "read", NULL, NULL);
-        read->ret = BASIC_INT;
-        insert("read", read, -1, 0);
-
-        Type *write = new_type(CMM_FUNC, "write", NULL, NULL);
-        write->param = new_type(CMM_PARAM, "o", BASIC_INT, NULL);
-        insert("write", write, -1, 0);
-
         semantic_analysis();
 
         if (!semantic_error) {

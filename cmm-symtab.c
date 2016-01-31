@@ -79,21 +79,52 @@ const Symbol *query(const char *sym, Symbol **table)
     return NULL;
 }
 
-void init_symtab()
-{
-}
+
+static Symbol ***scopes = NULL;
+
+static size_t scope_capacity = 1;
+
+static size_t scope_cnt = 0;
 
 void new_symtab()
 {
+    if (scope_cnt == scope_capacity) {
+        scope_capacity *= 2;
+        scopes = realloc(scopes, scope_capacity);
+    }
+
+    scopes[scope_cnt++] = calloc(SIZE, sizeof(Symbol *));
+}
+
+void init_symtab()
+{
+    scope_capacity = 1;
+    scope_cnt = 0;
+    scopes = calloc(scope_capacity, sizeof(Symbol **));
+}
+
+void push_symtab(Symbol **symtab)
+{
+    if (scope_cnt == scope_capacity) {
+        scope_capacity *= 2;
+        scopes = realloc(scopes, scope_capacity);
+    }
+
+    scopes[scope_cnt++] = symtab;
 }
 
 Symbol **pop_symtab()
 {
-    return NULL;
+    if (scope_cnt == 0) {
+        return NULL;
+    }
+    else {
+        return scopes[--scope_cnt];
+    }
 }
 
 Symbol **get_symtab_top()
 {
-    return NULL;
+    return scopes[scope_cnt - 1];
 }
 

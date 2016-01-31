@@ -90,7 +90,6 @@ static void dec_is_vardec_initialization(Node dec)
 static void analyze_field_dec(Node dec)
 {
     if (dec == NULL) {
-        dec->sema.type = NULL;
         return;
     }
 
@@ -151,6 +150,8 @@ static void struct_is_id_def(Node struc)
 {
     is_in_struct = true;
 
+    new_symtab();
+
     const char *name = (struc->tag == STRUCT_is_DEF) ? "" : struc->child->val.s;
     Node def = (struc->tag == STRUCT_is_DEF) ? struc->child : struc->child->sibling;
 
@@ -161,6 +162,9 @@ static void struct_is_id_def(Node struc)
     // Get field list
     sema_visit(def);
     this->field = def->sema.type;
+
+    this->field_table = pop_symtab();
+
     def = def->sibling;
     for (Type *tail = this->field; def != NULL; def = def->sibling) {
         sema_visit(def);
@@ -638,11 +642,27 @@ static void extdef_is_spec_func_compst(Node extdef)
 
 static void prog_is_extdef(Node prog)
 {
+    init_symtab();
+    new_symtab();
+
+    // Add predefined functions
+    Type *read = new_type(CMM_FUNC, "read", NULL, NULL);
+    read->ret = BASIC_INT;
+    insert("read", read, -1, get_symtab_top());
+
+    Type *write = new_type(CMM_FUNC, "write", NULL, NULL);
+    write->param = new_type(CMM_PARAM, "o", BASIC_INT, NULL);
+    insert("write", write, -1, get_symtab_top());
+
     Node extdef = prog->child;
     while (extdef != NULL) {
         sema_visit(extdef);
         extdef = extdef->sibling;
     }
+
+    assert(prog->sema.symtab == NULL);
+    prog->sema.symtab = pop_symtab();
+    assert(prog->sema.symtab != NULL);
 }
 
 
