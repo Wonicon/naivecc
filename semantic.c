@@ -345,8 +345,8 @@ static void exp_is_exp_idx(Node exp)
 
     // If lexp_type is null, it means that an semantic error has occurred, then we can ignore the
     // consecutive errors.
-    if (exp->sema.type != NULL) {
-        if (exp->sema.type->class != CMM_ARRAY) {
+    if (lexp->sema.type != NULL) {
+        if (lexp->sema.type->class != CMM_ARRAY) {
             SEMA_ERROR_MSG(lexp->lineno, "expression is not an array.");
         }
         else {

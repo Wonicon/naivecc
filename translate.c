@@ -511,6 +511,7 @@ static int translate_exp_is_exp_field(Node exp)
     Node struc = exp->child;
     Node field = struc->sibling;
     // Recursive translation of exp.field and array will return address
+    struc->dst = new_operand(OPE_ADDR);
     translate_dispatcher(struc);
     // The semantic type of this exp node is set in semantic analysis,
     // So we directly use it.

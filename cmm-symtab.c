@@ -113,7 +113,7 @@ void new_symtab()
 {
     if (scope_cnt == scope_capacity) {
         scope_capacity *= 2;
-        scopes = realloc(scopes, scope_capacity);
+        scopes = realloc(scopes, sizeof(Symbol ***) * scope_capacity);
     }
 
     scopes[scope_cnt++] = calloc(SIZE, sizeof(Symbol *));
@@ -130,7 +130,7 @@ void push_symtab(Symbol **symtab)
 {
     if (scope_cnt == scope_capacity) {
         scope_capacity *= 2;
-        scopes = realloc(scopes, scope_capacity);
+        scopes = realloc(scopes, sizeof(Symbol ***) * scope_capacity);
     }
 
     scopes[scope_cnt++] = symtab;
