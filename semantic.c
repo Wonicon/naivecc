@@ -26,6 +26,7 @@ bool semantic_error = false;
 
 
 static bool is_in_struct = false;
+static int offset = 0;
 
 
 static void vardec_is_id(Node vardec)
@@ -87,25 +88,6 @@ static void dec_is_vardec_initialization(Node dec)
 }
 
 
-static void analyze_field_dec(Node dec)
-{
-    if (dec == NULL) {
-        return;
-    }
-
-    // Analyze the dec first in order to have a right symbol registering sequence.
-    sema_visit(dec);
-
-    // Recursively analyze field to insert the node before head in order.
-    analyze_field_dec(dec->sibling);
-
-    Type *new_field = new_type(CMM_FIELD, dec->sema.name, dec->sema.type, dec->sibling->sema.type);
-    new_field->lineno = dec->sema.lineno;
-
-    dec->sema.type = new_field;
-}
-
-
 static void def_is_spec_dec(Node def)
 {
     // Handle Specifier
@@ -114,20 +96,9 @@ static void def_is_spec_dec(Node def)
     Type *type = spec->sema.type;
     assert(type->type_size != 0);
 
-    // Handle DecList and get a field list if in struct scope
-    if (is_in_struct) {
-        Node dec = spec->sibling;
+    for (Node dec = spec->sibling; dec != NULL; dec = dec->sibling) {
         dec->sema.type = type;
-
-        analyze_field_dec(spec->sibling);
-
-        def->sema.type = spec->sibling->sema.type;  // Transfer field link list
-    }
-    else {
-        for (Node dec = spec->sibling; dec != NULL; dec = dec->sibling) {
-            dec->sema.type = type;
-            sema_visit(dec);
-        }
+        sema_visit(dec);
     }
 }
 
@@ -135,7 +106,7 @@ static void def_is_spec_dec(Node def)
 static void struct_is_id(Node struc)
 {
     Node id = struc->child;
-    const Symbol *ent = query(id->val.s, get_symtab_top());
+    const Symbol *ent = query(id->val.s);
     if (ent == NULL || ent->type->class != CMM_TYPE || ent->type->meta->class != CMM_STRUCT) {
         SEMA_ERROR_MSG(id->lineno, "Undefined struct name '%s'", id->val.s);
     }
@@ -148,8 +119,10 @@ static void struct_is_id(Node struc)
 
 static void struct_is_id_def(Node struc)
 {
-    is_in_struct = true;
+    int saved_offset = offset;
 
+    is_in_struct = true;
+    offset = 0;  // Calc field's offset from zero
     new_symtab();
 
     const char *name = (struc->tag == STRUCT_is_DEF) ? "" : struc->child->val.s;
@@ -161,51 +134,13 @@ static void struct_is_id_def(Node struc)
 
     // Get field list
     sema_visit(def);
-    this->field = def->sema.type;
 
+    // Save the struct symbol table for fields
     this->field_table = pop_symtab();
-
-    def = def->sibling;
-    for (Type *tail = this->field; def != NULL; def = def->sibling) {
-        sema_visit(def);
-        tail->link = def->sema.type;
-        while (tail->link) tail = tail->link;
-    }
-
-    int struct_size = 0;
-
-    // Check field name collision and add up the size and offset
-    for (Type *outer = this->field; outer != NULL; outer = outer->link) {
-        if (outer->name[0] == '\0') {
-            // This is an anonymous field, which means that it has been detected as a duplicated field.
-            continue;
-        }
-
-        if (insert(outer->name, outer->base, outer->lineno, get_symtab_top()) < 0) {
-            SEMA_ERROR_MSG(outer->lineno, "Redefined field \"%s\".", outer->name);
-        }
-
-        // 记录偏移量并累加大小
-        outer->offset = struct_size;
-        struct_size += outer->meta->type_size;
-
-        Type *inner = outer->link;
-        while (inner != NULL) {
-            if (!strcmp(outer->name, inner->name)) {
-                SEMA_ERROR_MSG(inner->lineno,
-                               "Duplicated decleration of field %s, the previous one is at %d",
-                               outer->name, outer->lineno);
-                inner->name = "";
-            }
-            inner = inner->link;
-        }
-    }
-
-    this->type_size = struct_size;
+    this->type_size = offset;
 
     // Use the struct name to register in the symbol table.
     // Ignore the struct with empty tag.
-
     if (struc->tag == STRUCT_is_ID_DEF) {
         Type *meta = new_type(CMM_TYPE, this->name, this, NULL);
         meta->lineno = struc->lineno;
@@ -217,6 +152,7 @@ static void struct_is_id_def(Node struc)
     struc->sema.type = this;
 
     is_in_struct = false;
+    offset = saved_offset;
 }
 
 
@@ -314,7 +250,7 @@ static inline int is_lval(const Node exp)
         // Avoid function name and type name.
         // An array directly found in the symbol table is a constant variable
         // which cannot be assigned.
-        const Symbol *ent = query(exp->child->val.s, get_symtab_top());
+        const Symbol *ent = query(exp->child->val.s);
         // TODO Ugly conditions
         return ent != NULL && ent->type->class != CMM_FUNC && ent->type->class != CMM_TYPE && ent->type->class != CMM_ARRAY;
     }
@@ -435,7 +371,7 @@ static void exp_is_id_arg(Node exp)
 {
     Node id = exp->child;
 
-    const Symbol *query_result = query(id->val.s, get_symtab_top());
+    const Symbol *query_result = query(id->val.s);
 
     if (query_result == NULL) {
         SEMA_ERROR_MSG(id->lineno, "Undefined function \"%s\".", id->val.s);
@@ -463,13 +399,13 @@ static void exp_is_exp_field(Node exp)
     }
     else {
         Node field = struc->sibling;
-        Type *field_type = query_field(struc->sema.type, field->val.s);
-        if (field_type == NULL) {
+        const Symbol *field_symbol = query_without_fallback(field->val.s, struc->sema.type->field_table);
+        if (field_symbol == NULL) {
             SEMA_ERROR_MSG(field->lineno, "Undefined field \"%s\" in struct \"%s\".",
                     field->val.s, struc->sema.type->name);
         }
         else {
-            exp->sema.type = field_type;
+            exp->sema.type = field_symbol->type;
         }
     }
 }
@@ -478,7 +414,7 @@ static void exp_is_exp_field(Node exp)
 static void exp_is_id(Node exp)
 {
     Node id = exp->child;
-    const Symbol *query_result = query(id->val.s, get_symtab_top());
+    const Symbol *query_result = query(id->val.s);
 
     if (query_result == NULL) {
         SEMA_ERROR_MSG(id->lineno, "Undefined variable \"%s\"", id->val.s);
@@ -576,16 +512,21 @@ static void stmt_is_compst(Node stmt)
     Node compst = stmt->child;
     compst->sema.type = stmt->sema.type;
     sema_visit(compst);
+
 }
 
 
 static void compst_is_def_stmt(Node compst)
 {
+    new_symtab();
+
     Node stmt = compst->child;
     while (stmt != NULL) {
         sema_visit(stmt);
         stmt = stmt->sibling;
     }
+
+    compst->sema.symtab = pop_symtab();
 }
 
 

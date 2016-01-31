@@ -31,7 +31,8 @@ typedef struct _Symbol {
 } Symbol;
 
 int insert(const char *sym, Type *type, int line, Symbol **table);
-const Symbol *query(const char *sym, Symbol **table);
+const Symbol *query_without_fallback(const char *sym, Symbol **table);
+const Symbol *query(const char *sym);
 
 void init_symtab();
 void new_symtab();

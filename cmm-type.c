@@ -145,25 +145,6 @@ bool typecmp(const Type *x, const Type *y)
     return 1;
 }
 
-// Find out whether a field belongs to a given structure
-// return the type of that field, NULL if not found
-Type *query_field(Type *target, const char *field_name)
-{
-    assert(target->class == CMM_STRUCT);
-    assert(field_name != NULL);
-
-    // Traverse the field list
-    for (const Type *itr = target->field;
-         itr != NULL; itr = itr->link) {
-        if (!strcmp(itr->name, field_name)) {
-            return itr->base;
-        }
-    }
-
-    // Not found
-    return NULL;
-}
-
 void _print_type(const Type *type, char *end)
 {
     const Type *base, *link;

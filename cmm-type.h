@@ -37,7 +37,6 @@ extern Type *BASIC_FLOAT;
 
 Type *new_type(CmmType class, const char *name, Type *type, Type *link);
 bool typecmp(const Type *x, const Type *y);
-Type *query_field(Type *target, const char *name);
 void print_type(const Type *type);
 
 #endif // CMM_TYPE_H
