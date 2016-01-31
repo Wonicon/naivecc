@@ -8,10 +8,8 @@ I want to keep polishing my code and present my work here.
 
 Some significant limitations are shown below:
 
-1. No scope, all names should be distinguished;
 1. No declaration, all functions should be defined before called;
 1. No global variables (parsed but cannot generate code);
-1. No struct (parsed but cannot generate code);
 1. No preprocessor;
 1. Basic type only consists of int (float is parsed but cannot generate code);
 1. All local variables should be defined at the beginning of a function.
@@ -23,6 +21,7 @@ The top level of a program should look like this:
 
 /**
  * multi-line comment
+ * can be /* nested */
  * ignore everything after //
  * like // */
  * like // /*
