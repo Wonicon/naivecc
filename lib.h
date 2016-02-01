@@ -111,7 +111,6 @@ typedef enum {
     OPE_FLOAT,
     OPE_LABEL,
     OPE_FUNC,
-    OPE_REF_INFO,
     NR_OPE_TYPE
 } Ope_Type;
 

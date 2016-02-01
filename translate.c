@@ -124,47 +124,33 @@ static void try_deref(Node exp)
 static int translate_exp_is_id(Node exp)
 {
     Node id = exp->child;
-
     const Symbol *sym = query(id->val.s);
-
     if (sym == NULL) {
         return FAIL_TO_GEN;
     }
 
-    // 上层希望存储到一个地址变量, 说明现在在寻址模式
-    if (exp->dst && exp->dst->type == OPE_REF_INFO) {
-        exp->dst->base_type = sym->address->base_type;  // 初始综合属性
-        exp->dst->offset = new_operand(OPE_INTEGER);    // 偏移量将来可能变成临时变量
-        exp->dst->offset->integer = 0;                  // 当前偏移量为常数 0
-        switch (sym->address->type) {
-            case OPE_ADDR:
-                exp->dst->ref = sym->address;
-                return NO_NEED_TO_GEN;
-            case OPE_REF:
-                assert(exp->dst->ref == NULL);
-                exp->dst->ref = new_operand(OPE_ADDR);
-                return new_instr(IR_ADDR, sym->address, NULL, exp->dst->ref);
-            default:
-                PANIC("Unexpected sym->address->type");
-        }
-    }
-    else if (sym->address->type == OPE_REF) {
-        if (exp->dst && exp->dst->type == OPE_TEMP) {
-            free(exp->dst);
-        }
-        exp->dst = new_operand(OPE_ADDR);
-        exp->dst->base_type = sym->type;
-        return new_instr(IR_ADDR, sym->address, NULL, exp->dst);
-    }
-
-    // 替换不必要的目标地址
-    // 如果赋值语句结点重复进入, 则被 free 掉的不是无用的 temp,
-    // 而可能是到处引用的变量!
-    if (exp->dst != NULL) {
+    // Directly return the id's value
+    assert(exp->dst == NULL || exp->dst->type == OPE_TEMP);
+    if (exp->dst && exp->dst->type == OPE_TEMP) {
         free(exp->dst);
     }
 
-    exp->dst = sym->address;
+    if (sym->type->class == CMM_STRUCT) {
+        exp->dst = new_operand(OPE_ADDR);
+        exp->base = exp->dst;
+        exp->dst->base_type = sym->type;
+        new_instr(IR_ADDR, sym->address, NULL, exp->dst);
+    }
+    else if (sym->type->class == CMM_ARRAY) {
+        exp->dst = new_operand(OPE_INTEGER);
+        exp->dst->integer = 0;
+        exp->base = new_operand(OPE_ADDR);
+        new_instr(IR_ADDR, sym->address, NULL, exp->base);
+    }
+    else {
+        exp->dst = sym->address;
+    }
+
     return NO_NEED_TO_GEN;
 }
 
@@ -295,12 +281,11 @@ static int translate_exp_is_exp_idx(Node exp)
     }
 
     Node base = exp->child;
-    Node idx = base->sibling;
-
-    base->dst = new_operand(OPE_REF_INFO);  // REF_INFO 存储基址操作数和总偏移, 为此栈独有
-    idx->dst = new_operand(OPE_TEMP);
-
+    base->dst = new_operand(OPE_TEMP);
     translate_dispatcher(base);
+
+    Node idx = base->sibling;
+    idx->dst = new_operand(OPE_TEMP);
     translate_dispatcher(idx);
     try_deref(idx);  // 如果是数组做下标的话, 则不能忽视解引用
 
@@ -309,11 +294,9 @@ static int translate_exp_is_exp_idx(Node exp)
     // 新的偏移量, 如果综合来的偏移量和下标有一个为非常量, 则要生成指令并转移操作数
 
     Operand offset = idx->dst;
-    Operand ref_info = base->dst;
-    assert(ref_info->type == OPE_REF_INFO);
 
     // 计算本层偏移
-    int size = ref_info->base_type->base->type_size;
+    int size = exp->sema.type->type_size;
     if (offset->type == OPE_INTEGER) {
         offset->integer = offset->integer * size;
     }
@@ -325,69 +308,65 @@ static int translate_exp_is_exp_idx(Node exp)
         offset = p;  // 转移本层偏移量
     }
 
-    // 计算总偏移
-    if (ref_info->offset->type == OPE_INTEGER && offset->type == OPE_INTEGER) {
-        LOG("Line %d: 地址偏移为常数, 直接计算, %d + %d = %d",
-            exp->lineno,
-            ref_info->offset->integer,
-            offset->integer,
-            ref_info->offset->integer + offset->integer
-        );
-        ref_info->offset->integer = offset->integer + ref_info->offset->integer;
-        free(offset);
+    // 如果 base->base 为空, 那么就是在非 id 处获得了数组的地址值,
+    // 那么 base->dst 才是需要的值.
+    if (base->base == NULL) {
+        base->base = base->dst;
+        base->dst = new_operand(OPE_INTEGER);
+        base->dst->integer = 0;
     }
-    else if (ref_info->offset->type == OPE_INTEGER && ref_info->offset->integer == 0) {
+
+    Operand addr = base->dst;
+
+    // 计算总偏移
+    if (addr->type == OPE_INTEGER && offset->type == OPE_INTEGER) {
+        LOG("Line %d: 地址偏移为常数, 直接计算", exp->lineno);
+        addr->integer += offset->integer;
+    }
+    else if (addr->type == OPE_INTEGER && addr->integer == 0) {
         LOG("Line %d: 旧偏移量为常数0, 直接更新", exp->lineno);
-        free(ref_info->offset);
-        ref_info->offset = offset;
+        addr->integer = offset->integer;
     }
     else if (offset->type == OPE_INTEGER && offset->integer == 0) {
-        LOG("Line %d: 新增偏移量为常数0, 释放掉", exp->lineno);
-        free(offset);
+        LOG("Line %d: 新增偏移量为常数0, 不更新", exp->lineno);
     }
     else {
         Operand p = new_operand(OPE_ADDR);
-        new_instr(IR_ADD, offset, ref_info->offset, p);
-        ref_info->offset = p;  // 再转移本层偏移量
+        new_instr(IR_ADD, addr, offset, p);
+        addr = p;  // 再转移本层偏移量
+    }
+
+    free(offset);
+
+    if (exp->dst && exp->dst->type == OPE_TEMP) {
+        free(exp->dst);
+    }
+    else {
+        WARN("没有来自上层exp(行号: %d)的目标操作数, 这不符合常理", exp->lineno);
     }
 
     // 现在我们就有了完整的偏移量
-    if (exp->dst->type == OPE_REF_INFO) {
+    if (exp->sema.type->class == CMM_ARRAY) {
         // 说明在下标翻译过程中
-        LOG("下标递归翻译中");
-        *exp->dst = *ref_info;
-        exp->dst->base_type = exp->dst->base_type->base;
-        return MULTI_INSTR;
-    }
-
-    // 进入这里说明是最后一个阶段, 要将地址进行解引用
-    // 虽然任何指令都可以内嵌解引用, 但是这样会产生复杂的依赖和同步问题,
-    // 所以比较好的策略是先生成一个解引用赋值指令, 进行完所有的优化后, 找到这些解引用赋值,
-    // 然后将属性替换, 删除该指令.
-    if (exp->dst->type != OPE_TEMP) {
-        LOG("(warn)没有来自上层exp(行号: %d)的目标操作数, 这不符合常理", exp->lineno);
+        exp->dst = addr;
+        exp->base = base->base;
     }
     else {
-        free(exp->dst);
-        exp->dst = NULL;
+        // 进入这里说明是最后一个阶段, 要将地址进行解引用
+        if (addr->type == OPE_INTEGER && addr->integer == 0) {
+            LOG("Line %d: 计算出引用偏移量为 0, 不生成加法指令", exp->lineno);
+            exp->dst = new_operand(OPE_ADDR);  // 区分变量数组和参数数组
+            exp->dst->base_type = exp->sema.type;   // 多维数组
+            new_instr(IR_ASSIGN, (base->base ?: base->dst), NULL, exp->dst);
+        }
+        else {
+            // 要生成加法指令
+            exp->dst = new_operand(OPE_ADDR);
+            exp->dst->base_type = exp->sema.type;  // 多维数组
+            new_instr(IR_ADD, (base->base ?: base->dst), addr, exp->dst);
+        }
     }
 
-    if (ref_info->offset->type == OPE_INTEGER && ref_info->offset->integer == 0) {
-        LOG("line %d: 计算出引用偏移量为 0, 不生成加法指令", exp->lineno);
-        exp->dst = new_operand(ref_info->ref->type);  // 区分变量数组和参数数组
-        exp->dst->base_type = ref_info->base_type->base;  // 多维数组
-        new_instr(IR_ASSIGN, ref_info->ref, NULL, exp->dst);  // 这个赋值是冗余的, 但是方便传递递归的类型信息,
-                                                              // 否则容易改动到全局变量的address的类型信息.
-                                                              // 这个在DAG中很容易消除.
-    }
-    else {
-        // 要生成加法指令
-        exp->dst = new_operand(OPE_ADDR);
-        exp->dst->base_type = ref_info->base_type->base;  // 多维数组
-        new_instr(IR_ADD, ref_info->ref, ref_info->offset, exp->dst);
-    }
-
-    free(ref_info);
     return 0;
 }
 

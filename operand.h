@@ -34,12 +34,8 @@ struct Operand_ {
     bool has_subroutine;
     bool is_param;
 
-    // OPE_REF, OPE_REF_INFO
+    // OPE_REF
     Type *base_type;   // 综合属性: 引用型操作数对应的类型, 关系到偏移量的计算
-
-    // OPE_REF_INFO
-    Operand ref;       // 综合属性: 下标递归表达式使用, 结构体应该也能用
-    Operand offset;    // 综合属性: 引用型操作数的偏移量
 
     // OPE_LABEL
     int label_ref_cnt; // Label 作为跳转目标的引用次数, 在删除 GOTO 或者翻转 BRANCH 后, 如果引用计数归零, 可以删除

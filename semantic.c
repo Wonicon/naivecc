@@ -350,6 +350,7 @@ static void exp_is_exp_idx(Node exp)
             SEMA_ERROR_MSG(lexp->lineno, "expression is not an array.");
         }
         else {
+            assert(lexp->sema.type->base != NULL);
             exp->sema.type = lexp->sema.type->base;
         }
     }

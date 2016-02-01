@@ -1,7 +1,7 @@
 CC = gcc
 FLEX = flex
 BISON = bison
-CFLAGS = -std=c99 -Wall -Werror -MD -ggdb #-D DEBUG
+CFLAGS = -std=c99 -Wall -Werror -MD -ggdb -D DEBUG
 
 GDBFLAGS = -ex "set args test.cmm test.S"\
 		   -ex "set print pretty on"
