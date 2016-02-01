@@ -496,7 +496,7 @@ static void stmt_is_if_else(Node stmt)
 {
     Node cond = stmt->child;
     Node true_branch = cond->sibling;
-    Node false_branch = cond->sibling;
+    Node false_branch = true_branch->sibling;
     
     sema_visit(cond);
     if (!typecmp(cond->sema.type, BASIC_INT)) {
