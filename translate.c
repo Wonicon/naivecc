@@ -130,7 +130,6 @@ static int translate_exp_is_id(Node exp)
     }
 
     // Directly return the id's value
-    assert(exp->dst == NULL || exp->dst->type == OPE_TEMP);
     if (exp->dst && exp->dst->type == OPE_TEMP) {
         free(exp->dst);
     }
