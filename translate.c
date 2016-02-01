@@ -310,6 +310,7 @@ static int translate_exp_is_exp_idx(Node exp)
     // 如果 base->base 为空, 那么就是在非 id 处获得了数组的地址值,
     // 那么 base->dst 才是需要的值.
     if (base->base == NULL) {
+        WARN("Line %d: 没有从 id 获得数组地址", exp->lineno);
         base->base = base->dst;
         base->dst = new_operand(OPE_INTEGER);
         base->dst->integer = 0;
@@ -324,7 +325,7 @@ static int translate_exp_is_exp_idx(Node exp)
     }
     else if (addr->type == OPE_INTEGER && addr->integer == 0) {
         LOG("Line %d: 旧偏移量为常数0, 直接更新", exp->lineno);
-        addr->integer = offset->integer;
+        addr = offset;
     }
     else if (offset->type == OPE_INTEGER && offset->integer == 0) {
         LOG("Line %d: 新增偏移量为常数0, 不更新", exp->lineno);
@@ -334,8 +335,6 @@ static int translate_exp_is_exp_idx(Node exp)
         new_instr(IR_ADD, addr, offset, p);
         addr = p;  // 再转移本层偏移量
     }
-
-    free(offset);
 
     if (exp->dst && exp->dst->type == OPE_TEMP) {
         free(exp->dst);
