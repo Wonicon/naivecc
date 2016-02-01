@@ -13,6 +13,8 @@
 *.s
 *.S
 *.py
+*.d
+test.cmm
 tags
 parser
 play
