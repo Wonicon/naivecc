@@ -48,5 +48,5 @@ gdb: $(COMPILER)
 clean:
 	rm -f $(COMPILER) syntax.output
 	rm -f $(OBJS) $(OBJS:.o=.d)
-	rm -f $(LFC) $(YFC) $(YFC:.c=.h)
+	rm -f $(LFC) $(YFC) $(YFC:.c=.h) $(LFO) $(YFO)
 	rm -f *~
