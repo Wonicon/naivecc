@@ -12,7 +12,8 @@ Some significant limitations are shown below:
 1. No global variables (parsed but cannot generate code);
 1. No preprocessor;
 1. Basic type only consists of int (float is parsed but cannot generate code);
-1. All local variables should be defined at the beginning of a function.
+1. All local variables should be defined at the beginning of a function;
+1. Struct is passed by reference, and returning a struct is dangerous.
 
 The top level of a program should look like this:
 
@@ -39,6 +40,11 @@ int echo(int e)
     return read();
 }
 
+struct A {
+    int a;
+    int b;
+};
+
 int main()
 {
     /* Local definitions, like follows */
@@ -46,6 +52,7 @@ int main()
     int foo;
     int bar = 3;
     int vec[2];
+    struct A a;
 
     /* Statements, like follows */
 
@@ -63,12 +70,20 @@ int main()
         /* Statements */
     }
 
-    foo = bar;
-    foo + 1;    // +, -, *, /
-    foo < bar;  // <, <=, >, >=, ==, !=
-    !foo;       // -, !
+    // the three parts of for-loop cannot be omitted currently
+    for (foo = 0; foo < 10; foo = foo + 1) {
+        write(foo);
+    }
+
+    /* Expressions */
+
+    foo = bar;  // Assignment
+    foo + 1;    // Binary operation: +, -, *, /
+    foo < bar;  // Comparing operation: <, <=, >, >=, ==, !=
+    !foo;       // Unary operation: -, !
+    a.a         // field access
     (foo);
-    echo(vec[0]);
+    foo = echo(vec[0]);  // Function call, array access
 
     return 0;
 }
