@@ -126,10 +126,6 @@ typedef enum {
 #define MAX_LINE 4096
 #define NAME_LEN 120
 
-#define FAIL_TO_GEN -1
-#define NO_NEED_TO_GEN -2
-#define MULTI_INSTR MAX_LINE
-
 char *cmm_strdup(const char *src);
 
 

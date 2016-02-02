@@ -18,19 +18,18 @@ TranslateState translate_state = FINE;
 // Used when translation meets an unexpected syntax tree (root).
 // Such syntax cannot be translated, so we change the global state
 // and intterrupt the code generation after translation.
-static int trans_default(Node node)
+static void trans_default(Node node)
 {
     translate_state = UNSUPPORT;
-    return FAIL_TO_GEN;
 }
 
 
-typedef int (*trans_visitor)(Node);
+typedef void (*trans_visitor)(Node);
 
 static trans_visitor trans_visitors[];
 
 #define translate_dispatcher(node) \
-    ((node) ? (trans_visitors[(node)->tag] ? trans_visitors[node->tag](node) : trans_default(node)) : NO_NEED_TO_GEN)
+    ((node) ? (trans_visitors[(node)->tag] ? trans_visitors[node->tag](node) : trans_default(node)) : (void)0)
 
 
 /////////////////////////////////////////////////////////////////////
@@ -62,14 +61,13 @@ void translate()
 /////////////////////////////////////////////////////////////////////
 
 
-static int translate_ast(Node ast)
+static void translate_ast(Node ast)
 {
     Node extdef = ast->child;
     while (extdef != NULL) {
         translate_dispatcher(extdef);
         extdef = extdef->sibling;
     }
-    return MULTI_INSTR;
 }
 
 
@@ -121,12 +119,12 @@ static void try_deref(Node exp)
 // 数组的地址是通过在声明语句中翻译 DEC 获得的, 对应的 Operand 为符号的 address 域所引用
 // 函数名和域名是在产生式中直接获取的, 不需要在这里翻译代码, 否则属于非法情况.
 //
-static int translate_exp_is_id(Node exp)
+static void translate_exp_is_id(Node exp)
 {
     Node id = exp->child;
     const Symbol *sym = query(id->val.s);
     if (sym == NULL) {
-        return FAIL_TO_GEN;
+        return;
     }
 
     // Directly return the id's value
@@ -149,15 +147,13 @@ static int translate_exp_is_id(Node exp)
     else {
         exp->dst = sym->address;
     }
-
-    return NO_NEED_TO_GEN;
 }
 
 
 //
 // 翻译表达式: 字面常量
 //
-static int translate_exp_is_const(Node nd)
+static void translate_exp_is_const(Node nd)
 {
     assert(nd->tag == EXP_is_INT || nd->tag == EXP_is_FLOAT);
 
@@ -172,7 +168,7 @@ static int translate_exp_is_const(Node nd)
             const_ope->real = nd->child->val.f;
             break;
         default:
-            return FAIL_TO_GEN;
+            return;
     }
 
     // 替换不必要的目标地址
@@ -183,7 +179,6 @@ static int translate_exp_is_const(Node nd)
         nd->dst = NULL;
     }
     nd->dst = const_ope;
-    return NO_NEED_TO_GEN;
 }
 
 
@@ -206,7 +201,7 @@ static int translate_exp_is_const(Node nd)
 // 必然会使用继承的操作数, 这时候可以修改该操作数的内容, 将其变换成左值变量. 不能使用直接修改指令的方法,
 // 因为像条件表达式这种, 很可能会在多处使用继承的目标操作数.
 //
-static int translate_exp_is_assign(Node assign_exp)
+static void translate_exp_is_assign(Node assign_exp)
 {
     assert(assign_exp && assign_exp->tag == EXP_is_ASSIGN);
 
@@ -236,22 +231,10 @@ static int translate_exp_is_assign(Node assign_exp)
         assign_exp->dst = lexp->dst;
     }
 
-    // TODO 更准确地判断赋值左右的等价性
-    // TODO 这里可能会发生访问违例
-#if 0
-    if (lexp->dst->type == rexp->dst->type && lexp->dst->index == rexp->dst->index) {
-        LOG("等价赋值");
-        free_ope(&lexp->dst);
-        free_ope(&rexp->dst);
-        return NO_NEED_TO_GEN;
-    }
-#endif
-
     // [优化] 当左值为变量而右值为运算指令时, 将右值的目标操作数转化为变量
     if (lexp->dst->type == OPE_VAR && rexp->dst->type == OPE_TEMP) {
         LOG("左值为变量(编号%d), 直接赋值", lexp->dst->index);
         replace_operand_global(lexp->dst, rexp->dst);
-        return NO_NEED_TO_GEN;
         // 这里实际上保证了不会出现如下的情景:
         //     t := *a
         //     v := t
@@ -261,11 +244,11 @@ static int translate_exp_is_assign(Node assign_exp)
         // 可以在未知的情况下被改变.
     }
     else if (lexp->dst->type == OPE_ADDR) {   // 左边是引用
-        return new_instr(IR_DEREF_L, lexp->dst, rexp->dst, NULL);
+        new_instr(IR_DEREF_L, lexp->dst, rexp->dst, NULL);
     }
     else {
         LOG("直接的赋值情况应该不会发生了");
-        return new_instr(IR_ASSIGN, rexp->dst, NULL, lexp->dst);
+        new_instr(IR_ASSIGN, rexp->dst, NULL, lexp->dst);
     }
 }
 
@@ -273,10 +256,10 @@ static int translate_exp_is_assign(Node assign_exp)
 //
 // 翻译下标表达式
 //
-static int translate_exp_is_exp_idx(Node exp)
+static void translate_exp_is_exp_idx(Node exp)
 {
     if (exp->dst == NULL) {
-        return NO_NEED_TO_GEN;
+        return;
     }
 
     Node base = exp->child;
@@ -364,60 +347,51 @@ static int translate_exp_is_exp_idx(Node exp)
             new_instr(IR_ADD, (base->base ?: base->dst), addr, exp->dst);
         }
     }
-
-    return 0;
 }
 
 
 //
 // 翻译括号表达式
 //
-static int translate_exp_is_exp(Node exp)
+static void translate_exp_is_exp(Node exp)
 {
     // 需要继承!
     exp->child->dst = exp->dst;
     translate_dispatcher(exp->child);
     // 还需要综合!
     exp->dst = exp->child->dst;
-    return MULTI_INSTR;
 }
 
 
 //
 // 翻译一元运算: 只有取负
 //
-static int translate_unary_operation(Node exp)
+static void translate_unary_operation(Node exp)
 {
     Node rexp = exp->child;
     rexp->dst = new_operand(OPE_TEMP);
 
     // 常量计算
-    if (translate_dispatcher(rexp) < 0) {
-        Operand const_ope = new_operand(OPE_NOT_USED);
-        if (rexp->dst->type == OPE_INTEGER) {
-            const_ope->type = OPE_INTEGER;
-            const_ope->integer = -rexp->dst->integer;
-            free_ope(&exp->dst);
-            exp->dst = const_ope;
-            return NO_NEED_TO_GEN;
-        }
-        else if (rexp->dst->type == OPE_FLOAT) {
-            const_ope->type = OPE_FLOAT;
-            const_ope->real = -rexp->dst->real;
-            free_ope(&exp->dst);
-            exp->dst = const_ope;
-            return NO_NEED_TO_GEN;
-        }
-        else {
-            // 变量情况
-            free(const_ope);
-        }
+    Operand const_ope = new_operand(OPE_NOT_USED);
+    if (rexp->dst->type == OPE_INTEGER) {
+        const_ope->type = OPE_INTEGER;
+        const_ope->integer = -rexp->dst->integer;
+        free_ope(&exp->dst);
+        exp->dst = const_ope;
     }
-
-    // 无脑上 0
-    Operand p = new_operand(OPE_INTEGER);
-    p->integer = 0;
-    return new_instr(IR_SUB, p, rexp->dst, exp->dst);
+    else if (rexp->dst->type == OPE_FLOAT) {
+        const_ope->type = OPE_FLOAT;
+        const_ope->real = -rexp->dst->real;
+        free_ope(&exp->dst);
+        exp->dst = const_ope;
+    }
+    else {
+        // 变量情况
+        free(const_ope);
+        Operand p = new_operand(OPE_INTEGER);
+        p->integer = 0;
+        new_instr(IR_SUB, p, rexp->dst, exp->dst);
+    }
 }
 
 #define CALC(op, rs, rt, rd, type) do {\
@@ -429,14 +403,14 @@ static int translate_unary_operation(Node exp)
     }\
     free_ope(&exp->dst);\
     exp->dst = rd;\
-    return NO_NEED_TO_GEN;\
+    return;\
 } while (0)
 
-static int translate_binary_operation(Node exp)
+static void translate_binary_operation(Node exp)
 {
     // 没有目标地址, 不需要翻译
     if (exp->dst == NULL) {
-        return NO_NEED_TO_GEN;
+        return;
     }
 
     Node lexp = exp->child;
@@ -471,10 +445,10 @@ static int translate_binary_operation(Node exp)
     }
 
     switch (exp->val.operator[0]) {
-        case '+': return new_instr(IR_ADD, lope, rope, exp->dst);
-        case '-': return new_instr(IR_SUB, lope, rope, exp->dst);
-        case '*': return new_instr(IR_MUL, lope, rope, exp->dst);
-        case '/': return new_instr(IR_DIV, lope, rope, exp->dst);
+        case '+': new_instr(IR_ADD, lope, rope, exp->dst); break;
+        case '-': new_instr(IR_SUB, lope, rope, exp->dst); break;
+        case '*': new_instr(IR_MUL, lope, rope, exp->dst); break;
+        case '/': new_instr(IR_DIV, lope, rope, exp->dst); break;
         default: assert(0);
     }
 }
@@ -484,7 +458,7 @@ static int translate_binary_operation(Node exp)
 // Translate exp -> exp.field
 // This translation will set exp->dst to an addr operand
 // Remember to dereference it
-static int translate_exp_is_exp_field(Node exp)
+static void translate_exp_is_exp_field(Node exp)
 {
     Node struc = exp->child;
     Node field = struc->sibling;
@@ -496,7 +470,6 @@ static int translate_exp_is_exp_field(Node exp)
     const Symbol *sym = query_without_fallback(field->val.s, struc->sema.type->field_table);
     if (sym == NULL) {
         PANIC("Unexpected non-exisiting field %s at line %d\n", field->val.s, field->lineno);
-        return FAIL_TO_GEN;
     }
     else {
         Operand offset = new_operand(OPE_INTEGER);
@@ -505,7 +478,7 @@ static int translate_exp_is_exp_field(Node exp)
             free(exp->dst);
         }
         exp->dst = new_operand(OPE_ADDR);
-        return new_instr(IR_ADD, struc->dst, offset, exp->dst);
+        new_instr(IR_ADD, struc->dst, offset, exp->dst);
     }
 }
 
@@ -537,7 +510,7 @@ static void pass_arg(Node arg)
 }
 
 
-static int translate_call(Node call)
+static void translate_call(Node call)
 {
     Node func = call->child;
     Node arg = func->sibling;
@@ -547,31 +520,29 @@ static int translate_call(Node call)
     }
 
     if (!strcmp(func->val.s, "read")) {
-        return new_instr(IR_READ, NULL, NULL, call->dst);
+        new_instr(IR_READ, NULL, NULL, call->dst);
     }
     else if (!strcmp(func->val.s, "write")) {
         arg->dst = new_operand(OPE_TEMP);
         translate_dispatcher(arg);
         try_deref(arg);  // 这里的思路和return是类似的
-        return new_instr(IR_WRITE, arg->dst, NULL, NULL);
+        new_instr(IR_WRITE, arg->dst, NULL, NULL);
     }
-
-    pass_arg(arg);
-
-    if (call->dst == NULL) {
-        call->dst = new_operand(OPE_TEMP);
+    else {  // Common function call
+        pass_arg(arg);
+        if (call->dst == NULL) {
+            call->dst = new_operand(OPE_TEMP);
+        }
+        Operand f = new_operand(OPE_FUNC);
+        f->name = func->val.s;
+        new_instr(IR_CALL, f, NULL, call->dst);
     }
-
-    Operand f = new_operand(OPE_FUNC);
-    f->name = func->val.s;
-    new_instr(IR_CALL, f, NULL, call->dst);
-    return MULTI_INSTR;
 }
 
 
 // The expression is translated as normal,
 // but its value needs to be used to change the control flow.
-static int translate_cond_exp(Node exp)
+static void translate_cond_exp(Node exp)
 {
     exp->dst = new_operand(OPE_TEMP);
     translate_dispatcher(exp);
@@ -579,23 +550,22 @@ static int translate_cond_exp(Node exp)
     const_zero->integer = 0;
     new_instr(IR_BNE, exp->dst, const_zero, exp->label_true);
     new_instr(IR_JMP, exp->label_false, NULL, NULL);
-    return MULTI_INSTR;
 }
 
 
 //
 // 在条件判断框架下翻译 NOT
 //
-static int translate_cond(Node);
+static void translate_cond(Node);
 // NOT changes the control flow directly,
 // which does not need to see expression as data.
 // Therefore we use translate_cond, not translate_dispatcher.
-static int translate_cond_not(Node exp)
+static void translate_cond_not(Node exp)
 {
     Node sub_exp = exp->child;
     sub_exp->label_true = exp->label_false;
     sub_exp->label_false = exp->label_true;
-    return translate_cond(sub_exp);
+    translate_cond(sub_exp);
 }
 
 
@@ -603,7 +573,7 @@ static int translate_cond_not(Node exp)
 // 在条件判断框架下翻译 RELOP
 // TODO 优化重点!
 //
-static int translate_cond_relop(Node exp)
+static void translate_cond_relop(Node exp)
 {
     Node left = exp->child;
     Node right = left->sibling;
@@ -624,15 +594,13 @@ static int translate_cond_relop(Node exp)
     new_instr(relop, left->dst, right->dst, exp->label_true);
 
     new_instr(IR_JMP, exp->label_false, NULL, NULL);
-
-    return MULTI_INSTR;
 }
 
 
 //
 // 翻译 与 表达式
 //
-static int translate_cond_and(Node exp)
+static void translate_cond_and(Node exp)
 {
     Node left = exp->child;
     Node right = left->sibling;
@@ -648,14 +616,14 @@ static int translate_cond_and(Node exp)
     new_instr(IR_LABEL, left->label_true, NULL, NULL);
 
     // 继续执行 right 的代码
-    return translate_cond(right);
+    translate_cond(right);
 }
 
 
 //
 // 翻译 或 表达式
 //
-static int translate_cond_or(Node exp)
+static void translate_cond_or(Node exp)
 {
     Node left = exp->child;
     Node right = left->sibling;
@@ -671,18 +639,27 @@ static int translate_cond_or(Node exp)
     new_instr(IR_LABEL, left->label_false, NULL, NULL);
 
     // 继续执行 right 的代码
-    return translate_cond(right);
+    translate_cond(right);
 }
 
 
-static int translate_cond(Node exp)
+static void translate_cond(Node exp)
 {
     switch (exp->tag) {
-        case EXP_is_AND:   return translate_cond_and(exp);
-        case EXP_is_OR:    return translate_cond_or(exp);
-        case EXP_is_RELOP: return translate_cond_relop(exp);
-        case EXP_is_NOT:   return translate_cond_not(exp);
-        default:           return translate_cond_exp(exp);
+        case EXP_is_AND:
+            translate_cond_and(exp);
+            break;
+        case EXP_is_OR:
+            translate_cond_or(exp);
+            break;
+        case EXP_is_RELOP:
+            translate_cond_relop(exp);
+            break;
+        case EXP_is_NOT:
+            translate_cond_not(exp);
+            break;
+        default:
+            translate_cond_exp(exp);
     }
 }
 
@@ -692,7 +669,7 @@ static int translate_cond(Node exp)
 // expressions, they do return a value. The value's changing
 // is like a control flow. Here we prepare such an operand to let
 // the logic expression change the flow of its value's changing.
-static int translate_cond_prepare(Node node)
+static void translate_cond_prepare(Node node)
 {
     node->label_true = new_operand(OPE_LABEL);
     node->label_false = new_operand(OPE_LABEL);
@@ -718,8 +695,6 @@ static int translate_cond_prepare(Node node)
     }
 
     new_instr(IR_LABEL, node->label_false, NULL, NULL);
-
-    return MULTI_INSTR;
 }
 
 
@@ -728,7 +703,7 @@ static int translate_cond_prepare(Node node)
 /////////////////////////////////////////////////////////////////////
 
 
-static int translate_for(Node stmt)
+static void translate_for(Node stmt)
 {
     Node init_exp = stmt->child;
     Node cond_exp = init_exp->sibling;
@@ -759,12 +734,10 @@ static int translate_for(Node stmt)
     new_instr(IR_JMP, begin, NULL, NULL);
 
     new_instr(IR_LABEL, cond_exp->label_false, NULL, NULL);
-
-    return MULTI_INSTR;
 }
 
 
-static int translate_while(Node stmt)
+static void translate_while(Node stmt)
 {
     Node cond = stmt->child;
     Node loop = cond->sibling;
@@ -784,12 +757,10 @@ static int translate_while(Node stmt)
     new_instr(IR_JMP, begin, NULL, NULL);
 
     new_instr(IR_LABEL, cond->label_false, NULL, NULL);
-
-    return MULTI_INSTR;
 }
 
 
-static int translate_if_else(Node exp)
+static void translate_if_else(Node exp)
 {
     Node cond = exp->child;
     Node true_stmt = cond->sibling;
@@ -812,12 +783,10 @@ static int translate_if_else(Node exp)
     translate_dispatcher(false_stmt);
 
     new_instr(IR_LABEL, next, NULL, NULL);
-
-    return MULTI_INSTR;
 }
 
 
-static int translate_if(Node exp)
+static void translate_if(Node exp)
 {
     Node cond = exp->child;
     Node stmt = cond->sibling;
@@ -827,41 +796,39 @@ static int translate_if(Node exp)
     new_instr(IR_LABEL, cond->label_true, NULL, NULL);
     translate_dispatcher(stmt);
     new_instr(IR_LABEL, cond->label_false, NULL, NULL);
-    return MULTI_INSTR;
 }
 
 
 //
 // 翻译返回语句
 //
-static int translate_return(Node exp)
+static void translate_return(Node exp)
 {
     Node sub_exp = exp->child;
     sub_exp->dst = new_operand(OPE_TEMP);
     translate_dispatcher(sub_exp);
     try_deref(sub_exp);
-    return new_instr(IR_RET, sub_exp->dst, NULL, NULL);
+    new_instr(IR_RET, sub_exp->dst, NULL, NULL);
 }
 
 
 //
 // 翻译复合语句: 纯粹的遍历框架
 //
-static int translate_compst(Node compst)
+static void translate_compst(Node compst)
 {
     Node child = compst->child;
     while (child != NULL) {
         translate_dispatcher(child);
         child = child->sibling;
     }
-    return MULTI_INSTR;
 }
 
 
 //
 // 翻译复合语句
 //
-static int translate_stmt_is_compst(Node stmt)
+static void translate_stmt_is_compst(Node stmt)
 {
     assert(stmt->sema.symtab != NULL);
     push_symtab(stmt->sema.symtab);
@@ -870,18 +837,15 @@ static int translate_stmt_is_compst(Node stmt)
 
     Symbol **symtab = pop_symtab();
     assert(symtab == stmt->sema.symtab);
-
-    return MULTI_INSTR;
 }
 
 
 //
 // 翻译表达式: 如果没有赋值之类的, 这条基本不需要生成指令了
 //
-static int translate_stmt_is_exp(Node stmt)
+static void translate_stmt_is_exp(Node stmt)
 {
     translate_dispatcher(stmt->child);
-    return MULTI_INSTR;
 }
 
 
@@ -890,13 +854,12 @@ static int translate_stmt_is_exp(Node stmt)
 /////////////////////////////////////////////////////////////////////
 
 
-static int translate_extdef_spec(Node extdef)
+static void translate_extdef_spec(Node extdef)
 {
-    return NO_NEED_TO_GEN;
 }
 
 
-static int translate_extdef_func(Node extdef)
+static void translate_extdef_func(Node extdef)
 {
     push_symtab(extdef->sema.symtab);
     Node spec = extdef->child;
@@ -907,14 +870,13 @@ static int translate_extdef_func(Node extdef)
     
     Symbol **symtab = pop_symtab();
     assert(symtab == extdef->sema.symtab);
-    return MULTI_INSTR;
 }
 
 
 //
 // 翻译函数: 主要是生成参数声明指令 PARAM
 //
-static int translate_func_head(Node func)
+static void translate_func_head(Node func)
 {
     Node funcname = func->child;
     Node param = funcname->sibling;
@@ -945,7 +907,6 @@ static int translate_func_head(Node func)
         new_instr(IR_PARAM, sym->address, NULL, NULL);
         param = param->sibling;
     }
-    return MULTI_INSTR;
 }
 
 
@@ -953,7 +914,7 @@ static int translate_func_head(Node func)
 // 翻译定义: 找 ID
 // dec 可以简单实现, 只要找数组定义就行了
 //
-static int translate_dec_is_vardec(Node dec)
+static void translate_dec_is_vardec(Node dec)
 {
     Node vardec = dec->child;
     Node iterator = vardec->child;
@@ -987,15 +948,11 @@ static int translate_dec_is_vardec(Node dec)
         if (sym->address->type == OPE_VAR && vardec->sibling->dst->type == OPE_TEMP) {
             LOG("初始化: 左值为变量(编号%d), 直接赋值", sym->address->index);
             replace_operand_global(sym->address, vardec->sibling->dst);
-            return NO_NEED_TO_GEN;
         }
         else {
             LOG("初始化: 直接的赋值");
-            return new_instr(IR_ASSIGN, vardec->sibling->dst, NULL, sym->address);
+            new_instr(IR_ASSIGN, vardec->sibling->dst, NULL, sym->address);
         }
-    }
-    else {
-        return NO_NEED_TO_GEN;
     }
 }
 
@@ -1003,7 +960,7 @@ static int translate_dec_is_vardec(Node dec)
 //
 // 翻译定义: 主要是用来遍历 declist 的
 //
-static int translate_def_is_spec_dec(Node def)
+static void translate_def_is_spec_dec(Node def)
 {
     Node spec = def->child;
     Node dec = spec->sibling;
@@ -1011,7 +968,6 @@ static int translate_def_is_spec_dec(Node def)
         translate_dispatcher(dec);
         dec = dec->sibling;
     }
-    return MULTI_INSTR;
 }
 
 
