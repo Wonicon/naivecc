@@ -462,6 +462,21 @@ static void stmt_is_return(Node stmt)
 }
 
 
+static void stmt_is_for(Node stmt)
+{
+    sema_visit(stmt->child);
+    if (stmt->child->tag != EXP_is_ASSIGN) {
+        SEMA_ERROR_MSG(stmt->child->lineno, "No initialization in for loop");
+    }
+    sema_visit(stmt->child->sibling);
+    if (!typecmp(stmt->child->sibling->sema.type, BASIC_INT)) {
+        SEMA_ERROR_MSG(stmt->child->sibling->lineno, "The expression type is not suitable for loop condition");
+    }
+    sema_visit(stmt->child->sibling->sibling);
+    sema_visit(stmt->child->sibling->sibling->sibling);
+}
+
+
 static void stmt_is_while(Node stmt)
 {
     Node cond = stmt->child;
@@ -652,6 +667,7 @@ static ast_visitor sema_visitors[] = {
     [STMT_is_EXP]                = stmt_is_exp,
     [STMT_is_IF]                 = stmt_is_if,
     [STMT_is_IF_ELSE]            = stmt_is_if_else,
+    [STMT_is_FOR]                = stmt_is_for,
     [STMT_is_WHILE]              = stmt_is_while,
     [STMT_is_RETURN]             = stmt_is_return,
     [EXP_is_INT]                 = exp_is_int,

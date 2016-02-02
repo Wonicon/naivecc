@@ -36,32 +36,33 @@ static int check_hex(char *yytext, int yyleng, int yylineno);
 digit [0-9]
 letter [a-zA-Z]
 %%
-<INITIAL>"=" return sym(ASSIGNOP);
-<INITIAL>"," return sym(COMMA);
-<INITIAL>";" return sym(SEMI);
-<INITIAL>"." return sym(DOT);
-<INITIAL>"(" return sym(LP);
-<INITIAL>")" return sym(RP);
-<INITIAL>"[" return sym(LB);
-<INITIAL>"]" return sym(RB);
-<INITIAL>"{" return sym(LC);
-<INITIAL>"}" return sym(RC);
-<INITIAL>"if" return sym(IF);
-<INITIAL>"else" return sym(ELSE);
-<INITIAL>"while" return sym(WHILE);
+<INITIAL>"="      return sym(ASSIGNOP);
+<INITIAL>","      return sym(COMMA);
+<INITIAL>";"      return sym(SEMI);
+<INITIAL>"."      return sym(DOT);
+<INITIAL>"("      return sym(LP);
+<INITIAL>")"      return sym(RP);
+<INITIAL>"["      return sym(LB);
+<INITIAL>"]"      return sym(RB);
+<INITIAL>"{"      return sym(LC);
+<INITIAL>"}"      return sym(RC);
+<INITIAL>"if"     return sym(IF);
+<INITIAL>"for"    return sym(FOR);
+<INITIAL>"else"   return sym(ELSE);
+<INITIAL>"while"  return sym(WHILE);
 <INITIAL>"struct" return sym(STRUCT);
 <INITIAL>"return" return sym(RETURN);
 
-<INITIAL>"+" return op(PLUS);
-<INITIAL>"-" return op(MINUS);
-<INITIAL>"*" return op(STAR);
-<INITIAL>"/" return op(DIV);
-<INITIAL>"!" return op(NOT);
-<INITIAL>"||" return op(OR);
-<INITIAL>"&&" return op(AND);
+<INITIAL>"+"             return op(PLUS);
+<INITIAL>"-"             return op(MINUS);
+<INITIAL>"*"             return op(STAR);
+<INITIAL>"/"             return op(DIV);
+<INITIAL>"!"             return op(NOT);
+<INITIAL>"||"            return op(OR);
+<INITIAL>"&&"            return op(AND);
 <INITIAL>>|<|>=|<=|==|!= return op(RELOP);
 
-<INITIAL>"int"|"float" return node(TYPE, TERM_ID);
+<INITIAL>"int"|"float"                     return node(TYPE, TERM_ID);
 <INITIAL>({letter}|_)({letter}|{digit}|_)* return node(ID, TERM_ID);
 
 <INITIAL>[0-9]+\.[0-9]+ {

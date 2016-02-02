@@ -24,6 +24,7 @@ enum ProductionTag {
     STMT_is_IF,
     STMT_is_IF_ELSE,
     STMT_is_WHILE,
+    STMT_is_FOR,
     DEF_is_SPEC_DEC,
     DEC_is_VARDEC,
     DEC_is_VARDEC_INITIALIZATION,

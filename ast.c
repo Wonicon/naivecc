@@ -30,6 +30,7 @@ static int body_size[] = {
     [STMT_is_RETURN] = 1,
     [STMT_is_IF] = 2,
     [STMT_is_IF_ELSE] = 3,
+    [STMT_is_FOR]   = 4,
     [STMT_is_WHILE] = 2,
     [DEF_is_SPEC_DEC] = 2,
     [DEC_is_VARDEC] = 1,

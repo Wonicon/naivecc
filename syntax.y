@@ -41,7 +41,7 @@ Node prog;
     LB RB
     LP RP
     LC RC
-    WHILE
+    FOR WHILE
     STRUCT
     RETURN
     ASSIGNOP
@@ -147,12 +147,13 @@ StmtList        : Stmt StmtList { $1->sibling = $2; $$ = $1; }
                 |               { $$ = NULL; }
                 ;
 
-Stmt            : Exp SEMI                         { $$ = create_tree(STMT_is_EXP, $1->lineno, $1); }
-                | CompSt                           { $$ = create_tree(STMT_is_COMPST, $1->lineno, $1); }
-                | RETURN Exp SEMI                  { $$ = create_tree(STMT_is_RETURN, $1, $2); }
-                | IF LP Exp RP Stmt %prec SUB_ELSE { $$ = create_tree(STMT_is_IF, $1, $3, $5); }
-                | IF LP Exp RP Stmt ELSE Stmt      { $$ = create_tree(STMT_is_IF_ELSE, $1, $3, $5, $7); }
-                | WHILE LP Exp RP Stmt             { $$ = create_tree(STMT_is_WHILE, $1, $3, $5); }
+Stmt            : Exp SEMI                             { $$ = create_tree(STMT_is_EXP, $1->lineno, $1); }
+                | CompSt                               { $$ = create_tree(STMT_is_COMPST, $1->lineno, $1); }
+                | RETURN Exp SEMI                      { $$ = create_tree(STMT_is_RETURN, $1, $2); }
+                | IF LP Exp RP Stmt %prec SUB_ELSE     { $$ = create_tree(STMT_is_IF, $1, $3, $5); }
+                | IF LP Exp RP Stmt ELSE Stmt          { $$ = create_tree(STMT_is_IF_ELSE, $1, $3, $5, $7); }
+                | WHILE LP Exp RP Stmt                 { $$ = create_tree(STMT_is_WHILE, $1, $3, $5); }
+                | FOR LP Exp SEMI Exp SEMI Exp RP Stmt { $$ = create_tree(STMT_is_FOR, $1, $3, $5, $7, $9); }
                 ;
 
 /* Local Definitions */

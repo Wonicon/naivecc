@@ -728,6 +728,42 @@ static int translate_cond_prepare(Node node)
 /////////////////////////////////////////////////////////////////////
 
 
+static int translate_for(Node stmt)
+{
+    Node init_exp = stmt->child;
+    Node cond_exp = init_exp->sibling;
+    Node step_exp = cond_exp->sibling;
+    Node loop_stmt = step_exp->sibling;
+
+    translate_dispatcher(init_exp);
+    
+    Operand begin = new_operand(OPE_LABEL);
+    cond_exp->label_true = new_operand(OPE_LABEL);
+    cond_exp->label_false = new_operand(OPE_LABEL);
+    loop_stmt->label_true = new_operand(OPE_LABEL);  // act as loop_stmt's next label
+    loop_stmt->label_false = cond_exp->label_false;
+    // TODO test the case that loop_stmt is immediately the if-statement or relop-exp
+
+    new_instr(IR_LABEL, begin, NULL, NULL);
+
+    translate_cond(cond_exp);  // We are not really need the value of cond_exp
+
+    new_instr(IR_LABEL, cond_exp->label_true, NULL, NULL);
+
+    translate_dispatcher(loop_stmt);
+
+    new_instr(IR_LABEL, loop_stmt->label_true, NULL, NULL);
+
+    translate_dispatcher(step_exp);
+
+    new_instr(IR_JMP, begin, NULL, NULL);
+
+    new_instr(IR_LABEL, cond_exp->label_false, NULL, NULL);
+
+    return MULTI_INSTR;
+}
+
+
 static int translate_while(Node stmt)
 {
     Node cond = stmt->child;
@@ -827,10 +863,14 @@ static int translate_compst(Node compst)
 //
 static int translate_stmt_is_compst(Node stmt)
 {
+    assert(stmt->sema.symtab != NULL);
     push_symtab(stmt->sema.symtab);
+
     translate_dispatcher(stmt->child);
+
     Symbol **symtab = pop_symtab();
     assert(symtab == stmt->sema.symtab);
+
     return MULTI_INSTR;
 }
 
@@ -990,6 +1030,7 @@ static trans_visitor trans_visitors[] =
     [STMT_is_RETURN]               = translate_return,
     [STMT_is_IF]                   = translate_if,
     [STMT_is_IF_ELSE]              = translate_if_else,
+    [STMT_is_FOR]                  = translate_for,
     [STMT_is_WHILE]                = translate_while,
     [EXP_is_EXP]                   = translate_exp_is_exp,
     [EXP_is_BINARY]                = translate_binary_operation,
