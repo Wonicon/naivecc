@@ -1,7 +1,6 @@
 #include "ir.h"
 #include "operand.h"
 #include "basic-block.h"
-#include "dag.h"
 #include "asm.h"
 #include "register.h"
 #include <stdlib.h>
@@ -47,11 +46,6 @@ struct {
 };
 
 #define LENGTH(x) (sizeof(x) / sizeof(*x))
-
-IR ir_from_dag[MAX_LINE];
-int nr_ir_from_dag = 0;
-extern DagNode dag_buf[];
-extern int dagnode_count;
 
 //
 // 中间代码构造函数
@@ -228,12 +222,6 @@ void print_instr(FILE *file)
     fclose(file);
 #endif
 
-
-    if (inline_deref && inline_addr) {
-        inline_replace(ir_from_dag, nr_ir_from_dag);
-        nr_ir_from_dag = compress_ir(ir_from_dag, nr_ir_from_dag);
-    }
-
     ////////////////////////////////////////////////////////
     //  Generate assembly code
     ////////////////////////////////////////////////////////
@@ -382,29 +370,42 @@ bool can_jump(IR *pIR)
 //
 // relop 字典使用接口
 //
-#define search_relop_common(name, field, type, miss_val) \
-    type name(IR_Type relop) {                           \
-        for (int i = 0; i < LENGTH(relop_dict); i++) {   \
-            if (relop_dict[i].relop == relop) {          \
-                return relop_dict[i].field;              \
-            }                                            \
-        }                                                \
-        return miss_val;                                 \
-    }
-
-search_relop_common(get_relop_symbol, str, const char *, NULL)
-
-search_relop_common(get_relop_anti, anti, IR_Type, IR_NOP)
-
-    IR_Type get_relop(const char *sym) {
-        for (int i = 0; i < LENGTH(relop_dict); i++) {
-            if (!strcmp(relop_dict[i].str, sym)) {
-                return relop_dict[i].relop;
-            }
+const char *get_relop_symbol(IR_Type relop)
+{
+    for (int i = 0; i < LENGTH(relop_dict); i++) {
+        if (relop_dict[i].relop == relop) {
+            return relop_dict[i].str;
         }
-        return IR_NOP;
     }
+    return NULL;
+}
 
+IR_Type get_relop_anti(IR_Type relop) {
+    for (int i = 0; i < LENGTH(relop_dict); i++) {
+        if (relop_dict[i].relop == relop) {
+            return relop_dict[i].anti;
+        }
+    }
+    return IR_NOP;
+}
+
+IR_Type get_relop(const char *sym) {
+    for (int i = 0; i < LENGTH(relop_dict); i++) {
+        if (!strcmp(relop_dict[i].str, sym)) {
+            return relop_dict[i].relop;
+        }
+    }
+    return IR_NOP;
+}
+
+//
+// 控制流分析工具
+// 翻译期的优化我只能进行简单的常数折叠
+// 更多优化还是要靠对指令的直接分析来决定, 毕竟还是不太敢在生成条件表达式时就对省略分支......
+// 关于控制流分析的主要知识现在来自 http://www.cs.utexas.edu/users/mckinley/380C
+//
+
+// 对 LABEL 进行引用计数管理
 void deref_label(IR *pIR)
 {
     assert(pIR->type == IR_LABEL);
@@ -421,17 +422,27 @@ void deref_label(IR *pIR)
 //
 int compress_ir(IR instr[], int n)
 {
-    int slow = 0;
-    for (int fast = 0; fast < n; fast++) {
-        if (instr[fast].type != IR_NOP) {
-            instr[slow++] = instr[fast];
+    int size = 0;
+    for (int index = 0; index < n; index++) {
+        if (instr[index].type != IR_NOP) {
+            instr[size++] = instr[index];
         }
     }
-    return slow;
+    return size;
 }
 
 //
-// 预处理 IR
+// 预处理
+//   预处理主要干以下工作:
+//   1. 将 Label 的编号替换为指令编号, 方便阅读
+//   2. 将下面的模式:
+//        IF cond GOTO L0
+//        GOTO L1
+//        LABEL L0
+//      替换成:
+//        IF !cond GOTO L1
+//      当然可能要确保 L0 的引用只有这一处, 否则还是要保留 LABEL L0 的
+//   3. 将 2 产生的 NOP 通过移动数组删除(那样子标签编号要最后做)
 //
 void preprocess_ir()
 {
@@ -505,28 +516,6 @@ void preprocess_ir()
 }
 
 //
-// 控制流分析工具
-// 翻译期的优化我只能进行简单的常数折叠, 以及利用中间指令特性减少不必要的中间变量
-// (机器指令生成时估计要遭报应, 就像我一开始偷懒只建立 concrete ast 一样)
-// 更多优化还是要靠对指令的直接分析来决定, 毕竟还是不太敢在生成条件表达式时就对省略分支......
-// 关于控制流分析的主要知识现在来自 http://www.cs.utexas.edu/users/mckinley/380C
-//
-
-//
-// 预处理
-//   预处理主要干以下工作:
-//   1. 将 Label 的编号替换为指令编号, 方便阅读 TODO 确保所有标号都是通过指针传递, 而不是成员赋值转换
-//   2. 稍有尝试的人都能看出来:
-//        IF cond GOTO L0
-//        GOTO L1
-//        LABEL L0
-//      可以替换成:
-//        IF !cond GOTO L1
-//      当然可能要确保 L0 的引用只有这一处, 否则还是要保留下 L0 的 TODO 计算所有标签的引用次数
-//   3. (可选)将 2 产生的 NOP 通过移动数组删除(那样子标签编号要最后做)
-//
-
-//
 // 分析基本块: 活跃性分析
 // end 不可取
 //
@@ -581,92 +570,6 @@ void optimize_liveness(int start, int end)
     }
 }
 
-static void gen_dag_from_instr(IR *pIR)
-{
-    LOG("转换: %s", ir_to_s(pIR));
-
-    Operand rs = pIR->rs;
-    Operand rt = pIR->rt;
-    Operand rd = pIR->rd;
-
-    if (rs && !rs->dep) {
-        LOG("rs: %s新建叶子", print_operand(rs));
-        rs->dep = new_leaf(rs);
-        add_depend(rs->dep, rs);
-    }
-    if (rt && !rt->dep) {
-        LOG("rt: %s新建叶子", print_operand(rt));
-        rt->dep = new_leaf(rt);
-        add_depend(rt->dep, rt);
-    }
-
-    // 虽然 rd 对应的操作数可能会与 rs / rt 相同
-    // 但是我们用于搜索的依据的是 rs / rt 的依赖结点, 如果操作数相同,
-    // 依赖结点最后会被更新, 就是另外一个搜索依据了.
-    if (rd && !can_jump(pIR)) {
-        if (rd->dep) {
-            LOG("取消rd: %s的引用", print_operand(rd));
-            rd->dep->ref_count--;
-            delete_depend(rd);
-        }
-        if (pIR->type == IR_ASSIGN && rs) {
-            LOG("赋值语句, 传递依赖");
-            if (is_always_live(rd) && is_tmp(rs) && rs->dep->op == IR_DEREF_R) {
-                rd->dep = new_dagnode(rs->dep->op, rs->dep->left, rs->dep->right);  // 右解引用不会被当做公共子表达式
-                TEST(0, "我就看看");
-            }
-            else {
-                rd->dep = rs->dep;
-            }
-        }
-        else {
-            if (pIR->type == IR_CALL || pIR->type == IR_READ) {
-                rd->dep = new_dagnode(pIR->type, rs ? rs->dep : NULL, rt ? rt->dep : NULL);
-            }
-            else {
-                rd->dep = query_dag_node(pIR->type, rs ? rs->dep : NULL, rt ? rt->dep : NULL);
-                if (is_always_live(rd) && query_operand_depending_on(rd->dep) && rd->dep->op == IR_DEREF_R) {
-                    WARN("夭寿, 依赖到了将被替换的变量(%s)的解引用", print_operand(rd->dep->embody));
-                    rd->dep = new_dagnode(rd->dep->op, rd->dep->left, rd->dep->right);
-                }
-            }
-        }
-        add_depend(rd->dep, rd);
-        pIR->depend = rd->dep;
-        if (is_always_live(rd) || pIR->type == IR_CALL || pIR->type == IR_READ) {
-            rd->dep->ref_count++;
-        }
-    }
-    else {
-        // 没有目标操作数的指令必须被生成
-        pIR->depend = new_dagnode(pIR->type, rs ? rs->dep : NULL, rt ? rt->dep : NULL);
-        if (can_jump(pIR)) {
-            LOG("加入%s", print_operand(pIR->rd));
-            add_depend(pIR->depend, pIR->rd);
-        }
-        pIR->depend->embody = pIR->rd;
-        pIR->depend->ref_count = 1;
-    }
-}
-
-void gen_dag(IR buf[], int start, int end)
-{
-    init_dag();
-    for (int i = start; i < end; i++) {
-        gen_dag_from_instr(&buf[i]);
-    }
-}
-
-int new_dag_ir(IR_Type type, Operand rs, Operand rt, Operand rd)
-{
-    new_instr_(&ir_from_dag[nr_ir_from_dag], type, rs, rt, rd);
-    return nr_ir_from_dag++;
-}
-
-//
-// 将 a := *b 和 a := &b 内联到指令中
-// 这会破坏操作数的依赖, 所以必须放到所有优化(包括多趟)之后
-//
 void log_ir(IR buf[], int start, int end)
 {
 #ifndef DEBUG
@@ -680,144 +583,6 @@ void log_ir(IR buf[], int start, int end)
 #endif
 }
 
-void inline_replace(IR buf[], int nr)
-{
-    for (int i = 0; i < nr; i++) {
-        IR *pir = &buf[i];
-        if (pir->rd && is_always_live(pir->rd)) {  // 变量不能被修改!
-            continue;
-        }
-        if (pir->type == IR_DEREF_R) {
-            LOG("发现右解引用 %s", ir_to_s(pir));
-            pir->type = IR_NOP;
-            if (pir->rs->type == OPE_ADDR) {
-                pir->rd->type = OPE_DEREF;
-            }
-            else if (pir->rs->type == OPE_REFADDR) {
-                pir->rd->type = OPE_REF;
-            }
-            else {
-                PANIC("右解引用的操作数不是地址");
-            }
-            pir->rd->index = pir->rs->index;
-            log_ir(buf, i, nr);
-        }
-        else if (pir->type == IR_ADDR) {
-            LOG("发现取地址 %s", ir_to_s(pir));
-            pir->type = IR_NOP;
-            pir->rd->type = OPE_REFADDR;
-            pir->rd->index = pir->rs->index;
-            log_ir(buf, i, nr);
-        }
-    }
-
-    // 消除 *&r
-    for (int i = 0; i < nr; i++) {
-        IR *pir = &buf[i];
-        if (pir->rs && pir->rs->type == OPE_REFADDR && pir->type == IR_DEREF_L) {
-            LOG("HIT DEREF_L");
-            log_ir(buf, i, i + 1);
-            TEST(pir->rd == NULL, "DEREF_L没有目标操作数");
-            pir->type = IR_ASSIGN;
-            pir->rd = new_operand(OPE_NOT_USED);  // 防止对引用变量产生副作用
-            pir->rd->type = OPE_REF;
-            pir->rd->index = pir->rs->index;
-            pir->rs = pir->rt;
-            pir->rt = NULL;
-        }
-        else if (pir->rs && pir->rs->type == OPE_REFADDR && pir->type == IR_DEREF_R) {
-            LOG("HIT DEREF_R");
-            log_ir(buf, i, i + 1);
-            TEST(pir->rt == NULL, "DEREF_L没有第二个操作数");
-            pir->type = IR_ASSIGN;
-            Operand ref = new_operand(OPE_NOT_USED);  // 防止对引用变量产生副作用
-            ref->type = OPE_REF;
-            ref->index = pir->rs->index;
-            pir->rs = ref;
-        }
-    }
-}
-
-Operand gen_single_instr_from_dag(pDagNode dag)
-{
-    if (dag == NULL) {
-        return NULL;
-    }
-
-    if (dag->type == DAG_LEAF) {
-        Operand old_init = dag->initial_value;
-        Operand current = query_operand_depending_on(dag);
-        if (old_init != current) {
-            LOG("原操作数%s已经不保有其初始值", print_operand(old_init));
-            if (current == NULL) {
-                WARN("预期外的空指针初始值操作数, 检查是否出现了自赋值");
-                current = old_init;
-            }
-            else {
-                LOG("用保存了初始值的%s代替", print_operand(current));
-            }
-
-            dag->initial_value = current;
-        }
-        return old_init;  // 叶结点用于返回初始值
-    }
-    else if (dag->type == DAG_OP && !dag->has_gen) {
-        dag->embody = query_operand_depending_on(dag);
-        if (dag->embody == NULL && (dag->op == IR_ADD || dag->op == IR_MUL || dag->op == IR_SUB || dag->op == IR_DIV)) {
-            WARN("FUCK");
-            dag->embody = new_operand(OPE_TEMP);
-            add_depend(dag, dag->embody);
-        }
-        new_dag_ir(dag->op, gen_single_instr_from_dag(dag->left), gen_single_instr_from_dag(dag->right), dag->embody);
-        dag->has_gen = 1;  // 防止重复生成
-        return dag->embody;  // 使用统一的代表操作数, 提供后续优化机会
-    }
-    else {
-        dag->embody = query_operand_depending_on(dag);
-        return dag->embody;
-    }
-}
-
-void gen_instr_from_dag(int start, int end)
-{
-    for (int i = start; i < end; i++) {
-        IR *p = &instr_buffer[i];
-        if (p->depend->ref_count > 0 || p->type == IR_CALL || p->type == IR_READ) {
-            pDagNode dag;
-            if (p->rd && (p->type != IR_CALL && p->type != IR_READ)) {
-                dag = query_dagnode_depended_on(p->rd);
-            }
-            else {
-                dag = p->depend;
-                if (!query_operand_depending_on(dag) && p->rd) {
-                    add_depend(p->depend, p->rd);
-                }
-            }
-            Operand dst = gen_single_instr_from_dag(dag);
-            if (p->rd && is_always_live(p->rd)  && p->rd != dst) {
-                new_dag_ir(IR_ASSIGN, dst, NULL, p->rd);
-                if (p->depend != query_dagnode_depended_on(p->rd)) {
-                    LOG("引用已经改变, 不生成: %s", ir_to_s(&ir_from_dag[nr_ir_from_dag - 1]));
-                    nr_ir_from_dag--;
-                }
-                else {
-                    LOG("弥补变量赋值 No.%d : %s", nr_ir_from_dag, ir_to_s(&ir_from_dag[nr_ir_from_dag - 1]));
-                }
-            }
-        }
-    }
-
-    // 清理操作数
-    for (int i = start; i < end; i++) {
-        IR *p = &instr_buffer[i];
-        for (int j = 0; j < 3; j++) {
-            if (p->operand[j]) {
-                p->operand[j]->dep = NULL;
-            }
-        }
-    }
-}
-
 //
 // 打印基本块
 //
@@ -828,10 +593,6 @@ void optimize_in_block()
         int beg = blk_buf[i].start;
         int end = blk_buf[i].end;
         optimize_liveness(beg, end);
-
-        // Temparally avoid dangerous in-block DAG optimization
-
-        // gen_dag(instr_buffer, beg, end);
-        // gen_instr_from_dag(beg, end);
     }
 }
+
