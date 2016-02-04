@@ -11,14 +11,6 @@
 extern FILE *asm_file;  // Stream to store assembly code.
 
 
-#ifdef INLINE_REPLACE
-bool inline_deref = true;
-bool inline_addr = true;
-#else
-bool inline_deref = false;
-bool inline_addr = false;
-#endif
-
 static Block blk_buf[MAX_LINE];
 static int nr_blk;
 
@@ -203,7 +195,6 @@ int in_func_check(IR buf[], int index, int n)
 //
 void preprocess_ir();
 void optimize_in_block();
-void inline_replace(IR buf[], int nr);
 int compress_ir(IR buf[], int n);
 
 void print_instr(FILE *file)
@@ -246,8 +237,6 @@ void print_instr(FILE *file)
 
         int j;
         for (j = blk->start; j < blk->end - 1; j++) {
-            LOG("ir %d", j + 1);
-
             IR *ir = instr_buffer + j;
 
             // Update destination's liveness information
@@ -357,13 +346,11 @@ bool can_jump(IR *pIR)
     if (is_branch(pIR)) {
         return true;
     }
+    else if (pIR->type == IR_JMP) {
+        return true;
+    }
     else {
-        switch (pIR->type) {
-            case IR_JMP:
-                return true;
-            default:
-                return false;
-        }
+        return false;
     }
 }
 
@@ -380,7 +367,8 @@ const char *get_relop_symbol(IR_Type relop)
     return NULL;
 }
 
-IR_Type get_relop_anti(IR_Type relop) {
+IR_Type get_relop_anti(IR_Type relop)
+{
     for (int i = 0; i < LENGTH(relop_dict); i++) {
         if (relop_dict[i].relop == relop) {
             return relop_dict[i].anti;
@@ -389,7 +377,8 @@ IR_Type get_relop_anti(IR_Type relop) {
     return IR_NOP;
 }
 
-IR_Type get_relop(const char *sym) {
+IR_Type get_relop(const char *sym)
+{
     for (int i = 0; i < LENGTH(relop_dict); i++) {
         if (!strcmp(relop_dict[i].str, sym)) {
             return relop_dict[i].relop;
@@ -504,15 +493,6 @@ void preprocess_ir()
 
     // 第一次压缩
     nr_instr = compress_ir(instr_buffer, nr_instr);
-
-    // 标签编号语义化
-    pIR = &instr_buffer[0];
-    for (int i = 0; i < nr_instr; i++) {
-        if (pIR->type == IR_LABEL) {
-            pIR->rs->index = i;
-        }
-        pIR++;
-    }
 }
 
 //
@@ -570,21 +550,8 @@ void optimize_liveness(int start, int end)
     }
 }
 
-void log_ir(IR buf[], int start, int end)
-{
-#ifndef DEBUG
-    return;
-#else
-    printf(WARN_COLOR);
-    for (int i = start; i < end; i++) {
-        print_single_instr(ir_from_dag[i], stdout);
-    }
-    printf(END);
-#endif
-}
-
 //
-// 打印基本块
+// 基本块
 //
 void optimize_in_block()
 {
