@@ -135,7 +135,7 @@ ParamDec        : Specifier VarDec { $$ = create_tree(VAR_is_SPEC_VARDEC, $1->li
                 ;
 
 VarList         : ParamDec COMMA VarList { $1->sibling = $3; $$ = $1; }
-                | ParamDec               { $$ = $1; }
+                | ParamDec
                 ;
 
 /* Statements */
@@ -165,7 +165,7 @@ DefList         : Def DefList { $1->sibling = $2; $$ = $1; }
 Def             : Specifier DecList SEMI { $$ = create_tree(DEF_is_SPEC_DEC, $1->lineno, $1, $2); }
                 ;
 
-DecList         : Dec               { $$ = $1; }
+DecList         : Dec
                 | Dec COMMA DecList { $1->sibling = $3; $$ = $1; }
                 ;
 
@@ -196,7 +196,7 @@ Exp             : Exp ASSIGNOP Exp { $$ = create_tree(EXP_is_ASSIGN, $2, $1, $3)
                 ;
 
 Args            : Exp COMMA Args  { $1->sibling = $3; $$ = $1; }
-                | Exp             { $$ = $1; }
+                | Exp
                 ;
 
 /* nonterminal end */
